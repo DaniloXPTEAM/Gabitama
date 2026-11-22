@@ -179,7 +179,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             assertFalse(defaultBlocked.reachable)
 
             val hs = client.handshakeAndListTools(url, allowLocalLan = true)
-            assertTrue(hs.reachable)
+            assertTrue(hs.error ?: "Handshake failed", hs.reachable)
             assertEquals("android-mock-mcp", hs.serverName)
             assertEquals(1, hs.tools.size)
 

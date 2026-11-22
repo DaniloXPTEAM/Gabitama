@@ -26,6 +26,10 @@ for root in roots:
             text=(failure.get('message','')+'\n'+(failure.text or ''))
             types=re.findall(r'(?:[a-zA-Z_$][\w$]*\.)*[\w$]*(?:Exception|Error)', text)
             if types: lines.append('Exception type: '+types[0])
+            for term, category in [('was already used', 'duplicate key'), ('CLEARTEXT', 'Android cleartext policy'), ('expected:<RESUMED>', 'lifecycle state mismatch'), ('not in the resumed state', 'activity not resumed')]:
+                if term.lower() in text.lower(): lines.append('Diagnostic: '+category)
+            testframes=re.findall(r'(?:at )?(com\.novoagentehb\.app\.[^\n() ]+\([^\n)]*\))',text)
+            lines.extend('frame '+x for x in testframes[:8] if x not in lines)
             if 'java.lang.IllegalArgumentException' in text:
                 # Emit only a fixed set of diagnostic phrases; never copy arbitrary values.
                 for phrase in ('No activities found', 'already exists', 'No value passed', 'must not be null', 'Failed requirement', 'Cannot round NaN', 'Only finite values', 'Navigation destination', 'Cannot navigate'):
