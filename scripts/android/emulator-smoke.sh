@@ -22,7 +22,10 @@ if 'com.novoagentehb.app.debug' in text:
     lines = []
     for line in text.splitlines():
         match = re.search(r'(?:Caused by: )?([\w.$]+(?:Exception|Error))(?::|\s|$)', line)
-        frame = re.search(r'\bat ([\w.$]+\([\w.$]+(?::\d+)?\))', line)
+        frame = re.search(r'\bat ([\w.$]+\((?:[\w.$]+(?::\d+)?|Unknown Source|Native Method)\))', line)
+        if 'NullPointerException' in line:
+            for symbol in re.findall(r'com\.novoagentehb\.app\.app\.navigation\.[A-Za-z0-9_.$]+(?:\([^)]{0,100}\))?', line):
+                lines.append('Referenced navigation symbol: ' + symbol)
         if match:
             lines.append(('Caused by: ' if 'Caused by:' in line else 'Exception: ') + match.group(1))
         elif frame:
