@@ -173,25 +173,7 @@ class ModelRouter @Inject constructor(
      */
     suspend fun discoverGeminiLiveModels(apiKey: String = resolveApiKey(ProviderId.GEMINI)): Result<List<String>> =
         withContext(Dispatchers.IO) {
-            val clean = apiKey.trim()
-            if (clean.isBlank()) {
-                return@withContext Result.failure(IllegalStateException("Chave Gemini não configurada no cofre."))
-            }
-            val req = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models")
-                .addHeader("x-goog-api-key", clean)
-                .get()
-                .build()
-            runCatching {
-                okHttpClient.newCall(req).execute().use { resp ->
-                    val raw = resp.body?.string().orEmpty()
-                    if (!resp.isSuccessful) {
-                        val fail = classifyHttpFailure("gemini", "models/list", resp.code, raw)
-                        throw IllegalStateException(fail.userSummary)
-                    }
-                    parseGeminiLiveModels(raw)
-                }
-            }
+            runCatching { GeminiLiveDiscovery.list(okHttpClient, apiKey) }
         }
 
     private fun callGeminiNative(

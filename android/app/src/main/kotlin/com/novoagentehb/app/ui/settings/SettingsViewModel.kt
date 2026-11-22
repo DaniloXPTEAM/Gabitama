@@ -102,15 +102,15 @@ class SettingsViewModel @Inject constructor(
             modelRouter.discoverGeminiLiveModels()
                 .onSuccess { list ->
                     _discoveredLiveModels.value = list
-                    if (list.isNotEmpty()) {
-                        val first = list.first()
-                        prefs.setModels(prefs.chatModel.first(), prefs.screenOpModel.first(), prefs.visionModel.first(), first)
-                        _statusBanner.value = "${list.size} modelo(s) Live encontrado(s). Selecionado: $first"
-                    } else {
-                        _statusBanner.value = "Nenhum modelo com bidiGenerateContent retornado para esta chave."
+                    val selected = prefs.liveVoiceModel.first().removePrefix("models/")
+                    _statusBanner.value = when {
+                        list.isEmpty() -> "Nenhum modelo bidirecional retornado. A seleção atual foi mantida."
+                        selected !in list -> "${list.size} candidato(s); modelo atual não listado. Escolha manualmente após verificar áudio, acesso e custos."
+                        else -> "${list.size} candidato(s). Modelo atual: $selected. Áudio, acesso e custos exigem verificação."
                     }
                 }
                 .onFailure { err ->
+                    _discoveredLiveModels.value = emptyList()
                     _statusBanner.value = "Falha na descoberta Live: ${err.message}"
                 }
         }

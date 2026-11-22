@@ -267,6 +267,7 @@ fun SettingsScreen(
                                     }
                                 }
                                 if (discoveredLiveModels.isNotEmpty()) {
+                                    Text("Candidatos bidirecionais: confirme compatibilidade de áudio, acesso e preço antes de selecionar. A listagem não garante gratuidade.", style = MaterialTheme.typography.bodySmall)
                                     Spacer(Modifier.height(6.dp))
                                     discoveredLiveModels.forEach { m ->
                                         Text(
