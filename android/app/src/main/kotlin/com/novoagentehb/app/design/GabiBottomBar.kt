@@ -125,10 +125,18 @@ fun GabiBottomBar(
                                 indication = null
                             ) {
                                 if (!selected) {
-                                    navController.navigate(item.screen.route) {
-                                        popUpTo(Screen.Home.route) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
+                                    if (item.screen == Screen.Home) {
+                                        // Returning home must not restore a saved sub-screen stack.
+                                        // Deep-link entry may not have Home on the back stack.
+                                        if (!navController.popBackStack(Screen.Home.route, inclusive = false)) {
+                                            navController.navigate(Screen.Home.route) { launchSingleTop = true }
+                                        }
+                                    } else {
+                                        navController.navigate(item.screen.route) {
+                                            popUpTo(Screen.Home.route) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
                                 }
                             },
