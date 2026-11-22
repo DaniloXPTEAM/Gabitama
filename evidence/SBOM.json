@@ -1,0 +1,232 @@
+{
+  "schema": "novo_agente_hb_sbom_v2",
+  "product_provisional_id": "NOVO_AGENTE_HB",
+  "application_id": "com.novoagentehb.app",
+  "owner_license_status": "PENDING_OWNER_DECISION (see LICENSE_PENDING_OWNER.txt)",
+  "license_audit_scope": "DIRECT_TOML_DECLARED_ONLY",
+  "transitive_audit_status": "UNVERIFIED_OFFLINE_REQUIRES_GRADLE_DEPENDENCIES",
+  "gpl_components_declared_count": 0,
+  "build_tooling": {
+    "gradle_wrapper_version": "8.9",
+    "gradle_wrapper_license": "Apache-2.0 (verified META-INF/LICENSE in gradle-wrapper.jar)",
+    "gradle_wrapper_jar_sha256": "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17"
+  },
+  "libraries": [
+    {
+      "alias": "androidx-core-ktx",
+      "coordinate": "androidx.core:core-ktx",
+      "version": "1.13.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "junit",
+      "coordinate": "junit:junit",
+      "version": "4.13.2",
+      "declared_license": "EPL-1.0 (testImplementation only)"
+    },
+    {
+      "alias": "androidx-junit",
+      "coordinate": "androidx.test.ext:junit",
+      "version": "1.2.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-espresso-core",
+      "coordinate": "androidx.test.espresso:espresso-core",
+      "version": "3.6.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-lifecycle-runtime-ktx",
+      "coordinate": "androidx.lifecycle:lifecycle-runtime-ktx",
+      "version": "2.8.4",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-lifecycle-viewmodel-compose",
+      "coordinate": "androidx.lifecycle:lifecycle-viewmodel-compose",
+      "version": "2.8.4",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-lifecycle-runtime-compose",
+      "coordinate": "androidx.lifecycle:lifecycle-runtime-compose",
+      "version": "2.8.4",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-activity-compose",
+      "coordinate": "androidx.activity:activity-compose",
+      "version": "1.9.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-compose-bom",
+      "coordinate": "androidx.compose:compose-bom",
+      "version": "2024.08.00",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui",
+      "coordinate": "androidx.compose.ui:ui",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui-graphics",
+      "coordinate": "androidx.compose.ui:ui-graphics",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui-tooling",
+      "coordinate": "androidx.compose.ui:ui-tooling",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui-tooling-preview",
+      "coordinate": "androidx.compose.ui:ui-tooling-preview",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui-test-manifest",
+      "coordinate": "androidx.compose.ui:ui-test-manifest",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-ui-test-junit4",
+      "coordinate": "androidx.compose.ui:ui-test-junit4",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-material3",
+      "coordinate": "androidx.compose.material3:material3",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-material-icons-extended",
+      "coordinate": "androidx.compose.material:material-icons-extended",
+      "version": "BOM-managed",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "hilt-android",
+      "coordinate": "com.google.dagger:hilt-android",
+      "version": "2.52",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "hilt-compiler",
+      "coordinate": "com.google.dagger:hilt-android-compiler",
+      "version": "2.52",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "hilt-navigation-compose",
+      "coordinate": "androidx.hilt:hilt-navigation-compose",
+      "version": "1.2.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "retrofit",
+      "coordinate": "com.squareup.retrofit2:retrofit",
+      "version": "2.11.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "retrofit-gson",
+      "coordinate": "com.squareup.retrofit2:converter-gson",
+      "version": "2.11.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "okhttp",
+      "coordinate": "com.squareup.okhttp3:okhttp",
+      "version": "4.12.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "okhttp-logging",
+      "coordinate": "com.squareup.okhttp3:logging-interceptor",
+      "version": "4.12.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "room-runtime",
+      "coordinate": "androidx.room:room-runtime",
+      "version": "2.6.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "room-ktx",
+      "coordinate": "androidx.room:room-ktx",
+      "version": "2.6.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "room-compiler",
+      "coordinate": "androidx.room:room-compiler",
+      "version": "2.6.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "datastore-preferences",
+      "coordinate": "androidx.datastore:datastore-preferences",
+      "version": "1.1.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "coroutines-android",
+      "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+      "version": "1.8.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "coroutines-test",
+      "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+      "version": "1.8.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "navigation-compose",
+      "coordinate": "androidx.navigation:navigation-compose",
+      "version": "2.7.7",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "gson",
+      "coordinate": "com.google.code.gson:gson",
+      "version": "2.11.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "media3-exoplayer",
+      "coordinate": "androidx.media3:media3-exoplayer",
+      "version": "1.4.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "media3-ui",
+      "coordinate": "androidx.media3:media3-ui",
+      "version": "1.4.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-security-crypto",
+      "coordinate": "androidx.security:security-crypto",
+      "version": "1.1.0-alpha06",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "androidx-documentfile",
+      "coordinate": "androidx.documentfile:documentfile",
+      "version": "1.0.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    }
+  ]
+}

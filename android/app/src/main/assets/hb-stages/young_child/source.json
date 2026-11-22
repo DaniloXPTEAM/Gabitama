@@ -1,0 +1,13 @@
+{
+  "stage_id": "young_child",
+  "label": "Infância (Padrão)",
+  "provenance": "DaniloXPTEAM/Jarvis-Projeto@voz-latencia (MIT em android/LICENSE)",
+  "assets": [
+    "gabi-idle.png",
+    "anim/home_idle/",
+    "avatar/idle/",
+    "hb-stages/young_child/avatar_circle.png"
+  ],
+  "avatar_circle": "hb-stages/young_child/avatar_circle.png",
+  "evolution_rules": "NONE_USER_SELECTED_ONLY"
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 2,
+  "primary_active_stack": "gemini",
+  "providers": [
+    {
+      "id": "gemini",
+      "display_name": "Google Gemini",
+      "protocol": "gemini_native_and_live",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/",
+      "openai_compat_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "live_ws_url": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent",
+      "default_chat_model": "gemini-2.5-flash",
+      "default_vision_model": "gemini-2.5-flash",
+      "default_screen_model": "gemini-2.5-flash",
+      "default_live_model": "gemini-2.5-flash-native-audio-preview-09-2025",
+      "live_model_verification_status": "REQUIRES_ACCOUNT_DISCOVERY_ON_DEVICE",
+      "requires_byok": true,
+      "pricing_tier_unknown_until_configured": true,
+      "supports_tools": true,
+      "supports_vision": true,
+      "supports_live_audio": true
+    },
+    {
+      "id": "groq",
+      "display_name": "Groq",
+      "protocol": "openai_compatible",
+      "base_url": "https://api.groq.com/openai/v1/",
+      "default_chat_model": "llama-3.3-70b-versatile",
+      "default_vision_model": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "default_screen_model": "llama-3.3-70b-versatile",
+      "requires_byok": true,
+      "pricing_tier_unknown_until_configured": true,
+      "supports_tools": true,
+      "supports_vision": true,
+      "supports_live_audio": false
+    },
+    {
+      "id": "openrouter",
+      "display_name": "OpenRouter",
+      "protocol": "openai_compatible",
+      "base_url": "https://openrouter.ai/api/v1/",
+      "default_chat_model": "openrouter/free",
+      "default_vision_model": "openrouter/free",
+      "default_screen_model": "openrouter/free",
+      "requires_byok": true,
+      "pricing_tier_unknown_until_configured": true,
+      "supports_tools": true,
+      "supports_vision": true,
+      "supports_live_audio": false
+    },
+    {
+      "id": "deepseek",
+      "display_name": "DeepSeek",
+      "protocol": "openai_compatible",
+      "base_url": "https://api.deepseek.com/v1/",
+      "default_chat_model": "deepseek-chat",
+      "default_vision_model": "",
+      "default_screen_model": "deepseek-chat",
+      "requires_byok": true,
+      "pricing_tier_unknown_until_configured": true,
+      "supports_tools": true,
+      "supports_vision": false,
+      "supports_live_audio": false
+    },
+    {
+      "id": "anthropic",
+      "display_name": "Anthropic Claude",
+      "protocol": "anthropic_messages",
+      "base_url": "https://api.anthropic.com/v1/",
+      "default_chat_model": "claude-sonnet-4-20250514",
+      "default_vision_model": "claude-sonnet-4-20250514",
+      "default_screen_model": "claude-sonnet-4-20250514",
+      "requires_byok": true,
+      "pricing_tier_unknown_until_configured": true,
+      "supports_tools": true,
+      "supports_vision": true,
+      "supports_live_audio": false
+    }
+  ]
+}

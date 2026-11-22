@@ -1,0 +1,23 @@
+NOVO_AGENTE_HB — AVISO PROVISÓRIO DE TITULARIDADE E LICENCIAMENTO (PENDENTE DE DECISÃO DO PROPRIETÁRIO)
+
+Proprietário e autoridade final: Danilo
+Data de criação desta base independente: 2026-11-21
+
+STATUS DE LICENCIAMENTO:
+Este projeto constitui uma implementação original e independente em preparação
+(identificador interno provisório NOVO_AGENTE_HB). Nenhuma licença final
+comercial ou open-source foi escolhida nem aplicada autonomamente pela equipe
+de implementação; a escolha e publicação da licença definitiva cabe exclusivamente
+ao proprietário (Danilo), após conclusão da auditoria jurídica/IP em
+docs/LICENSE_PROVENANCE.md.
+
+DECLARAÇÃO DE NÃO-HERANÇA:
+- Este projeto NÃO deriva de nanoMuse, OpenMinis, tama-v2 ou tamaaiv2 e NÃO
+  incorpora código ou assets sob GNU GPL / AGPL / LGPL copiados daquelas bases.
+- Atribuições de bibliotecas de terceiros efetivamente declaradas em Gradle
+  (exclusivamente Apache-2.0 / MIT) constam em THIRD_PARTY_NOTICES.md.
+- Os assets visuais da personagem Gabi e do Quarto da Gabi presentes em
+  android/app/src/main/assets/ e res/raw/ são recursos fornecidos pelo
+  proprietário a partir de DaniloXPTEAM/Jarvis-Projeto@voz-latencia e permanecem
+  sujeitos à verificação final de direitos comerciais pelo proprietário antes
+  de eventual distribuição pública (ver docs/LICENSE_PROVENANCE.md).

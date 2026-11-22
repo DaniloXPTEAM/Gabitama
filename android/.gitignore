@@ -1,0 +1,17 @@
+# Gradle & Android Studio
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+.cxx/
+captures/
+local.properties
+*.apk
+*.aab
+*.ap_
+
+# Keystores locais de release
+*.jks
+*.keystore
+keystore.properties

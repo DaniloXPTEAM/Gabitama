@@ -1,0 +1,26 @@
+# CORREÇÕES R1.0 — GABITAMA (`novo-agente-hb/`)
+
+**Data:** 2026-11-21  
+**Documento base:** `GABITAMA_ARENA_CORRECOES_HB_QUARTO_AGENT_RUNTIME_2026-11-21.md` (R1.0)  
+**Branch isolada:** `arena/cc3c891a-jarvis-projeto` (derivada de `dcae193c02737a34e6f7f0fff8d4051d490e50d4`)  
+**Pasta privada de entrega:** `Google Drive/GabiTama` (`OWNER_PRIVATE_DRIVE_DELIVERY_FOLDER`)
+
+## 1. Diagnóstico Confirmado no Gate C0
+
+Inspeção direta do código R0 (`NOVO_AGENTE_HB_projeto_completo.zip`) comparada à referência real da Gabi (`DaniloXPTEAM/Jarvis-Projeto@voz-latencia`, `RoomScreen.kt` e `RoomViewModel.kt`):
+
+1. **P0-A (HB ausente do Quarto):** `QuartoGabiScreen.kt` usava um `when` exclusivo (`RoomIntroVideo -> QuartoLoopVideo -> GabiUriImage`) dentro de um painel de `340.dp` que navegava ao Chat ao toque, sem plano de personagem transparente em primeiro plano e sem reação própria.
+2. **P0-B (Regressão das interações da Gabi):** `HabitatViewModel.kt` apenas armazenava `selectedOutfitId`, `customBackgroundUri` e `lastCareAt`. Os botões `"Aconchego/Leitura/Noturno"` gravavam `selectedOutfitId` mas alteravam somente o texto da legenda; faltavam rotina por hora (`06–10h`, `11–16h`, `17–20h`, madrugada), override temporário `Eating` de 3 segundos em `feed()`, guarda-roupa real com "Rotina do dia", caixinha de som reativa ao Spotify real e introdução com persistência/botão pular.
+3. **P0-C (Inventário de assets e pendências):** `assets/anim/` contém apenas `home_idle/` (86 PNGs) e `scene_computador/` (92 PNGs), enquanto `avatar/` contém `idle/`, `listening/`, `talking/`, `thinking/` (WebP com canal alfa), mais os 7 PNGs RGBA da personagem e 2 fundos (`avatar/room.webp` e `room-bg.png`). Não existem `scene_comer/`, `scene_ler/`, `scene_dormir/`, `scene_comendo_reacao/` nem `gabi-look-*.png` avulsos em nenhuma branch de `Jarvis-Projeto` nem no Drive.
+4. **P0-D (Sincronização Quarto ↔ Home ↔ Chat):** `QuartoGabiScreen` não observava voz, processamento, execução de ferramenta, erro ou cancelamento.
+5. **P0-E (Gradle Wrapper ausente):** `novo-agente-hb/android/` possuía apenas `gradle-wrapper.properties`, faltando `gradlew`, `gradlew.bat` e `gradle-wrapper.jar`.
+6. **P0-F (Gemini Live desconectado):** `GeminiLiveVoiceClient.kt` possuía cliente WebSocket e parser, mas `VoiceEngineCoordinator.kt` nunca chamava `connect()`, nem capturava PCM 16 kHz de microfone, nem consumia a fila de `AudioOutput` PCM 24 kHz ou despachava `ToolInvocation` ao `TaskOrchestrator`, além de fixar a string não verificada `gemini-3.8-live`.
+7. **P1-A (Separação honesta do motor Tama V2):** `SkillAndMcpRegistry.kt` e `ComputerViewModel.kt` salvavam descritores locais sem cliente MCP JSON-RPC nem executor real de skill local; Linux PRoot e Operador Genérico de Tela não existem neste pacote.
+8. **P1-B (Segredos em BuildConfig & SBOM):** `app/build.gradle.kts` declarava 8 `buildConfigField` para chaves de API e `ModelRouter.kt` / `SpotifyBridge.kt` liam esses campos.
+9. **P1-C (UX imersiva do Quarto):** Quarto comprimido num card de `340.dp` dentro de lista rolável com cara de cartão genérico em vez da cena imersiva em camadas com controles compactos.
+
+## 2. Plano de Correção Executado nos Gates C1–C3
+
+- **Gate C1:** Criação de `HBCharacterController` + `HBStateMachine` (máquina de estados pura e testável em JVM com injeção de relógio e prioridade estrita: `Cancelled > Error > Speaking > Listening > Thinking > Working > Success > Eating > TapReaction > WearingOutfit > Spotify/Routine`), `RoomUiState` reativo, reconstrução completa de `QuartoGabiScreen.kt` (fundo independente + HB transparente/respiração em primeiro plano + reação ao toque sem abrir Chat + Guarda-roupa honesto separando looks existentes de `ASSET_PENDING` + diálogo de Ambiente separado de Guarda-roupa + caixinha Spotify com checagem real de permissão de notificações + introdução única persistente), e sincronização única de Home, Chat e Quarto pelo mesmo `HBCharacterController`.
+- **Gate C2:** Ligação de eventos de `TaskOrchestrator` e `VoiceEngineCoordinator` ao `HBCharacterController`; fiação completa de sessão Gemini Live em `VoiceEngineCoordinator` (`connect()`, captura `AudioRecord` PCM16 16 kHz, fila sequencial `Channel<ByteArray>` para `AudioTrack` PCM 24 kHz, barge-in imediato em `Interrupted`, handoff real de `ToolInvocation` para `PolicyGate`/`ToolExecutorAndVerifier` com `sendToolResponse`, descoberta real via `GET /v1beta/models` para modelos `bidiGenerateContent`, e sinalização explícita `BLOCKED`/`NOT_TESTED` no sandbox sem rede/hardware); implementação de cliente MCP JSON-RPC 2.0 real opt-in (`McpJsonRpcClient.kt`), executor seguro de Skill local (`LocalSkillExecutor.kt`) e matriz de classificação exata das 27 ferramentas (`VERIFIED_RUNTIME_CATEGORY` / `DESCRIPTOR_ONLY` / `NOT_IMPLEMENTED`).
+- **Gate C3:** Instalação dos binários oficiais Apache-2.0 do Gradle Wrapper 8.9 (`gradlew`, `gradlew.bat`, `gradle-wrapper.jar` de `gradle/gradle@v8.9.0`), remoção total dos 8 campos de chave de `BuildConfig` (`app/build.gradle.kts`, `ModelRouter.kt`, `SpotifyBridge.kt`), ampliação da tela `Ajustes` para cobrir todas as chaves no cofre AES256-GCM, expansão da suíte JUnit4 e dos testes Python de integridade/IP/segredos, e documentação honesta do bloqueio de JDK/Android SDK no sandbox junto a `BUILD_LOCAL.md` passo a passo para Windows.

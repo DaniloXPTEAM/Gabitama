@@ -1,0 +1,35 @@
+# Build & IDE local artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.iml
+.gradle/
+build/
+app/build/
+.idea/
+.cxx/
+captures/
+local.properties
+
+# Keystores, segredos e configurações locais
+*.jks
+*.keystore
+*.p12
+*.pem
+.env
+.env.*
+keystore.properties
+
+# Python & caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# OS & temporários
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

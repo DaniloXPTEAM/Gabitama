@@ -1,0 +1,66 @@
+{
+  "frozen_identity": "gabi_24l",
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "language": "pt-BR",
+  "pocket_tts_model": "portuguese_24l",
+  "pocket_tts_license": "MIT",
+  "private_audio_excluded": true,
+  "private_audio_note": "Arquivo Gabi Voz isolada.mp3 e amostras WAV brutas excluidos por privacidade; usar runtime configurado ou adaptador autorizado.",
+  "requested_profiles": {
+    "B2_base": {
+      "eos_threshold": -4.0,
+      "max_tokens": 200,
+      "measured_duration_s": 5.68,
+      "measured_wpm": 179.6
+    },
+    "B2_pausas": {
+      "eos_threshold": -4.0,
+      "max_tokens": 220,
+      "measured_duration_s": 6.48,
+      "measured_wpm": 157.4
+    },
+    "C2_base": {
+      "eos_threshold": -4.0,
+      "max_tokens": 220,
+      "measured_duration_s": 6.32,
+      "measured_wpm": 170.9
+    },
+    "C2_pausas": {
+      "eos_threshold": -4.0,
+      "max_tokens": 240,
+      "measured_duration_s": 9.44,
+      "measured_wpm": 114.4
+    }
+  },
+  "historical_baseline_b3_c3": {
+    "B3": {
+      "eos_threshold": -4.0,
+      "max_tokens": 260,
+      "measured_duration_s": 6.72,
+      "measured_wpm": 151.8,
+      "wav_sha256": "f6c3140d89532da2e168ae870ac26a916f4960d6fb35faa0e954fb045a1511f9"
+    },
+    "C3": {
+      "eos_threshold": -4.0,
+      "max_tokens": 260,
+      "measured_duration_s": 6.72,
+      "measured_wpm": 151.8,
+      "wav_sha256": "8290789d8c7e7d0e82a096a6abd4dd139d1468924d568827b089b012c411b9fd"
+    }
+  },
+  "gemini_live": {
+    "default_model": "gemini-2.5-flash-native-audio-preview-09-2025",
+    "model_verification_status": "REQUIRES_ACCOUNT_DISCOVERY_ON_DEVICE",
+    "default_prebuilt_voice": "Kore",
+    "input_pcm_hz": 16000,
+    "output_pcm_hz": 24000,
+    "endpoint": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+  },
+  "fallback_policy": {
+    "allow_silent_swap_to_system_tts": false,
+    "notify_user_on_fallback": true,
+    "system_tts_pitch": 1.05,
+    "system_tts_rate": 1.0
+  }
+}

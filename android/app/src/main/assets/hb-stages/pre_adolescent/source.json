@@ -1,0 +1,21 @@
+{
+  "stage_id": "pre_adolescent",
+  "label": "Pré-adolescente (idade1)",
+  "drive_folder_id": "OWNER_PRIVATE_DRIVE_AVATAR_FOLDER",
+  "drive_file_id": "185Zaa0ZZdXxPuAbgE88IALjgwInsqXhL",
+  "original_filename": "idade1.mp4",
+  "sha256": "bc5f1741a19094b69eac028077a31286e48d85cc740c607a60f7ef265cffc11e",
+  "md5": "4a7de57300286b4e599d65dfcb313335",
+  "size_bytes": 2150423,
+  "dimensions": "720x1280",
+  "fps": 24,
+  "frames": 240,
+  "duration_ms": 10010,
+  "avatar_circle": "hb-stages/pre_adolescent/avatar_circle.png",
+  "presentation_mode": "FULL_BLEED_ROOM_STAGE_VIDEO_AND_LIVE_CIRCULAR_HERO_MEDALLION",
+  "has_transparent_alpha_cutout": false,
+  "has_dedicated_action_clips": false,
+  "custom_room_background_compatible": false,
+  "continuity_rule": "PRESERVES_STAGE_ON_ALL_INTERACTIVE_STATES_WITH_EXPLICIT_IDLE_DISCLOSURE",
+  "evolution_rules": "NONE_USER_SELECTED_ONLY"
+}

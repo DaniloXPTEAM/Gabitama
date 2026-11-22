@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gabi_bg_night">#FF120F11</color>
+    <color name="gabi_surface_dark">#FF1B1618</color>
+    <color name="gabi_surface_mid">#FF251E20</color>
+    <color name="gabi_accent_gold">#FFFFCF8C</color>
+    <color name="gabi_accent_copper">#FFD96830</color>
+    <color name="gabi_accent_amber">#FFE5A952</color>
+    <color name="gabi_accent_teal">#FF5FB8AC</color>
+    <color name="gabi_text_primary">#FFF5F1ED</color>
+    <color name="gabi_text_secondary">#FFB5A9A5</color>
+</resources>
