@@ -514,9 +514,12 @@ class VoiceEngineCoordinator @Inject constructor(
     private fun observeGeminiLiveEvents() {
         scope.launch {
             geminiLive.events.collect { evt ->
+                // A queued callback must not revive a session stopped by the user or after failure.
+                if (!liveReducerState.keepAlive) return@collect
                 val decision = GeminiLiveSessionReducer.reduce(liveReducerState, evt)
                 liveReducerState = liveReducerState.copy(
                     state = decision.nextState,
+                    keepAlive = liveReducerState.keepAlive && decision.nextState != LiveSessionState.BLOCKED && decision.nextState != LiveSessionState.DISCONNECTED,
                     reconnectAttempts = decision.nextReconnectAttempts
                 )
 
