@@ -13,12 +13,24 @@ files=glob.glob('android/app/build/outputs/androidTest-results/connected/**/*.xm
 roots=[E.parse(f).getroot() for f in files]
 counts={k:sum(int(r.get(k,0)) for r in roots) for k in ('tests','failures','errors','skipped')}
 print('::notice title=Android tests::'+ ' '.join(f'{k}={v}' for k,v in counts.items()))
+import re
+lines=[]
 for root in roots:
     for case in root.iter('testcase'):
         failure=case.find('failure')
         if failure is None: failure=case.find('error')
+        name=case.get('classname','')+'.'+case.get('name','')
+        lines.append(('FAIL ' if failure is not None else 'PASS ')+name)
         if failure is not None:
-            # Do not put UI hierarchy, test data, or exception messages into public annotations.
-            print('::error title=Android test failed::'+case.get('classname','')+'.'+case.get('name',''))
+            text=(failure.get('message','')+'\n'+(failure.text or ''))
+            types=re.findall(r'(?:[a-zA-Z_$][\w$]*\.)*[\w$]*(?:Exception|Error)', text)
+            if types: lines.append('Exception type: '+types[0])
+            frames=re.findall(r'at (com\.novoagentehb\.app\.[\w$.$]+\([\w.$]+(?::\d+)?\))', text)
+            lines.extend('at '+frame for frame in frames[:8])
+            for term in ('METAS','MEMÓRIA','ARQUIVOS','Permissões','Quarto da Gabi','DIAGNÓSTICO LOCAL','Diagnóstico','Ajustes','Avançar','Adicionar meta','Continuar','Gabi · HB','Avisos & Recibos'):
+                if term in text: lines.append('Mentioned selector: '+term)
+if lines:
+    print('::notice title=Android test case summary::'+'%0A'.join(lines))
+
 PY
 exit "$status"
