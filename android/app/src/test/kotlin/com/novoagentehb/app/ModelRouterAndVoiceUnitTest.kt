@@ -148,7 +148,7 @@ class ModelRouterAndVoiceUnitTest {
         val ready = GeminiLiveSessionReducer.reduce(LiveReducerInput(LiveSessionState.CONNECTING, keepAlive = true), GeminiLiveEvent.Ready)
         assertEquals(LiveSessionState.ACTIVE, ready.nextState)
         assertTrue(ready.startMicStream)
-        assertEquals(true, ready.isListening)
+        assertEquals(false, ready.isListening) // only after AudioRecord has actually started
 
         val audio = GeminiLiveSessionReducer.reduce(LiveReducerInput(LiveSessionState.ACTIVE, keepAlive = true), GeminiLiveEvent.AudioOutput(byteArrayOf(1, 2)))
         assertEquals(true, audio.isSpeaking)

@@ -713,7 +713,7 @@ class VoiceEngineCoordinator @Inject constructor(
         stopPcmMicCapture()
         val generation = micGeneration.get()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            failLiveAudio("Permissão de microfone necessária para Gemini Live.")
+            scope.launch { if (generation == micGeneration.get()) failLiveAudio("Permissão de microfone necessária para Gemini Live.") }
             return
         }
         micStreamJob = scope.launch(Dispatchers.IO) {
