@@ -249,7 +249,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
         assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, imageBuffer))
         bitmap.recycle()
         val encoded = java.util.Base64.getEncoder().encodeToString(imageBuffer.toByteArray())
-        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("127.0.0.1").build()
+        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("127.0.0.1").addSubjectAlternativeName("localhost").build()
         val serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
         val clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()
         val server = MockWebServer()
