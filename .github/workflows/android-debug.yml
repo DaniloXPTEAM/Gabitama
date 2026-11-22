@@ -2,6 +2,9 @@ name: Build Android Debug APK (GabiTama)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - arena/a142d5dd-gabitama
 
 jobs:
   build-debug:
