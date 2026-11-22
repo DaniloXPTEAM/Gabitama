@@ -37,6 +37,8 @@ for root in roots:
 try:
     crash=open('/tmp/gabitama-test-crash-private.txt',encoding='utf-8',errors='replace').read()
     if 'com.novoagentehb.app.debug' in crash:
+        if re.search(r'Key .* was already used', crash, re.I):
+            print('::error title=Crash cause::Compose duplicate lazy-list key detected')
         out=[]
         for line in crash.splitlines():
             exc=re.search(r'(?:Caused by: )?([\w.$]+(?:Exception|Error))(?::|\s|$)',line)
