@@ -1,13 +1,28 @@
 #!/usr/bin/env bash
 set -uo pipefail
-# Only run on the disposable CI emulator. Preserve the original test status.
+# Collect while instrumentation is active: Gradle may uninstall the target and its
+# external files after tests. Only the explicitly named synthetic AVD evidence is copied.
+mkdir -p evidence-android/test-screenshots
+remote=/sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots
+collector() {
+  while :; do
+    if adb shell test -d "$remote" 2>/dev/null; then
+      adb pull "$remote/." evidence-android/test-screenshots/ >/tmp/gabitama-screenshot-pull-private.txt 2>&1 || :
+    fi
+    sleep 1
+  done
+}
+collector & collector_pid=$!
+trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null || :' EXIT
 (cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace) 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
 status=${PIPESTATUS[0]}
-mkdir -p evidence-android
-adb logcat -d -b crash -v brief > /tmp/gabitama-test-crash-private.txt
-if adb shell test -d /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots; then
-  adb pull /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots evidence-android/ || status=1
-fi
+kill "$collector_pid" 2>/dev/null || :
+wait "$collector_pid" 2>/dev/null || :
+trap - EXIT
+adb logcat -d -b crash -v brief > /tmp/gabitama-test-crash-private.txt 2>/dev/null || echo '::warning title=Test crash log::Indisponível; diagnóstico de crash limitado.'
+# Public diagnostics contain only app test evidence messages (path, dimensions, UID, size).
+adb logcat -d -s GabiTestEvidence:I '*:S' > /tmp/gabitama-screenshot-log-private.txt 2>/dev/null || :
+python3 scripts/android/validate-screenshots.py || status=1
 python3 - <<'PY'
 import glob,xml.etree.ElementTree as E
 files=glob.glob('android/app/build/outputs/androidTest-results/connected/**/*.xml',recursive=True)

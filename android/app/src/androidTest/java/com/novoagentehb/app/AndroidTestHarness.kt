@@ -1,6 +1,7 @@
 package com.novoagentehb.app
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertIsDisplayed
@@ -121,9 +122,15 @@ object AndroidTestHarness {
         val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Screenshot unavailable" }
         val dir = requireNotNull(instrumentation.targetContext.getExternalFilesDir("test-screenshots"))
         check(dir.exists() || dir.mkdirs()) { "Cannot create screenshot directory" }
-        FileOutputStream(File(dir, "$name.png")).use { out ->
+        check(bitmap.width > 0 && bitmap.height > 0) { "Invalid screenshot dimensions" }
+        val temporary = File(dir, "$name.tmp")
+        val screenshot = File(dir, "$name.png")
+        FileOutputStream(temporary).use { out ->
             check(bitmap.compress(Bitmap.CompressFormat.PNG, 95, out)) { "Cannot save screenshot" }
         }
+        check(temporary.renameTo(screenshot)) { "Cannot publish screenshot" }
+        check(screenshot.isFile && screenshot.length() > 0) { "Screenshot missing after write" }
+        Log.i("GabiTestEvidence", "path=${screenshot.absolutePath} bytes=${screenshot.length()} uid=${instrumentation.targetContext.applicationInfo.uid} package=${instrumentation.targetContext.packageName} dimensions=${bitmap.width}x${bitmap.height}")
         bitmap.recycle()
     }
 }

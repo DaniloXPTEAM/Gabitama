@@ -38,16 +38,26 @@ PY
 }
 trap on_error ERR
 adb devices -l
+# Destructive reset is permitted only on the disposable CI emulator.
+[ "${CI:-}" = true ] && [[ "$(adb get-serialno)" =~ ^emulator-[0-9]+$ ]]
+[ "$(adb get-state)" = device ]
 [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]
+adb shell pm path android | grep -q '^package:'
+adb shell service check activity | grep -q 'found'
 adb shell getprop ro.build.version.sdk
 stage=install
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 echo '::notice title=INSTALL_PASS::APK instalado em AVD descartável'
 stage=clear
 adb shell pm clear "$pkg"
-adb logcat -c
+if ! adb logcat -c >/tmp/gabitama-logcat-clear-private.txt 2>&1; then
+  echo '::warning title=Android logcat::Buffer não pôde ser limpo; usando delimitação temporal.'
+fi
+# Device clock, not runner clock: logcat -T reads entries after this time even if clear failed.
+log_start=$(adb shell date '+%m-%d %H:%M:%S.000' | tr -d '\r')
 stage=start
 adb shell am start -W -n "$pkg/$activity" | tee evidence-android/start.txt
+if grep -Eq '(^Error:|^Exception|Status: (error|timeout))' evidence-android/start.txt; then exit 1; fi
 stage=stability
 sleep 8
 adb shell pidof "$pkg"
@@ -55,8 +65,13 @@ stage=foreground
 adb shell dumpsys activity activities | grep -E "(mResumedActivity|topResumedActivity).*${pkg}"
 adb exec-out screencap -p > evidence-android/startup.png
 stage=crash-buffer
-if adb logcat -d -b crash | grep -F "Process: $pkg,"; then
-  echo 'Crash do aplicativo detectado; coletar logcat completo em ambiente privado.' >&2
-  false
+if adb logcat -d -b crash -v threadtime -T "$log_start" > /tmp/gabitama-launch-crash-private.txt 2>/dev/null; then
+  if grep -Fq "Process: $pkg," /tmp/gabitama-launch-crash-private.txt; then
+    echo 'Crash do aplicativo detectado; coletar logcat completo em ambiente privado.' >&2
+    false
+  fi
+  echo '::notice title=Crash buffer::Sem crash do aplicativo no intervalo após abertura.'
+else
+  echo '::warning title=Crash buffer indisponível::Verificação de crash por logcat NÃO comprovada.'
 fi
 echo '::notice title=Smoke process alive::Processo vivo e Activity em primeiro plano após 8 segundos; UI ainda requer instrumentação.'

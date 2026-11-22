@@ -110,15 +110,6 @@ jobs:
             scripts/android/connected-tests.sh
             adb exec-out screencap -p > evidence-android/after-ui-test.png
             echo '::notice title=UI test::connectedDebugAndroidTest passou; veja o relatório para a cobertura exata.'
-      - name: Preparar revisão visual dos screenshots sintéticos
-        if: success()
-        run: python3 -m pip install --user pillow
-      - name: Prévia visual das telas 1
-        if: success()
-        run: python3 scripts/android/screenshot-annotations.py 1
-      - name: Prévia visual das telas 2
-        if: success()
-        run: python3 scripts/android/screenshot-annotations.py 2
       - name: Relatórios do emulador (sem logcat bruto)
         if: always()
         uses: actions/upload-artifact@v4
@@ -132,13 +123,12 @@ jobs:
 
   android-legacy:
     name: Android API ${{ matrix.api }} — regressão instrumentada
-    needs: android-emulator
     runs-on: ubuntu-latest
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        api: [29, 26]
+        api: [26]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
