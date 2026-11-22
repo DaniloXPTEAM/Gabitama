@@ -50,8 +50,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
 
         // Verifica persistência no Room após recriar a Activity
         compose.activityRule.scenario.recreate()
-        AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
-        AndroidTestHarness.clickBottomTab(compose, "Gabi")
+        AndroidTestHarness.waitUntilText(compose, "Chat com a Gabi")
         AndroidTestHarness.waitUntilText(compose, "DIAGNÓSTICO LOCAL", substring = true)
 
         compose.onNode(hasContentDescription("Limpar conversa") and hasClickAction()).performClick()
@@ -84,8 +83,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
 
         // Recria e confirma persistência de meta e lembrete no Room
         compose.activityRule.scenario.recreate()
-        AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
-        compose.onNode(hasText("METAS")).performScrollTo().performClick()
+        AndroidTestHarness.waitUntilText(compose, "Metas & Lembretes")
         AndroidTestHarness.waitUntilText(compose, "Estudar Compose UI (25%)")
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Beber água"))
         compose.onAllNodes(hasText("Beber água")).onFirst().assertIsDisplayed()

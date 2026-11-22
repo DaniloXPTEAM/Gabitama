@@ -4,6 +4,7 @@ set -uo pipefail
 (cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace) 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
 status=${PIPESTATUS[0]}
 mkdir -p evidence-android
+adb logcat -d -b crash -v brief > /tmp/gabitama-test-crash-private.txt
 if adb shell test -d /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots; then
   adb pull /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots evidence-android/ || status=1
 fi
@@ -33,6 +34,18 @@ for root in roots:
             lines.extend('at '+frame for frame in frames[:8])
             for term in ('METAS','MEMÓRIA','ARQUIVOS','Permissões','Quarto da Gabi','DIAGNÓSTICO LOCAL','Diagnóstico','Ajustes','Avançar','Adicionar meta','Continuar','Gabi · HB','Avisos & Recibos'):
                 if term in text: lines.append('Mentioned selector: '+term)
+try:
+    crash=open('/tmp/gabitama-test-crash-private.txt',encoding='utf-8',errors='replace').read()
+    if 'com.novoagentehb.app.debug' in crash:
+        out=[]
+        for line in crash.splitlines():
+            exc=re.search(r'(?:Caused by: )?([\w.$]+(?:Exception|Error))(?::|\s|$)',line)
+            frame=re.search(r'\bat (com\.novoagentehb\.app\.[\w.$]+\([\w.$]+(?::\d+)?\))',line)
+            if exc: out.append(('Caused by: ' if 'Caused by:' in line else 'Exception: ')+exc.group(1))
+            elif frame: out.append('at '+frame.group(1))
+        if out: print('::error title=Sanitized test crash::'+'%0A'.join(out[:60]))
+except OSError:
+    pass
 try:
     log=open('/tmp/gabitama-instrumentation-ci.log',encoding='utf-8',errors='replace').read()
     progress=re.findall(r'Tests? \d+/\d+ completed[^\n]*', log)

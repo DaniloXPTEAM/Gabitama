@@ -102,7 +102,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     }
 
     @Test
-    fun localSkillWritesAndVerifiesSha256InPrivateWorkspaceAndRoomPersists() = runBlocking {
+    fun localSkillWritesAndVerifiesSha256InPrivateWorkspaceAndRoomPersists(): Unit = runBlocking {
         val saf = SafLibraryManager(context)
         val executor = LocalSkillExecutor(saf)
         val registry = SkillAndMcpRegistry(db.skillRecordDao())
@@ -146,7 +146,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     }
 
     @Test
-    fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer() = runBlocking {
+    fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {

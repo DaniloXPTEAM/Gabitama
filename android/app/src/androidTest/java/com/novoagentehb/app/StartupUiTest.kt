@@ -36,7 +36,7 @@ class StartupUiTest {
         compose.activityRule.scenario.onActivity {
             assertEquals(Lifecycle.State.RESUMED, it.lifecycle.currentState)
         }
-        compose.onNodeWithText("Gabi", useUnmergedTree = true).performClick()
+        AndroidTestHarness.clickBottomTab(compose, "Gabi")
         compose.waitUntil(30_000) {
             compose.onAllNodes(hasText("Chat com a Gabi")).fetchSemanticsNodes().isNotEmpty()
         }
