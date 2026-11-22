@@ -158,11 +158,12 @@ class AgentCoreUnitTest {
 
     @Test
     fun capabilitySemanticsSeparateHandoffNotificationPreviewAndUnimplemented() {
-        assertEquals(27, registry.capabilities.size)
+        assertEquals(28, registry.capabilities.size)
         val counts = registry.countByTier()
         assertTrue((counts[RuntimeSupportTier.NATIVE_LOCAL_VERIFIED] ?: 0) >= 6)
         assertTrue((counts[RuntimeSupportTier.ANDROID_BRIDGE_INTENT] ?: 0) >= 10)
 
+        assertEquals(ToolExecutionSemantics.EXECUTED_AND_VERIFIED, registry.find("execute_workspace_program")?.expectedSemantics)
         assertEquals(ToolExecutionSemantics.HANDOFF_TO_USER, registry.find("search_spotify")?.expectedSemantics)
         assertEquals(ToolExecutionSemantics.NOTIFICATION_PREVIEW_ONLY, registry.find("read_gmail")?.expectedSemantics)
         assertTrue(registry.unimplementedCapabilities.any { it.first == "linux_proot_shell" })
