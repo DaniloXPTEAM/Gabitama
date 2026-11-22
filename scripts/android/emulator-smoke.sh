@@ -46,7 +46,15 @@ adb shell pm path android | grep -q '^package:'
 adb shell service check activity | grep -q 'found'
 adb shell getprop ro.build.version.sdk
 stage=install
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+sha256sum -c candidate/SHA256SUMS
+adb install -r candidate/app-debug.apk
+# Compare the actual installed base APK, not merely a file adjacent to the test.
+installed=$(adb shell pm path "$pkg" | tr -d '\r' | sed -n 's/^package://p')
+[ "$(printf '%s\n' "$installed" | wc -l)" -eq 1 ]
+adb exec-out cat "$installed" > /tmp/gabitama-installed-app.apk
+cmp candidate/app-debug.apk /tmp/gabitama-installed-app.apk
+sha256sum /tmp/gabitama-installed-app.apk | cut -d' ' -f1 > evidence-android/installed-apk-sha256.txt
+echo "::notice title=Installed APK SHA256::$(cat evidence-android/installed-apk-sha256.txt)"
 echo '::notice title=INSTALL_PASS::APK instalado em AVD descartável'
 stage=clear
 adb shell pm clear "$pkg"

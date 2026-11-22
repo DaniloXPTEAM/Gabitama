@@ -1,69 +1,12 @@
 name: Build Android Debug APK (GabiTama)
-
 on:
   workflow_dispatch:
   push:
-    branches:
-      - arena/a142d5dd-gabitama
-
+    branches: [arena/a142d5dd-gabitama]
 jobs:
   build-debug:
-    name: Test Debug & Assemble Debug APK
+    name: JVM e APKs compartilhados
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17 (Temurin)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Verify preinstalled Android SDK (API 34)
-        shell: bash
-        run: |
-          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          echo "ANDROID_HOME=$SDK_ROOT"
-          if [ -z "$SDK_ROOT" ] || [ ! -d "$SDK_ROOT" ]; then
-            echo "Android SDK não encontrado no runner." >&2
-            exit 1
-          fi
-          if [ ! -d "$SDK_ROOT/platforms/android-34" ]; then
-            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
-            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-          fi
-
-      - name: Setup Gradle & cache
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Ensure gradlew is executable
-        run: chmod +x ./gradlew
-
-      - name: Run Kotlin unit tests and build Debug APK
-        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --stacktrace
-
-      - name: Contagem de testes JVM
-        run: |
-          python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; print("::notice title=Unit tests::tests=%d failures=%d errors=%d skipped=%d" % tuple(sum(int(x.get(k,0)) for x in r) for k in ("tests","failures","errors","skipped")))'
-
-      - name: Upload Debug APK artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gabitama-debug-apk-LAUNCH_NOT_TESTED-${{ github.sha }}
-          path: |
-            android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
-
-  android-emulator:
-    name: Android API 34 — smoke e instrumentação (experimental)
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -71,72 +14,44 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Habilitar KVM no runner Linux
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          if [ ! -e /dev/kvm ]; then
-            echo "::error title=KVM indisponível::Runner sem /dev/kvm; não é falha comprovada do aplicativo."
-            exit 1
-          fi
-          sudo chmod a+rw /dev/kvm
-          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
-            echo "::error title=KVM sem acesso::Sem permissão de leitura e escrita em /dev/kvm."
-            exit 1
-          fi
-      - name: Compilar APK e APK de testes
+      - name: Testes JVM e compilação única dos APKs
         working-directory: android
         run: |
           chmod +x gradlew
-          set -o pipefail
-          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee /tmp/gabitama-compile.log || {
-            grep -E '^e: .*/src/(androidTest|main)/.*\.kt:[0-9]+:[0-9]+' /tmp/gabitama-compile.log | head -10 | while IFS= read -r line; do echo "::error title=Kotlin compilation::$line"; done
-            exit 1
-          }
-      - name: Inicializar AVD e executar testes no Android
-        uses: reactivecircus/android-emulator-runner@v2
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+          python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; assert r; print("::notice title=Unit tests::tests=%d failures=%d errors=%d skipped=%d" % tuple(sum(int(x.get(k,0)) for x in r) for k in ("tests","failures","errors","skipped")))'
+      - name: Registrar binários e metadados
+        run: |
+          mkdir -p candidate
+          cp android/app/build/outputs/apk/debug/app-debug.apk candidate/
+          cp android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk candidate/
+          sha256sum candidate/*.apk | tee candidate/SHA256SUMS
+          echo "::notice title=Shared APK SHA256::$(sha256sum candidate/app-debug.apk | cut -d' ' -f1)"
+          echo "::notice title=Test APK SHA256::$(sha256sum candidate/app-debug-androidTest.apk | cut -d' ' -f1)"
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging candidate/app-debug.apk > candidate/package-metadata.txt
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs candidate/app-debug.apk > candidate/signature.txt
+      - uses: actions/upload-artifact@v4
         with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          emulator-boot-timeout: 600
-          disable-animations: true
-          script: |
-            sha256sum android/app/build/outputs/apk/debug/app-debug.apk | tee evidence-apk-sha256.txt
-            echo "::notice title=Emulator APK SHA256::$(cut -d' ' -f1 evidence-apk-sha256.txt)"
-            scripts/android/emulator-smoke.sh
-            GABITAMA_TEST_CLASSES=com.novoagentehb.app.AllTenScreensNavigationAndroidTest,com.novoagentehb.app.FunctionalFlowsAndPersistenceAndroidTest scripts/android/connected-tests.sh
-            adb exec-out screencap -p > evidence-android/after-ui-test.png
-            echo '::notice title=UI test::connectedDebugAndroidTest passou; veja o relatório para a cobertura exata.'
-      - name: Relatórios do emulador (sem logcat bruto)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-api34-evidence-${{ github.sha }}
-          path: |
-            evidence-android/
-            evidence-apk-sha256.txt
-            android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: warn
-
-  android-legacy:
-    if: ${{ false }} # Ciclo A focado: somente API 34; reativar para regressão.
-    name: Android API ${{ matrix.api }} — regressão instrumentada
+          name: shared-apks-${{ github.sha }}
+          path: candidate/
+          if-no-files-found: error
+  android-emulator:
+    name: Android API ${{ matrix.api }} — binário compartilhado
+    needs: build-debug
     runs-on: ubuntu-latest
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        api: [29, 26]
+        api: [34]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+          name: shared-apks-${{ github.sha }}
+          path: candidate/
+      - name: Verificar hashes antes da instalação
+        run: sha256sum -c candidate/SHA256SUMS
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -144,11 +59,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           test -e /dev/kvm
           sudo chmod a+rw /dev/kvm
-          test -r /dev/kvm && test -w /dev/kvm
-      - name: Compilar APK e instrumentação
-        working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
-      - name: AVD e testes Android
+      - name: Executar smoke e AndroidJUnitRunner
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -158,8 +69,6 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            sha256sum android/app/build/outputs/apk/debug/app-debug.apk > evidence-apk-sha256.txt
-            echo "::notice title=Emulator APK SHA256::$(cut -d' ' -f1 evidence-apk-sha256.txt)"
             scripts/android/emulator-smoke.sh
             scripts/android/connected-tests.sh
       - name: Evidências sanitizadas
@@ -167,7 +76,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-api${{ matrix.api }}-evidence-${{ github.sha }}
-          path: |
-            evidence-android/
-            evidence-apk-sha256.txt
+          path: evidence-android/
           if-no-files-found: warn

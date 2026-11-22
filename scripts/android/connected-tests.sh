@@ -14,12 +14,16 @@ collector() {
 }
 collector & collector_pid=$!
 trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null || :' EXIT
-gradle_args=()
-if [ -n "${GABITAMA_TEST_CLASSES:-}" ]; then
-  gradle_args+=("-Pandroid.testInstrumentationRunnerArguments.class=$GABITAMA_TEST_CLASSES")
+# No Gradle invocation here: install and run the exact shared test APK.
+status=0
+adb install -r candidate/app-debug-androidTest.apk || status=1
+adb shell pm list instrumentation | grep -F 'com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner (target=com.novoagentehb.app.debug)' >/dev/null || status=1
+if [ "$status" -eq 0 ]; then
+  adb shell am instrument -w -r com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1 || status=1
+  python3 scripts/android/parse-instrumentation.py || status=1
 fi
-(cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace "${gradle_args[@]}") 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
-status=${PIPESTATUS[0]}
+# Capture files once more before stopping the collector.
+adb pull "$remote/." evidence-android/test-screenshots/ >/tmp/gabitama-screenshot-final-private.txt 2>&1 || :
 kill "$collector_pid" 2>/dev/null || :
 wait "$collector_pid" 2>/dev/null || :
 trap - EXIT
