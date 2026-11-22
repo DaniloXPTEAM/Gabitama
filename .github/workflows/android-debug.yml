@@ -71,8 +71,7 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            scripts/android/emulator-smoke.sh
-            scripts/android/connected-tests.sh
+            scripts/android/offline-emulator-tests.sh
       - name: Disponibilizar PNGs sintéticos para inspeção
         if: success()
         env:
