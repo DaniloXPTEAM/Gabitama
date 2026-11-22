@@ -13,7 +13,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.novoagentehb.app.app.MainActivity
 import org.junit.Rule
@@ -40,7 +39,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         val inputField = compose.onNode(hasSetTextAction())
         inputField.performClick()
         inputField.performTextInput("/diagnostico")
-        Espresso.closeSoftKeyboard()
+        AndroidTestHarness.dismissImeIfVisible(compose)
         compose.onNode(hasContentDescription("Enviar") and hasClickAction()).performClick()
 
         AndroidTestHarness.waitUntilText(compose, "DIAGNÓSTICO LOCAL", substring = true)
@@ -66,7 +65,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         AndroidTestHarness.waitUntilText(compose, "Metas & Lembretes")
         compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Estudar Compose UI")
-        Espresso.closeSoftKeyboard()
+        AndroidTestHarness.dismissImeIfVisible(compose)
         compose.onNode(hasContentDescription("Adicionar meta") and hasClickAction()).performClick()
 
         AndroidTestHarness.waitUntilText(compose, "Estudar Compose UI (0%)")
@@ -77,7 +76,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("+15m"))
         compose.onAllNodes(hasSetTextAction()).onLast().performClick()
         compose.onAllNodes(hasSetTextAction()).onLast().performTextInput("Beber água")
-        Espresso.closeSoftKeyboard()
+        AndroidTestHarness.dismissImeIfVisible(compose)
         compose.onNode(hasText("+15m") and hasClickAction()).performClick()
         AndroidTestHarness.waitUntilText(compose, "Beber água")
 
@@ -109,7 +108,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         memFields[0].performTextInput("cidade_teste")
         memFields[1].performClick()
         memFields[1].performTextInput("Fortaleza")
-        Espresso.closeSoftKeyboard()
+        AndroidTestHarness.dismissImeIfVisible(compose)
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Salvar fato"))
         compose.onNode(hasText("Salvar fato") and hasClickAction()).performClick()
 
@@ -133,7 +132,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         libFields[0].performTextInput("smoke_r142.txt")
         libFields[1].performClick()
         libFields[1].performTextInput("Conteudo verificado R1.4.2")
-        Espresso.closeSoftKeyboard()
+        AndroidTestHarness.dismissImeIfVisible(compose)
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Salvar no Workspace", substring = true))
         compose.onNode(hasText("Salvar no Workspace", substring = true) and hasClickAction()).performClick()
 

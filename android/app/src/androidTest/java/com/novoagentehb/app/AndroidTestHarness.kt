@@ -19,6 +19,9 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.rules.ActivityScenarioRule
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.novoagentehb.app.app.MainActivity
 import java.io.File
@@ -85,6 +88,38 @@ object AndroidTestHarness {
         val matcher = hasText(label) and hasClickAction()
         waitUntilNodeExists(compose, matcher, timeoutMs = 15_000L)
         compose.onAllNodes(matcher).onLast().performClick()
+    }
+
+    /** Close the actual IME if visible, without asking Espresso to choose a focused root. */
+    fun dismissImeIfVisible(compose: MainComposeRule) {
+        var visible: Boolean? = null
+        var focused = false
+        compose.waitForIdle()
+        compose.activityRule.scenario.onActivity { activity ->
+            val decor = activity.window.decorView
+            focused = decor.hasWindowFocus()
+            val insets = ViewCompat.getRootWindowInsets(decor)
+            visible = insets?.isVisible(WindowInsetsCompat.Type.ime())
+            Log.i("GabiTestEvidence", "ime_before visible=$visible windowFocus=$focused")
+            if (visible == true) WindowInsetsControllerCompat(activity.window, decor).hide(WindowInsetsCompat.Type.ime())
+        }
+        check(visible != null) { "Window insets unavailable while checking the keyboard." }
+        if (visible == true) {
+            compose.waitUntil(10_000L) {
+                var hidden = false
+                compose.activityRule.scenario.onActivity { activity ->
+                    val insets = ViewCompat.getRootWindowInsets(activity.window.decorView)
+                    hidden = insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime())
+                }
+                hidden
+            }
+        }
+        compose.waitForIdle()
+        compose.activityRule.scenario.onActivity { activity ->
+            val decor = activity.window.decorView
+            val insets = ViewCompat.getRootWindowInsets(decor)
+            Log.i("GabiTestEvidence", "ime_after visible=${insets?.isVisible(WindowInsetsCompat.Type.ime())} windowFocus=${decor.hasWindowFocus()}")
+        }
     }
 
     fun pressSystemBack(compose: MainComposeRule) {
