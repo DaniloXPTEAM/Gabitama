@@ -45,7 +45,9 @@ sealed class Screen(val route: String) {
     object Permissions : Screen("permissions")
 
     companion object {
-        val allRoutes: List<String> = listOf(
+        // Do not initialize nested screen objects during Screen class initialization.
+        // The initial destination may itself be the first object being initialized.
+        val allRoutes: List<String> get() = listOf(
             Home.route,
             Chat.route,
             Habitat.route,
