@@ -22,7 +22,7 @@ class GeminiImageGenerationUnitTest {
         assertTrue(runCatching { GeminiImageGeneration.buildRequest("fake", "model/escape", "maçã", true) }.isFailure)
         assertTrue(PolicyGate().evaluate(descriptor, req.copy(userConfirmed = true, paidConsentGranted = true), false) is PolicyDecision.Allowed)
     }
-    @Test fun mockedProviderReturnsImageAndKeepsKeyOutOfUrl() = runBlocking {
+    @Test fun mockedProviderReturnsImageAndKeepsKeyOutOfUrl(): Unit = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("""{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"$png"}}]}}]}"""))
             server.start()
@@ -40,7 +40,7 @@ class GeminiImageGenerationUnitTest {
             client.dispatcher.executorService.shutdownNow()
         }
     }
-    @Test fun quotaAndInvalidResponseAreReportedWithoutEchoingProviderSecrets() = runBlocking {
+    @Test fun quotaAndInvalidResponseAreReportedWithoutEchoingProviderSecrets(): Unit = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setResponseCode(429).setBody("private secret"))
             server.start()
