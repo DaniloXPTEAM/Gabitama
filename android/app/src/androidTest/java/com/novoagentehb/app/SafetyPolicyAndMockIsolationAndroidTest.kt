@@ -150,7 +150,10 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     @Test
     fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
         // Ephemeral self-signed TLS, trusted only by this test client; never weaken app policy.
-        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("127.0.0.1").build()
+        val certificate = HeldCertificate.Builder()
+            .addSubjectAlternativeName("127.0.0.1")
+            .addSubjectAlternativeName("localhost")
+            .build()
         val serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
         val clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()
         val server = MockWebServer()
