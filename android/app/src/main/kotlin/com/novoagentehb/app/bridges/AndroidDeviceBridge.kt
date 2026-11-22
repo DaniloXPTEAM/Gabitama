@@ -195,25 +195,19 @@ class AndroidDeviceBridge @Inject constructor(
             isInstalled("com.whatsapp.w4b") -> "com.whatsapp.w4b"
             else -> return BridgeOutcome(false, false, "WhatsApp não está instalado neste aparelho.", "WHATSAPP_MISSING")
         }
-        val phone = findContactPhone(contactName)?.replace(Regex("[^0-9]"), "")
-        val intent = if (!phone.isNullOrBlank()) {
-            Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$phone")).apply {
-                setPackage(waPkg)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        } else {
-            context.packageManager.getLaunchIntentForPackage(waPkg)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        } ?: return BridgeOutcome(false, false, "Não foi possível abrir o WhatsApp.", "WHATSAPP_LAUNCH_FAILED")
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return BridgeOutcome(false, false, "Permissão de contatos necessária para identificar o destinatário.", "MISSING_READ_CONTACTS")
+        }
+        val phone = findContactPhone(contactName)
+            ?: return BridgeOutcome(false, false, "Contato não encontrado exatamente ou possui números ambíguos; escolha o nome e número antes de continuar.", "CONTACT_AMBIGUOUS_OR_MISSING")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$phone")).apply {
+            setPackage(waPkg)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
 
         return runCatching {
             context.startActivity(intent)
-            if (phone != null) {
-                BridgeOutcome(true, true, "Conversa com $contactName aberta no WhatsApp (nenhuma mensagem enviada ainda).")
-            } else {
-                BridgeOutcome(true, false, "WhatsApp aberto; número de \"$contactName\" não localizado nos contatos.")
-            }
+            BridgeOutcome(true, false, "Solicitada abertura da conversa com $contactName; confirme o destinatário no WhatsApp. Nenhuma mensagem foi enviada.")
         }.getOrElse { err ->
             BridgeOutcome(false, false, "Erro ao abrir WhatsApp: ${err.message}", "WHATSAPP_ERROR")
         }
@@ -237,13 +231,13 @@ class AndroidDeviceBridge @Inject constructor(
             if (service.isStopRequested()) break
             delay(150L)
             if (service.isStopRequested()) break
-            if (service.attemptTypeAndSendWhatsApp(message)) {
+            if (service.attemptTypeAndSendWhatsApp(contactName, message)) {
                 sent = true
                 break
             }
         }
         return if (sent) {
-            BridgeOutcome(true, true, "Mensagem enviada via acessibilidade para $contactName.")
+            BridgeOutcome(true, false, "Clique em enviar solicitado via acessibilidade para $contactName; envio e entrega não foram verificados.", "WHATSAPP_SEND_UNVERIFIED")
         } else {
             BridgeOutcome(
                 false,
@@ -432,25 +426,17 @@ class AndroidDeviceBridge @Inject constructor(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val normQuery = normalize(contactQuery)
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER
         )
         return runCatching {
             context.contentResolver.query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                projection,
-                null,
-                null,
-                null
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, null, null, null
             )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val name = normalize(cursor.getString(0).orEmpty())
-                    val number = cursor.getString(1).orEmpty()
-                    if (name.contains(normQuery) && number.isNotBlank()) return@use number
-                }
-                null
+                val contacts = mutableListOf<Pair<String, String>>()
+                while (cursor.moveToNext()) contacts.add(cursor.getString(0).orEmpty() to cursor.getString(1).orEmpty())
+                ContactMatch.uniqueNumber(contactQuery, contacts)
             }
         }.getOrNull()
     }

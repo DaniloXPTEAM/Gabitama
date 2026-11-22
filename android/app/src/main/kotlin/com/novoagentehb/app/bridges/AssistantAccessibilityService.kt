@@ -56,15 +56,16 @@ class AssistantAccessibilityService : AccessibilityService() {
         return collected.joinToString(" | ").take(600)
     }
 
-    fun attemptTypeAndSendWhatsApp(message: String): Boolean {
+    fun attemptTypeAndSendWhatsApp(contactName: String, message: String): Boolean {
         if (stopRequested.get()) return false
         val root = rootInActiveWindow ?: return false
         val rootPkg = root.packageName?.toString().orEmpty()
-        val pkg = when {
-            rootPkg == WA_PACKAGE || rootPkg == WA_BUSINESS_PACKAGE -> rootPkg
-            _activePackage.value == WA_PACKAGE || _activePackage.value == WA_BUSINESS_PACKAGE -> _activePackage.value
-            else -> return false
-        }
+        if (rootPkg != WA_PACKAGE && rootPkg != WA_BUSINESS_PACKAGE) return false
+        val pkg = rootPkg
+        // Fail closed unless the actual active conversation header matches exactly.
+        val headers = root.findAccessibilityNodeInfosByViewId("$pkg:id/conversation_contact_name")
+        val wanted = ContactMatch.normalize(contactName)
+        if (wanted.isBlank() || headers.none { ContactMatch.normalize(it.text?.toString().orEmpty()) == wanted }) return false
 
         val entryNode = root.findAccessibilityNodeInfosByViewId("$pkg:id/entry").firstOrNull()
             ?: return false
