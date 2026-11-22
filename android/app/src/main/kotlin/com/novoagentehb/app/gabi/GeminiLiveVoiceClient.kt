@@ -86,10 +86,18 @@ class GeminiLiveVoiceClient @Inject constructor(
 
             override fun onMessage(webSocket: WebSocket, text: String) = synchronized(this@GeminiLiveVoiceClient) {
                 if (activeSocket !== webSocket) return@synchronized
-                parseServerMessage(text).forEach {
+                val parsed = parseServerMessage(text)
+                val failure = parsed.filterIsInstance<GeminiLiveEvent.ConnectionFailed>().firstOrNull()
+                if (failure != null) {
+                    _connected.value = false
+                    activeSocket = null
+                    _events.tryEmit(failure)
+                    webSocket.cancel()
+                    return@synchronized
+                }
+                parsed.forEach {
                     if (it is GeminiLiveEvent.Ready) _connected.value = true
-                    if (it is GeminiLiveEvent.ConnectionFailed) _connected.value = false
-                    _events.tryEmit(it)
+                    if (_connected.value || it is GeminiLiveEvent.GoingAway) _events.tryEmit(it)
                 }
             }
 

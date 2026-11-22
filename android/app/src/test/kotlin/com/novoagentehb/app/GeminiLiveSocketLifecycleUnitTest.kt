@@ -96,4 +96,20 @@ class GeminiLiveSocketLifecycleUnitTest {
         assertArrayEquals(byteArrayOf(3, 4), (events[2] as GeminiLiveEvent.AudioOutput).pcm24k)
         assertTrue(events[3] is GeminiLiveEvent.TurnComplete)
     }
+
+    @Test fun serverErrorCannotBeOverriddenBySetupCompleteInSameMessage() = runBlocking {
+        val factory = Factory()
+        val client = GeminiLiveVoiceClient(OkHttpClient(), Gson()).apply { webSocketFactory = factory }
+        assertTrue(client.connect("synthetic-key", systemInstruction = "test"))
+        factory.open(0)
+        val failure = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(1000) { client.events.first { it is GeminiLiveEvent.ConnectionFailed } }
+        }
+        factory.listeners[0].onMessage(factory.sockets[0], """{"error":{"message":"model unavailable"},"setupComplete":{}}""")
+        assertTrue(failure.await() is GeminiLiveEvent.ConnectionFailed)
+        assertFalse(client.connected.value)
+        assertTrue(factory.sockets[0].closed)
+        factory.ready(0)
+        assertFalse(client.connected.value)
+    }
 }
