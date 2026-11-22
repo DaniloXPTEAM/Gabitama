@@ -102,7 +102,7 @@ jobs:
             sha256sum android/app/build/outputs/apk/debug/app-debug.apk | tee evidence-apk-sha256.txt
             echo "::notice title=Emulator APK SHA256::$(cut -d' ' -f1 evidence-apk-sha256.txt)"
             scripts/android/emulator-smoke.sh
-            (cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace)
+            scripts/android/connected-tests.sh
             adb exec-out screencap -p > evidence-android/after-ui-test.png
             echo '::notice title=UI test::connectedDebugAndroidTest passou; veja o relatório para a cobertura exata.'
       - name: Relatórios do emulador (sem logcat bruto)
