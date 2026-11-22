@@ -163,7 +163,7 @@ object GeminiLiveSessionReducer {
             is GeminiLiveEvent.Ready -> LiveReducerDecision(
                 nextState = LiveSessionState.ACTIVE,
                 nextReconnectAttempts = 0,
-                isListening = true,
+                isListening = false,
                 startMicStream = true
             )
             is GeminiLiveEvent.AudioOutput -> LiveReducerDecision(
@@ -444,7 +444,6 @@ class VoiceEngineCoordinator @Inject constructor(
     private var mediaPlayer: MediaPlayer? = null
     private var pcmTrack: AudioTrack? = null
     private var audioRecord: AudioRecord? = null
-    private var echoCanceler: AcousticEchoCanceler? = null
     private var systemTts: TextToSpeech? = null
     private var systemTtsReady = false
     private var speechJob: Job? = null
@@ -453,7 +452,11 @@ class VoiceEngineCoordinator @Inject constructor(
     private var liveReconnectJob: Job? = null
     private var livePlaybackJob: Job? = null
     private val pcmLock = Any()
-    private val pcmOutChannel = Channel<ByteArray>(capacity = Channel.UNLIMITED)
+    private val micLock = Any()
+    private val micGeneration = java.util.concurrent.atomic.AtomicLong()
+    private data class PcmChunk(val generation: Long, val bytes: ByteArray)
+    private val pcmGeneration = java.util.concurrent.atomic.AtomicLong()
+    private val pcmOutChannel = Channel<PcmChunk>(capacity = Channel.UNLIMITED)
 
     private var liveReducerState = LiveReducerInput()
     private var activeLiveModel: String = AppPreferences.DEFAULT_GEMINI_LIVE_MODEL
@@ -525,7 +528,7 @@ class VoiceEngineCoordinator @Inject constructor(
                 }
 
                 decision.enqueuePcm24k?.let { pcm ->
-                    pcmOutChannel.trySend(pcm)
+                    pcmOutChannel.trySend(PcmChunk(pcmGeneration.get(), pcm))
                 }
 
                 emitTurnCommits(turnFlush)
@@ -691,107 +694,118 @@ class VoiceEngineCoordinator @Inject constructor(
         }
     }
 
+    /** Fail closed, without exposing audio, keys or raw exception messages. */
+    private fun failLiveAudio(message: String) {
+        if (!liveReducerState.keepAlive || liveReducerState.state != LiveSessionState.ACTIVE) return
+        liveWatchdogJob?.cancel()
+        liveReconnectJob?.cancel()
+        liveReducerState = LiveReducerInput(state = LiveSessionState.BLOCKED, keepAlive = false)
+        stopPcmMicCapture()
+        drainPcmOutQueueAndFlushTrack()
+        releasePcmTrack()
+        geminiLive.disconnect()
+        updateStatus { it.copy(liveSessionState = LiveSessionState.BLOCKED, liveConnectionError = message, isListening = false, isSpeaking = false) }
+        _events.tryEmit(VoiceTranscriptEvent.VoiceError(message))
+    }
+
     @SuppressLint("MissingPermission")
     private fun startPcmMicCapture() {
+        stopPcmMicCapture()
+        val generation = micGeneration.get()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            failLiveAudio("Permissão de microfone necessária para Gemini Live.")
             return
         }
-        stopPcmMicCapture()
         micStreamJob = scope.launch(Dispatchers.IO) {
-            val sampleRate = GeminiLiveVoiceClient.INPUT_SAMPLE_RATE
-            val minBuf = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            ).coerceAtLeast(3200)
-
-            val recorder = runCatching {
-                AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                    sampleRate,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    minBuf * 2
-                )
-            }.getOrNull() ?: return@launch
-
-            if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                recorder.release()
-                return@launch
-            }
-
-            audioRecord = recorder
-            if (AcousticEchoCanceler.isAvailable()) {
-                runCatching {
-                    echoCanceler = AcousticEchoCanceler.create(recorder.audioSessionId)?.apply { enabled = true }
+            var recorder: AudioRecord? = null
+            var echo: AcousticEchoCanceler? = null
+            try {
+                val minBuf = PcmIoContracts.requireBufferSize(AudioRecord.getMinBufferSize(
+                    GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+                )).coerceAtLeast(3200)
+                val created = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                    GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, minBuf * 2)
+                recorder = created
+                check(created.state == AudioRecord.STATE_INITIALIZED) { "Microfone não inicializado." }
+                synchronized(micLock) {
+                    if (generation != micGeneration.get()) return@launch
+                    audioRecord = created
+                    created.startRecording()
+                    check(created.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microfone não iniciou gravação." }
                 }
-            }
-
-            val chunkBuffer = ByteArray(1280) // ~40ms de PCM16 16kHz mono
-            runCatching {
-                recorder.startRecording()
-                while (isActive && liveReducerState.keepAlive && geminiLive.connected.value) {
-                    val read = recorder.read(chunkBuffer, 0, chunkBuffer.size)
-                    if (read > 0) {
-                        val payload = if (read == chunkBuffer.size) chunkBuffer.copyOf() else chunkBuffer.copyOf(read)
-                        geminiLive.sendPcm16AudioChunk(payload)
+                if (AcousticEchoCanceler.isAvailable()) {
+                    echo = runCatching { AcousticEchoCanceler.create(created.audioSessionId)?.apply { enabled = true } }.getOrNull()
+                }
+                scope.launch {
+                    if (generation == micGeneration.get() && liveReducerState.state == LiveSessionState.ACTIVE) {
+                        updateStatus { it.copy(isListening = true) }
                     }
                 }
+                val buffer = ByteArray(1280)
+                while (isActive && generation == micGeneration.get() && geminiLive.connected.value) {
+                    val count = PcmIoContracts.requireReadResult(created.read(buffer, 0, buffer.size))
+                    if (count > 0 && generation == micGeneration.get() && !geminiLive.sendPcm16AudioChunk(buffer.copyOf(count))) {
+                        error("Falha ao enviar áudio do microfone.")
+                    }
+                }
+            } catch (_: Exception) {
+                if (generation == micGeneration.get() && isActive) scope.launch {
+                    if (generation == micGeneration.get()) failLiveAudio("Falha no microfone ou no envio de áudio Live. Verifique a permissão e tente novamente.")
+                }
+            } finally {
+                runCatching { echo?.release() }
+                synchronized(micLock) { if (audioRecord === recorder) audioRecord = null }
+                runCatching { recorder?.stop() }
+                runCatching { recorder?.release() }
             }
         }
     }
 
     private fun stopPcmMicCapture() {
+        micGeneration.incrementAndGet()
         micStreamJob?.cancel()
         micStreamJob = null
-        runCatching { echoCanceler?.release() }
-        echoCanceler = null
-        runCatching {
-            audioRecord?.stop()
-            audioRecord?.release()
-        }
-        audioRecord = null
+        // stop() unblocks read(); the capture job owns release(), including cancellation races.
+        synchronized(micLock) { runCatching { audioRecord?.stop() } }
     }
 
-    private fun writePcm24kBlocking(pcmBytes: ByteArray) {
-        if (pcmBytes.isEmpty()) return
-        runCatching {
-            val minBuf = AudioTrack.getMinBufferSize(
-                GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            ).coerceAtLeast(4800)
-
-            val track = synchronized(pcmLock) {
+    private fun writePcm24kBlocking(chunk: PcmChunk) {
+        val pcmBytes = chunk.bytes
+        if (pcmBytes.isEmpty() || chunk.generation != pcmGeneration.get()) return
+        try {
+            val minBuf = PcmIoContracts.requireBufferSize(AudioTrack.getMinBufferSize(
+                GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+            )).coerceAtLeast(4800)
+            synchronized(pcmLock) {
+                if (chunk.generation != pcmGeneration.get()) return
                 if (pcmTrack == null) {
                     pcmTrack = AudioTrack.Builder()
-                        .setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .build()
-                        )
-                        .setAudioFormat(
-                            AudioFormat.Builder()
-                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                                .setSampleRate(GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE)
-                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                                .build()
-                        )
-                        .setBufferSizeInBytes(maxOf(minBuf * 2, pcmBytes.size))
-                        .setTransferMode(AudioTrack.MODE_STREAM)
-                        .build()
-                    pcmTrack?.play()
-                } else if (pcmTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
-                    pcmTrack?.play()
+                        .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                        .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                        .setBufferSizeInBytes(maxOf(minBuf * 2, pcmBytes.size)).setTransferMode(AudioTrack.MODE_STREAM).build()
                 }
-                pcmTrack
+                val current = checkNotNull(pcmTrack)
+                check(current.state == AudioTrack.STATE_INITIALIZED) { "Reprodução não inicializada." }
+                if (current.playState != AudioTrack.PLAYSTATE_PLAYING) current.play()
             }
-            track?.write(pcmBytes, 0, pcmBytes.size)
+            PcmIoContracts.writeFully(pcmBytes.size) { offset, remaining ->
+                synchronized(pcmLock) {
+                    if (chunk.generation != pcmGeneration.get()) return
+                    checkNotNull(pcmTrack).write(pcmBytes, offset, minOf(remaining, 1920))
+                }
+            }
+        } catch (_: Exception) {
+            scope.launch {
+                if (chunk.generation == pcmGeneration.get()) failLiveAudio("Falha na reprodução de áudio Live. Verifique a saída de áudio e tente novamente.")
+            }
         }
     }
 
     private fun drainPcmOutQueueAndFlushTrack() {
+        synchronized(pcmLock) { pcmGeneration.incrementAndGet() }
         while (pcmOutChannel.tryReceive().isSuccess) {
             // descarta áudio pendente imediatamente em barge-in/encerramento
         }
@@ -939,7 +953,7 @@ class VoiceEngineCoordinator @Inject constructor(
     fun playPcm24kAudio(pcmBytes: ByteArray) {
         if (pcmBytes.isEmpty()) return
         ensurePcmPlayerConsumer()
-        pcmOutChannel.trySend(pcmBytes)
+        pcmOutChannel.trySend(PcmChunk(pcmGeneration.get(), pcmBytes))
     }
 
     fun stopSpeaking() {
