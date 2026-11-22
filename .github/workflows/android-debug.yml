@@ -87,7 +87,13 @@ jobs:
           fi
       - name: Compilar APK e APK de testes
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee /tmp/gabitama-compile.log || {
+            grep -E '^e: .*/src/(androidTest|main)/.*\.kt:[0-9]+:[0-9]+' /tmp/gabitama-compile.log | head -10 | while IFS= read -r line; do echo "::error title=Kotlin compilation::$line"; done
+            exit 1
+          }
       - name: Inicializar AVD e executar testes no Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
