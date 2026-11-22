@@ -81,7 +81,8 @@ internal object WorkspaceProgram {
         inputs: String,
         confirmed: Boolean,
         write: (String, String) -> WorkspaceWriteOutcome,
-        read: (String) -> String?
+        read: (String) -> String?,
+        onRow: suspend (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.Default) {
         require(confirmed) { "Confirmação necessária para executar o programa." }
         require(expression.isNotBlank() && expression.length <= MAX_EXPRESSION) { "Expressão vazia ou longa demais." }
@@ -90,8 +91,10 @@ internal object WorkspaceProgram {
         val rows = inputs.split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }
         require(rows.isNotEmpty() && rows.size <= MAX_ROWS) { "Forneça de 1 a $MAX_ROWS números." }
         val result = StringBuilder("entrada,resultado\n")
-        for (row in rows) {
+        for ((index, row) in rows.withIndex()) {
             yield() // lets the orchestrator's stop button cancel before any artifact is committed
+            onRow(index)
+            coroutineContext.ensureActive()
             val value = row.toDoubleOrNull()
             require(value != null && value.isFinite()) { "Entrada numérica inválida." }
             val evaluated = program.eval(value)
