@@ -69,6 +69,7 @@ class SafLibraryManager @Inject constructor(
 
     fun listWorkspaceFiles(): List<LibraryEntry> {
         return workspaceRoot.walkTopDown()
+            .onEnter { directory -> directory == workspaceRoot || !java.nio.file.Files.isSymbolicLink(directory.toPath()) }
             .filter { it.isFile && workspaceTarget(it.relativeTo(workspaceRoot).path) != null }
             .sortedByDescending { it.lastModified() }
             .map {
