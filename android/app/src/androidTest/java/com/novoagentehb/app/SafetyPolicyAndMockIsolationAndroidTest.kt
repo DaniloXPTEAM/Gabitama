@@ -169,6 +169,25 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     }
 
     @Test
+    fun arithmeticProgramExecutesAndPersistsARealArtifact() = runBlocking {
+        val saf = SafLibraryManager(context)
+        val result = com.novoagentehb.app.agent.computer.WorkspaceProgram.execute(
+            "x*3+1", "2,4", true,
+            { path, body -> saf.createWorkspaceFile(path, body) },
+            { path -> saf.readWorkspaceFile(path) }
+        )
+        try {
+            assertEquals(2, result.rowCount)
+            assertEquals("entrada,resultado\n2,7.0\n4,13.0\n", saf.readWorkspaceFile(result.path))
+            assertEquals(64, result.sha256.length)
+            assertFalse(saf.createWorkspaceFile(result.path, "não sobrescrever").success)
+            assertEquals("entrada,resultado\n2,7.0\n4,13.0\n", saf.readWorkspaceFile(result.path))
+        } finally {
+            assertTrue(saf.deleteWorkspaceFile(result.path))
+        }
+    }
+
+    @Test
     fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
         // Ephemeral self-signed TLS, trusted only by this test client; never weaken app policy.
         val certificate = HeldCertificate.Builder()

@@ -1,5 +1,6 @@
 package com.novoagentehb.app.agent.executor
 
+import com.novoagentehb.app.agent.computer.WorkspaceProgram
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsEngine
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsInput
 import com.novoagentehb.app.agent.memory.MemoryStore
@@ -48,6 +49,25 @@ class ToolExecutorAndVerifier @Inject constructor(
     suspend fun executeAndVerify(request: ToolExecutionRequest): ToolExecutionResult {
         val args = request.args
         return when (request.capabilityName) {
+            "execute_workspace_program" -> {
+                try {
+                    val result = WorkspaceProgram.execute(
+                        expression = args["expression"].orEmpty(), inputs = args["inputs"].orEmpty(),
+                        confirmed = request.userConfirmed,
+                        write = { path, text -> safLibraryManager.createWorkspaceFile(path, text) },
+                        read = { path -> safLibraryManager.readWorkspaceFile(path) }
+                    )
+                    ToolExecutionResult(true, true,
+                        "Expressão calculada para ${result.rowCount} entrada(s); CSV verificado: ${result.path}; SHA-256 ${result.sha256}. Interpretador limitado, não shell Linux.",
+                        payload = result.path, semantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: IllegalArgumentException) {
+                    ToolExecutionResult(false, false, e.message ?: "Programa inválido.", errorCode = "PROGRAM_INVALID")
+                } catch (e: IllegalStateException) {
+                    ToolExecutionResult(false, false, e.message ?: "Falha no artefato.", errorCode = "PROGRAM_ARTIFACT_FAILED")
+                }
+            }
             "open_app" -> {
                 val res = deviceBridge.openApp(args["app_name"].orEmpty())
                 ToolExecutionResult(res.success, res.verified, res.message, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)

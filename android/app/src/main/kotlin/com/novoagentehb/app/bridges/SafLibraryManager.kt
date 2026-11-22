@@ -60,6 +60,28 @@ class SafLibraryManager @Inject constructor(
         }
     }
 
+    /** Create a new artifact only: never replace an existing user file. */
+    fun createWorkspaceFile(relativePath: String, content: String): WorkspaceWriteOutcome {
+        val sanitized = sanitizeRelative(relativePath)
+        if (sanitized.isBlank()) return WorkspaceWriteOutcome(false, "", 0L, "", "Nome de arquivo inválido.")
+        var created: File? = null
+        return try {
+            val target = workspaceTarget(sanitized) ?: return WorkspaceWriteOutcome(false, sanitized, 0L, "", "Caminho fora do workspace.")
+            check(target.parentFile?.let { it.exists() || it.mkdirs() } == true)
+            check(workspaceTarget(sanitized) == target)
+            check(target.createNewFile()) { "Arquivo já existe." }
+            created = target
+            val bytes = content.toByteArray(Charsets.UTF_8)
+            target.writeBytes(bytes)
+            val readBack = target.readBytes()
+            check(readBack.contentEquals(bytes))
+            WorkspaceWriteOutcome(true, sanitized, readBack.size.toLong(), sha256Hex(readBack))
+        } catch (_: Exception) {
+            created?.delete()
+            WorkspaceWriteOutcome(false, sanitized, 0L, "", "Não foi possível criar ou verificar o arquivo sem sobrescrever.")
+        }
+    }
+
     fun readWorkspaceFile(relativePath: String): String? {
         val sanitized = sanitizeRelative(relativePath)
         if (sanitized.isBlank()) return null

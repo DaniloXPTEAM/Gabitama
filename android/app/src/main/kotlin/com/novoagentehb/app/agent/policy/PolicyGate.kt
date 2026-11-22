@@ -54,6 +54,8 @@ class PolicyGate @Inject constructor() {
         // 4. Portão de efeito externo (WhatsApp, ligação, calendário)
         if (descriptor.riskLevel == RiskLevel.EXTERNAL_SIDE_EFFECT && !request.userConfirmed) {
             val detail = when (descriptor.name) {
+                "execute_workspace_program" ->
+                    "Executar localmente a expressão aritmética \"${request.args["expression"].orEmpty().take(256)}\" nos números fornecidos e criar um novo CSV privado? Não é shell Linux."
                 "send_whatsapp_message" ->
                     "Enviar WhatsApp para ${request.args["contact_name"] ?: "contato"}: \"${request.args["message"].orEmpty()}\"?"
                 "call_contact", "call_number" ->

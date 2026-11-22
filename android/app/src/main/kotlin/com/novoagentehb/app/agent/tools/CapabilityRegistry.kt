@@ -291,6 +291,18 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Arquivo existe + SHA-256 conferido"
         ),
         ToolDescriptor(
+            name = "execute_workspace_program",
+            description = "Executa uma expressão aritmética limitada para cada número e salva CSV. Não executa shell, Python ou comandos arbitrários.",
+            riskLevel = RiskLevel.EXTERNAL_SIDE_EFFECT,
+            params = listOf(
+                ToolParamSpec("expression", "Expressão com x, números, + - * / e parênteses; exemplo x*2+1", required = true),
+                ToolParamSpec("inputs", "Números separados por vírgula ou linha", required = true)
+            ),
+            runtimeTier = RuntimeSupportTier.NATIVE_LOCAL_VERIFIED,
+            expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
+            postConditionNote = "Cálculo executado; CSV novo relido no workspace; recibo no histórico"
+        ),
+        ToolDescriptor(
             name = "workspace_read_file",
             description = "Lê um arquivo do workspace privado do agente.",
             riskLevel = RiskLevel.READ_ONLY,
