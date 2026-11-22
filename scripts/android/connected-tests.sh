@@ -36,6 +36,8 @@ for root in roots:
         lines.append(('FAIL ' if failure is not None else 'PASS ')+name)
         if failure is not None:
             text=(failure.get('message','')+'\n'+(failure.text or ''))
+            checkpoints=re.findall(r'checkpoint=[A-Za-z0-9_]+ inicio_clickable=\d+ home=\d+ goals=\d+ lifecycle=[A-Z]+', text)
+            lines.extend('Navigation: '+x for x in checkpoints[:3])
             types=re.findall(r'(?:[a-zA-Z_$][\w$]*\.)*[\w$]*(?:Exception|Error)', text)
             if types: lines.append('Exception type: '+types[0])
             for term, category in [('was already used', 'duplicate key'), ('CLEARTEXT', 'Android cleartext policy'), ('expected:<RESUMED>', 'lifecycle state mismatch'), ('not in the resumed state', 'activity not resumed')]:

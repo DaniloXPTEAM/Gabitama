@@ -93,7 +93,7 @@ object AndroidTestHarness {
 
 
     /** AVD-only diagnostic: tree structure and known screen labels, never arbitrary text. */
-    fun captureNavigationDiagnostic(compose: MainComposeRule, name: String) {
+    fun captureNavigationDiagnostic(compose: MainComposeRule, name: String): String {
         captureScreenshot(name)
         val labels = listOf("Início", "Gabi · HB", "Metas & Lembretes", "Memória da Gabi", "Arquivos & SAF", "Continuar")
         val root = compose.onRoot(useUnmergedTree = true).fetchSemanticsNode()
@@ -113,6 +113,7 @@ object AndroidTestHarness {
         val dir = requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("test-screenshots"))
         File(dir, "$name-tree-sanitized.txt").writeText(summary + "\n" + lines.joinToString("\n"))
         println("GABIDIAG $summary")
+        return summary
     }
 
     fun captureScreenshot(name: String) {
