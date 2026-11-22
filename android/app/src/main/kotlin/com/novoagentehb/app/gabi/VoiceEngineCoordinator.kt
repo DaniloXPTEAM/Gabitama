@@ -221,17 +221,26 @@ object GeminiLiveSessionReducer {
                     )
                 }
             }
-            is GeminiLiveEvent.ConnectionFailed -> LiveReducerDecision(
-                nextState = LiveSessionState.BLOCKED,
-                nextReconnectAttempts = current.reconnectAttempts,
-                isListening = false,
-                isSpeaking = false,
-                stopMicStream = true,
-                clearAudioQueue = true,
-                errorMessage = event.reason
-            )
+            is GeminiLiveEvent.ConnectionFailed -> {
+                val retry = event.retryable && current.keepAlive && current.state == LiveSessionState.ACTIVE &&
+                    current.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+                LiveReducerDecision(
+                    nextState = if (retry) LiveSessionState.RECONNECTING else LiveSessionState.BLOCKED,
+                    nextReconnectAttempts = current.reconnectAttempts + if (retry) 1 else 0,
+                    isListening = false,
+                    isSpeaking = false,
+                    stopMicStream = true,
+                    clearAudioQueue = true,
+                    attemptReconnect = retry,
+                    errorMessage = event.reason
+                )
+            }
             is GeminiLiveEvent.Closed -> LiveReducerDecision(
-                nextState = if (current.state == LiveSessionState.RECONNECTING) LiveSessionState.RECONNECTING else LiveSessionState.DISCONNECTED,
+                nextState = when (current.state) {
+                    LiveSessionState.RECONNECTING -> LiveSessionState.RECONNECTING
+                    LiveSessionState.BLOCKED -> LiveSessionState.BLOCKED
+                    else -> LiveSessionState.DISCONNECTED
+                },
                 nextReconnectAttempts = current.reconnectAttempts,
                 isListening = false,
                 isSpeaking = false,

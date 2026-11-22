@@ -31,7 +31,7 @@ sealed class GeminiLiveEvent {
     data class ToolInvocation(val callId: String, val name: String, val argsJson: Map<String, String>) : GeminiLiveEvent()
     data class Usage(val inputTokens: Int, val outputTokens: Int) : GeminiLiveEvent()
     object GoingAway : GeminiLiveEvent()
-    data class ConnectionFailed(val reason: String) : GeminiLiveEvent()
+    data class ConnectionFailed(val reason: String, val retryable: Boolean = false) : GeminiLiveEvent()
     data class Closed(val code: Int, val reason: String) : GeminiLiveEvent()
 }
 
@@ -94,11 +94,12 @@ class GeminiLiveVoiceClient @Inject constructor(
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = synchronized(this@GeminiLiveVoiceClient) {
                 if (activeSocket !== webSocket) return@synchronized
+                val wasReady = _connected.value
                 activeSocket = null
                 _connected.value = false
                 val codePart = response?.code?.let { "HTTP $it · " }.orEmpty()
                 val msg = SecureKeyVault.redactSecrets("$codePart${t.message ?: "Falha WebSocket Gemini Live"}")
-                _events.tryEmit(GeminiLiveEvent.ConnectionFailed(msg))
+                _events.tryEmit(GeminiLiveEvent.ConnectionFailed(msg, retryable = wasReady && response == null && t is java.io.IOException))
                 Unit
             }
 
