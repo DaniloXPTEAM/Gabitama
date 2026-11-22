@@ -319,6 +319,28 @@ class TaskOrchestrator @Inject constructor(
         return res
     }
 
+    /** Request a bounded local computation through the same confirmation and receipt path as agent tools. */
+    fun requestWorkspaceProgram(expression: String, inputs: String, onResult: (String) -> Unit) {
+        if (_turnState.value.status != TaskStatus.IDLE || _turnState.value.pendingConfirmation != null) {
+            onResult("Outra ação está em andamento ou aguardando confirmação.")
+            return
+        }
+        val taskId = UUID.randomUUID().toString()
+        publishTurnState { it.copy(status = TaskStatus.PLANNING, activeTaskDescription = "Preparando cálculo local…") }
+        currentJob = scope.launch {
+            queueMutex.withLock {
+                val receipt = executeCapabilityWithPolicies(ToolExecutionRequest(
+                    taskId = taskId, idempotencyKey = "$taskId:workspace_program",
+                    capabilityName = "execute_workspace_program", args = mapOf("expression" to expression, "inputs" to inputs)
+                ))
+                if (receipt.status != TaskStatus.AWAITING_CONFIRMATION) {
+                    publishTurnState { it.copy(status = TaskStatus.IDLE, activeTaskDescription = "", lastReceipt = receipt) }
+                    onResult(receipt.summary)
+                }
+            }
+        }
+    }
+
     fun requestMcpToolExecution(
         skillId: String,
         toolName: String,

@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -78,6 +79,8 @@ fun ComputerScreen(
     val statusNotice by viewModel.statusNotice.collectAsState()
     val sceneFrames = rememberAnimFrameCount("scene_computador") ?: 0
 
+    var expression by remember { mutableStateOf("") }
+    var numbers by remember { mutableStateOf("") }
     var skillName by remember { mutableStateOf("") }
     var skillPrompt by remember { mutableStateOf("") }
     var skillWriteVerifyMode by remember { mutableStateOf(false) }
@@ -261,6 +264,27 @@ fun ComputerScreen(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        item {
+                            GabiFeaturedSurface(borderColor = GabiTokens.Hairline) {
+                                Text("Cálculo local limitado", style = MaterialTheme.typography.titleMedium, color = GabiTokens.TextPrimary)
+                                Text("Expressões aritméticas com x, +, -, *, / e parênteses; produz um CSV privado após autorização. Não é terminal Linux nem executa Python.", color = GabiTokens.TextSecondary, style = MaterialTheme.typography.bodySmall)
+                                OutlinedTextField(
+                                    value = expression, onValueChange = { expression = it },
+                                    label = { Text("Expressão (ex.: x*2+1)") },
+                                    modifier = Modifier.fillMaxWidth().testTag("workspace_expression"), singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = numbers, onValueChange = { numbers = it },
+                                    label = { Text("Números separados por vírgula") },
+                                    modifier = Modifier.fillMaxWidth().testTag("workspace_numbers"), maxLines = 3
+                                )
+                                Button(onClick = { viewModel.requestWorkspaceProgram(expression, numbers) },
+                                    enabled = expression.isNotBlank() && numbers.isNotBlank() && !processing && turnState.pendingConfirmation == null) {
+                                    Text("Preparar cálculo")
                                 }
                             }
                         }

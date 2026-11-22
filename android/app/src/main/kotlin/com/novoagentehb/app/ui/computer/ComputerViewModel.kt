@@ -158,6 +158,10 @@ class ComputerViewModel @Inject constructor(
         }
     }
 
+    fun requestWorkspaceProgram(expression: String, inputs: String) {
+        orchestrator.requestWorkspaceProgram(expression, inputs) { _statusNotice.value = it }
+    }
+
     fun runDiagnosticsCommand() {
         orchestrator.submitUserMessage("/diagnostico")
         _statusNotice.value = "Comando /diagnostico enviado para a fila do orquestrador."

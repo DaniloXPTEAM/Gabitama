@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.novoagentehb.app.app.MainActivity
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -200,6 +202,47 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         AndroidTestHarness.waitUntilText(compose, "Rever abertura do Quarto")
         compose.onNode(hasText("Rever abertura do Quarto")).performClick()
         AndroidTestHarness.dismissQuartoIntroIfVisible(compose, dontShowAgain = true)
+    }
+
+    @Test
+    fun computerRunsConfirmedExpressionAndRecordsArtifact() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val workspace = com.novoagentehb.app.bridges.SafLibraryManager(context)
+        val before = workspace.listWorkspaceFiles().map { it.name }.toSet()
+        var output: String? = null
+        try {
+            AndroidTestHarness.ensureOnHomeScreen(compose)
+            AndroidTestHarness.clickBottomTab(compose, "Quarto")
+            AndroidTestHarness.dismissQuartoIntroIfVisible(compose, dontShowAgain = true)
+            compose.onNode(hasContentDescription("Computador e Skills")).performClick()
+            AndroidTestHarness.waitUntilText(compose, "Computador & Skills")
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Cálculo local limitado"))
+            compose.onNode(hasTestTag("workspace_expression")).performTextInput("x*3+1")
+            compose.onNode(hasTestTag("workspace_numbers")).performTextInput("2,4")
+            AndroidTestHarness.dismissImeIfVisible(compose)
+            compose.onNode(hasText("Preparar cálculo") and hasClickAction()).performScrollTo().performClick()
+            AndroidTestHarness.waitUntilText(compose, "Sim, autorizar")
+            // No artifact before authorization.
+            assertEquals(before, workspace.listWorkspaceFiles().map { it.name }.toSet())
+            compose.onNode(hasText("Sim, autorizar") and hasClickAction()).performClick()
+            compose.waitUntil(20_000) {
+                output = workspace.listWorkspaceFiles().map { it.name }.firstOrNull { it !in before && it.startsWith("computations/") }
+                output != null
+            }
+            val path = requireNotNull(output)
+            assertEquals("entrada,resultado\n2,7.0\n4,13.0\n", workspace.readWorkspaceFile(path))
+            compose.waitUntil(20_000) {
+                val dbPath = context.getDatabasePath(com.novoagentehb.app.data.local.AppDatabase.DATABASE_NAME).path
+                val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+                try {
+                    db.rawQuery("SELECT COUNT(*) FROM task_receipts WHERE capabilityName=? AND verifiedOutcome=1 AND summary LIKE ?", arrayOf("execute_workspace_program", "%$path%")).use {
+                        it.moveToFirst() && it.getInt(0) > 0
+                    }
+                } finally { db.close() }
+            }
+        } finally {
+            output?.let { workspace.deleteWorkspaceFile(it) }
+        }
     }
 
     @Test
