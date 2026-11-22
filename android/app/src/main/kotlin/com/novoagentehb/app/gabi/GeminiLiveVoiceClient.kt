@@ -54,6 +54,7 @@ class GeminiLiveVoiceClient @Inject constructor(
     private val _events = MutableSharedFlow<GeminiLiveEvent>(extraBufferCapacity = 128)
     val events: SharedFlow<GeminiLiveEvent> = _events.asSharedFlow()
 
+    @Synchronized
     fun connect(
         apiKey: String,
         model: String = DEFAULT_LIVE_MODEL,
@@ -75,53 +76,76 @@ class GeminiLiveVoiceClient @Inject constructor(
 
         val setupJson = buildSetupJson(model, systemInstruction, voiceName, tools)
         activeSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                _connected.value = true
-                webSocket.send(setupJson)
+            override fun onOpen(webSocket: WebSocket, response: Response) = synchronized(this@GeminiLiveVoiceClient) {
+                if (activeSocket === webSocket && !webSocket.send(setupJson)) {
+                    _events.tryEmit(GeminiLiveEvent.ConnectionFailed("Falha ao enviar setup Gemini Live."))
+                    webSocket.cancel()
+                }
             }
 
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                parseServerMessage(text).forEach { _events.tryEmit(it) }
+            override fun onMessage(webSocket: WebSocket, text: String) = synchronized(this@GeminiLiveVoiceClient) {
+                if (activeSocket !== webSocket) return@synchronized
+                parseServerMessage(text).forEach {
+                    if (it is GeminiLiveEvent.Ready) _connected.value = true
+                    if (it is GeminiLiveEvent.ConnectionFailed) _connected.value = false
+                    _events.tryEmit(it)
+                }
             }
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = synchronized(this@GeminiLiveVoiceClient) {
+                if (activeSocket !== webSocket) return@synchronized
+                activeSocket = null
                 _connected.value = false
                 val codePart = response?.code?.let { "HTTP $it · " }.orEmpty()
                 val msg = SecureKeyVault.redactSecrets("$codePart${t.message ?: "Falha WebSocket Gemini Live"}")
                 _events.tryEmit(GeminiLiveEvent.ConnectionFailed(msg))
+                Unit
             }
 
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = synchronized(this@GeminiLiveVoiceClient) {
+                if (activeSocket !== webSocket) return@synchronized
                 _connected.value = false
                 val sanitized = SecureKeyVault.redactSecrets(reason)
                 if (code != 1000) {
                     _events.tryEmit(GeminiLiveEvent.ConnectionFailed("Conexão encerrada ($code): $sanitized"))
                 }
+                webSocket.close(code, null)
+                Unit
             }
 
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = synchronized(this@GeminiLiveVoiceClient) {
+                if (activeSocket !== webSocket) return@synchronized
+                activeSocket = null
                 _connected.value = false
                 _events.tryEmit(GeminiLiveEvent.Closed(code, SecureKeyVault.redactSecrets(reason)))
+                Unit
             }
         })
         return true
     }
 
+    @Synchronized
     fun sendPcm16AudioChunk(pcm16k: ByteArray): Boolean {
+        if (!_connected.value) return false
         val ws = activeSocket ?: return false
         return ws.send(buildAudioChunkJson(pcm16k))
     }
 
+    @Synchronized
     fun sendTextTurn(text: String): Boolean {
+        if (!_connected.value) return false
         val ws = activeSocket ?: return false
         return ws.send(buildTextTurnJson(text))
     }
 
+    @Synchronized
     fun sendToolResponse(callId: String, name: String, outputText: String): Boolean {
+        if (!_connected.value) return false
         val ws = activeSocket ?: return false
         return ws.send(buildToolResponseJson(callId, name, outputText))
     }
 
+    @Synchronized
     fun disconnect() {
         runCatching { activeSocket?.close(1000, "client_disconnect") }
         activeSocket = null
