@@ -23,11 +23,14 @@ class GeminiLiveHandshakeUnitTest {
         MockWebServer().use { server ->
             val remote = AtomicReference<WebSocket>()
             val setupReceived = CountDownLatch(1)
+            val closed = CountDownLatch(1)
             server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) { remote.set(webSocket) }
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     if (text.contains("\"setup\"")) setupReceived.countDown()
                 }
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(code, reason) }
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { closed.countDown() }
             }))
             server.start()
             val http = OkHttpClient.Builder().addInterceptor { chain ->
@@ -48,6 +51,7 @@ class GeminiLiveHandshakeUnitTest {
                 assertTrue(client.sendPcm16AudioChunk(byteArrayOf(1, 2)))
             } finally {
                 client.disconnect()
+                assertTrue("local socket did not close", closed.await(10, TimeUnit.SECONDS))
                 http.dispatcher.executorService.shutdownNow()
             }
         }
