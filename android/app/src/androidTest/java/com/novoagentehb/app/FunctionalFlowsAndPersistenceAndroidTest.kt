@@ -162,7 +162,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         // Fases da HB (Pré-adolescente -> validação -> restaura Infância) + Bíblia
         compose.onNode(hasContentDescription("Fase da HB")).performClick()
         AndroidTestHarness.waitUntilText(compose, "Pré-adolescente (idade1)")
-        AndroidTestHarness.captureScreenshot("05b_quarto_stage_dialog")
+        AndroidTestHarness.captureScreen(compose, "05b_quarto_stage_dialog", "habitat", "Pré-adolescente (idade1)")
         compose.onNode(hasText("Pré-adolescente (idade1)")).performClick()
         AndroidTestHarness.waitUntilText(compose, "Cena completa (pre_adolescent)", substring = true)
 

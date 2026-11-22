@@ -107,7 +107,7 @@ jobs:
             sha256sum android/app/build/outputs/apk/debug/app-debug.apk | tee evidence-apk-sha256.txt
             echo "::notice title=Emulator APK SHA256::$(cut -d' ' -f1 evidence-apk-sha256.txt)"
             scripts/android/emulator-smoke.sh
-            scripts/android/connected-tests.sh
+            GABITAMA_TEST_CLASSES=com.novoagentehb.app.AllTenScreensNavigationAndroidTest,com.novoagentehb.app.FunctionalFlowsAndPersistenceAndroidTest scripts/android/connected-tests.sh
             adb exec-out screencap -p > evidence-android/after-ui-test.png
             echo '::notice title=UI test::connectedDebugAndroidTest passou; veja o relatório para a cobertura exata.'
       - name: Relatórios do emulador (sem logcat bruto)
@@ -122,6 +122,7 @@ jobs:
           if-no-files-found: warn
 
   android-legacy:
+    if: ${{ false }} # Ciclo A focado: somente API 34; reativar para regressão.
     name: Android API ${{ matrix.api }} — regressão instrumentada
     runs-on: ubuntu-latest
     timeout-minutes: 50

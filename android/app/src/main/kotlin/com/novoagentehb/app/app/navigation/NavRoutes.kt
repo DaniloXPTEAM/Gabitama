@@ -14,6 +14,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -94,34 +95,54 @@ fun NovoAgenteNavGraph(
         popExitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 10 } }
     ) {
         composable(Screen.Home.route) {
-            HomeScreen(navController = navController, autoStartListening = autoStartListening)
+            Box(Modifier.fillMaxSize().testTag("screen_home")) {
+                HomeScreen(navController = navController, autoStartListening = autoStartListening)
+            }
         }
         composable(Screen.Chat.route) {
-            ChatScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_chat")) {
+                ChatScreen(navController = navController)
+            }
         }
         composable(Screen.Habitat.route) {
-            QuartoGabiScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_habitat")) {
+                QuartoGabiScreen(navController = navController)
+            }
         }
         composable(Screen.Feed.route) {
-            FeedScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_feed")) {
+                FeedScreen(navController = navController)
+            }
         }
         composable(Screen.Goals.route) {
-            GoalsScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_goals")) {
+                GoalsScreen(navController = navController)
+            }
         }
         composable(Screen.Library.route) {
-            LibraryScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_library")) {
+                LibraryScreen(navController = navController)
+            }
         }
         composable(Screen.Memory.route) {
-            MemoryScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_memory")) {
+                MemoryScreen(navController = navController)
+            }
         }
         composable(Screen.Computer.route) {
-            ComputerScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_computer")) {
+                ComputerScreen(navController = navController)
+            }
         }
         composable(Screen.Settings.route) {
-            SettingsScreen(navController = navController)
+            Box(Modifier.fillMaxSize().testTag("screen_settings")) {
+                SettingsScreen(navController = navController)
+            }
         }
         composable(Screen.Permissions.route) {
-            PermissionsScreen(navController = navController, viewModel = permissionsViewModel)
+            Box(Modifier.fillMaxSize().testTag("screen_permissions")) {
+                PermissionsScreen(navController = navController, viewModel = permissionsViewModel)
+            }
         }
     }
 }

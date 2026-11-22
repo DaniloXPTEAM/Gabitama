@@ -28,24 +28,24 @@ class AllTenScreensNavigationAndroidTest {
         AndroidTestHarness.clickBottomTab(compose, "Avisos")
         AndroidTestHarness.waitUntilText(compose, "Avisos & Recibos")
         compose.onNode(hasText("Avisos & Recibos")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("03_feed")
+        AndroidTestHarness.captureScreen(compose, "03_feed", "feed", "Avisos & Recibos")
 
         // 4. Chat ("Gabi")
         AndroidTestHarness.clickBottomTab(compose, "Gabi")
         AndroidTestHarness.waitUntilText(compose, "Chat com a Gabi")
         compose.onNode(hasText("Chat com a Gabi")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("04_chat")
+        AndroidTestHarness.captureScreen(compose, "04_chat", "chat", "Chat com a Gabi")
 
         // 5. Quarto / Habitat ("Quarto")
         AndroidTestHarness.clickBottomTab(compose, "Quarto")
         AndroidTestHarness.dismissQuartoIntroIfVisible(compose, dontShowAgain = false)
-        AndroidTestHarness.captureScreenshot("05_quarto")
+        AndroidTestHarness.captureScreen(compose, "05_quarto", "habitat", "Quarto da Gabi")
 
         // 6. Computer (via ícone do Quarto) + Back
         compose.onNode(hasContentDescription("Computador e Skills")).performClick()
         AndroidTestHarness.waitUntilText(compose, "Computador & Skills")
         compose.onNode(hasText("Computador & Skills")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("06_computer")
+        AndroidTestHarness.captureScreen(compose, "06_computer", "computer", "Computador & Skills")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Quarto da Gabi")
 
@@ -53,12 +53,12 @@ class AllTenScreensNavigationAndroidTest {
         AndroidTestHarness.clickBottomTab(compose, "Ajustes")
         AndroidTestHarness.waitUntilText(compose, "Ajustes · Gemini & Voz")
         compose.onNode(hasText("Ajustes · Gemini & Voz")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("07_settings")
+        AndroidTestHarness.captureScreen(compose, "07_settings", "settings", "Ajustes · Gemini & Voz")
 
         compose.onNode(hasText("Permissões") and hasClickAction()).performClick()
         AndroidTestHarness.waitUntilText(compose, "Permissões da Gabi · HB")
         compose.onNode(hasText("Solicitar padrão")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("11_permissions")
+        AndroidTestHarness.captureScreen(compose, "11_permissions", "permissions", "Permissões da Gabi · HB")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Ajustes · Gemini & Voz")
 
@@ -70,7 +70,7 @@ class AllTenScreensNavigationAndroidTest {
         compose.onNode(hasText("METAS")).performScrollTo().performClick()
         AndroidTestHarness.waitUntilText(compose, "Metas & Lembretes")
         compose.onNode(hasText("Metas & Lembretes")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("08_goals")
+        AndroidTestHarness.captureScreen(compose, "08_goals", "goals", "Metas & Lembretes")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
 
@@ -78,7 +78,7 @@ class AllTenScreensNavigationAndroidTest {
         compose.onNode(hasText("MEMÓRIA")).performScrollTo().performClick()
         AndroidTestHarness.waitUntilText(compose, "Memória da Gabi")
         compose.onNode(hasText("Memória da Gabi")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("09_memory")
+        AndroidTestHarness.captureScreen(compose, "09_memory", "memory", "Memória da Gabi")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
 
@@ -86,7 +86,7 @@ class AllTenScreensNavigationAndroidTest {
         compose.onNode(hasText("ARQUIVOS")).performScrollTo().performClick()
         AndroidTestHarness.waitUntilText(compose, "Arquivos & SAF")
         compose.onNode(hasText("Arquivos & SAF")).assertIsDisplayed()
-        AndroidTestHarness.captureScreenshot("10_library")
+        AndroidTestHarness.captureScreen(compose, "10_library", "library", "Arquivos & SAF")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
         compose.onNode(hasText("Gabi · HB")).performScrollTo().assertIsDisplayed()

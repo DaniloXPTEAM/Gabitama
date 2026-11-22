@@ -2,9 +2,16 @@ package com.novoagentehb.app
 
 import android.graphics.Bitmap
 import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import android.view.Choreographer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -48,12 +55,12 @@ object AndroidTestHarness {
         }
         if (hasAnyNode(compose, hasText("Continuar"))) {
             compose.onNode(hasText("Permissões da Gabi · HB")).assertIsDisplayed()
-            captureScreenshot("01_permissions_onboarding")
+            captureScreen(compose, "01_permissions_onboarding", "permissions", "Permissões da Gabi · HB")
             compose.onNode(hasText("Continuar") and hasClickAction()).performClick()
         }
         waitUntilText(compose, "Gabi · HB", timeoutMs = 30_000L)
         compose.onNode(hasText("Gabi · HB")).assertIsDisplayed()
-        captureScreenshot("02_home")
+        captureScreen(compose, "02_home", "home", "Gabi · HB")
     }
 
     fun dismissQuartoIntroIfVisible(
@@ -115,6 +122,31 @@ object AndroidTestHarness {
         File(dir, "$name-tree-sanitized.txt").writeText(summary + "\n" + lines.joinToString("\n"))
         println("GABIDIAG $summary")
         return summary
+    }
+
+    /** Synchronize semantics, an actual rendered node and Android display frames before capture. */
+    fun captureScreen(compose: MainComposeRule, name: String, route: String, title: String) {
+        val screen = compose.onNode(hasTestTag("screen_$route"))
+        val heading = compose.onNode(hasText(title))
+        compose.waitForIdle()
+        screen.assertIsDisplayed()
+        heading.assertIsDisplayed()
+        // captureToImage uses PixelCopy on the node's own window (also works for dialogs).
+        // It synchronizes with rendering rather than merely observing a semantic node.
+        val rendered = heading.captureToImage()
+        check(rendered.width > 0 && rendered.height > 0)
+        val frames = CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            Choreographer.getInstance().postFrameCallback {
+                Choreographer.getInstance().postFrameCallback { frames.countDown() }
+            }
+        }
+        check(frames.await(10, TimeUnit.SECONDS)) { "Display did not produce frames for $name" }
+        compose.waitForIdle()
+        screen.assertIsDisplayed()
+        heading.assertIsDisplayed()
+        Log.i("GabiTestEvidence", "capture=$name expectedScreen=screen_$route expectedTitleVisible=true")
+        captureScreenshot(name)
     }
 
     fun captureScreenshot(name: String) {

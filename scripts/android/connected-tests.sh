@@ -14,7 +14,11 @@ collector() {
 }
 collector & collector_pid=$!
 trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null || :' EXIT
-(cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace) 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
+gradle_args=()
+if [ -n "${GABITAMA_TEST_CLASSES:-}" ]; then
+  gradle_args+=("-Pandroid.testInstrumentationRunnerArguments.class=$GABITAMA_TEST_CLASSES")
+fi
+(cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace "${gradle_args[@]}") 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
 status=${PIPESTATUS[0]}
 kill "$collector_pid" 2>/dev/null || :
 wait "$collector_pid" 2>/dev/null || :
