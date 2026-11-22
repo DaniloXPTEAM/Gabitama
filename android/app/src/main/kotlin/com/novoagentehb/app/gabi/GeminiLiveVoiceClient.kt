@@ -47,6 +47,7 @@ class GeminiLiveVoiceClient @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val gson: Gson
 ) {
+    internal var webSocketFactory: WebSocket.Factory = okHttpClient
     private var activeSocket: WebSocket? = null
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -75,7 +76,7 @@ class GeminiLiveVoiceClient @Inject constructor(
             .build()
 
         val setupJson = buildSetupJson(model, systemInstruction, voiceName, tools)
-        activeSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
+        activeSocket = webSocketFactory.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) = synchronized(this@GeminiLiveVoiceClient) {
                 if (activeSocket === webSocket && !webSocket.send(setupJson)) {
                     _events.tryEmit(GeminiLiveEvent.ConnectionFailed("Falha ao enviar setup Gemini Live."))
