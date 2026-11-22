@@ -38,6 +38,8 @@ jobs:
   android-emulator:
     name: Android API ${{ matrix.api }} — binário compartilhado
     needs: build-debug
+    permissions:
+      contents: write # Export only synthetic AVD captures as unreferenced blobs for review.
     runs-on: ubuntu-latest
     timeout-minutes: 50
     strategy:
@@ -71,6 +73,11 @@ jobs:
           script: |
             scripts/android/emulator-smoke.sh
             scripts/android/connected-tests.sh
+      - name: Disponibilizar PNGs sintéticos para inspeção
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/android/export-review-blobs.py
       - name: Evidências sanitizadas
         if: always()
         uses: actions/upload-artifact@v4

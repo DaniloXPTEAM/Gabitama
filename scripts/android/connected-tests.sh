@@ -17,6 +17,13 @@ trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null 
 # No Gradle invocation here: install and run the exact shared test APK.
 status=0
 adb install -r candidate/app-debug-androidTest.apk || status=1
+test_installed=$(adb shell pm path com.novoagentehb.app.debug.test | tr -d '\r' | sed -n 's/^package://p')
+if [ -z "$test_installed" ] || ! adb exec-out cat "$test_installed" > /tmp/gabitama-installed-test.apk || ! cmp candidate/app-debug-androidTest.apk /tmp/gabitama-installed-test.apk; then
+  echo '::error title=Test APK::Installed test APK does not match shared binary.'
+  status=1
+else
+  echo "::notice title=Installed Test APK SHA256::$(sha256sum /tmp/gabitama-installed-test.apk | cut -d' ' -f1)"
+fi
 adb shell pm list instrumentation | grep -F 'com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner (target=com.novoagentehb.app.debug)' >/dev/null || status=1
 if [ "$status" -eq 0 ]; then
   adb shell am instrument -w -r com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1 || status=1
