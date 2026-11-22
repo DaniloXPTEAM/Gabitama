@@ -186,7 +186,6 @@ object GeminiLiveSessionReducer {
                 nextState = LiveSessionState.ACTIVE,
                 nextReconnectAttempts = current.reconnectAttempts,
                 isSpeaking = false,
-                isListening = true,
                 clearAudioQueue = true
             )
             is GeminiLiveEvent.TurnComplete -> LiveReducerDecision(
@@ -459,6 +458,7 @@ class VoiceEngineCoordinator @Inject constructor(
     private var micStreamJob: Job? = null
     private var liveWatchdogJob: Job? = null
     private var liveReconnectJob: Job? = null
+    private var liveConnectJob: Job? = null
     private var livePlaybackJob: Job? = null
     private val pcmLock = Any()
     private val micLock = Any()
@@ -615,17 +615,16 @@ class VoiceEngineCoordinator @Inject constructor(
     }
 
     fun startGeminiLiveSession() {
+        if (liveReducerState.keepAlive) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             val msg = "Permissão de microfone necessária para Gemini Live."
             updateStatus { it.copy(liveSessionState = LiveSessionState.BLOCKED, liveConnectionError = msg) }
             _events.tryEmit(VoiceTranscriptEvent.VoiceError(msg))
             return
         }
-        scope.launch {
-            turnAggregator.reset()
-            liveReducerState = LiveReducerInput(state = LiveSessionState.CONNECTING, keepAlive = true, reconnectAttempts = 0)
-            connectGeminiLiveInternal(isReconnect = false)
-        }
+        turnAggregator.reset()
+        liveReducerState = LiveReducerInput(state = LiveSessionState.CONNECTING, keepAlive = true, reconnectAttempts = 0)
+        liveConnectJob = scope.launch { connectGeminiLiveInternal(isReconnect = false) }
     }
 
     private suspend fun connectGeminiLiveInternal(isReconnect: Boolean) {
@@ -688,6 +687,8 @@ class VoiceEngineCoordinator @Inject constructor(
     }
 
     fun stopGeminiLiveSession() {
+        liveConnectJob?.cancel()
+        liveConnectJob = null
         liveWatchdogJob?.cancel()
         liveReconnectJob?.cancel()
         emitTurnCommits(turnAggregator.flushOnStop())
