@@ -1,6 +1,8 @@
 package com.novoagentehb.app
 
 import com.google.gson.Gson
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import com.novoagentehb.app.gabi.GeminiLiveVoiceClient
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -44,6 +46,33 @@ class GeminiLiveHandshakeUnitTest {
                 while (!client.connected.value && System.nanoTime() < end) Thread.yield()
                 assertTrue("setupComplete must make session ready", client.connected.value)
                 assertTrue(client.sendPcm16AudioChunk(byteArrayOf(1, 2)))
+            } finally {
+                client.disconnect()
+                http.dispatcher.executorService.shutdownNow()
+            }
+        }
+    }
+
+    @Test fun rejectedHandshakeReportsFailureWithoutReady() = kotlinx.coroutines.runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(401))
+            server.start()
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                chain.proceed(chain.request().newBuilder().url(server.url("/")).build())
+            }.build()
+            val client = GeminiLiveVoiceClient(http, Gson())
+            val failure = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                kotlinx.coroutines.withTimeout(10000) {
+                    client.events.first { it is com.novoagentehb.app.gabi.GeminiLiveEvent.ConnectionFailed }
+                }
+            }
+            try {
+                assertTrue(client.connect("synthetic-key", systemInstruction = "test"))
+                val event = failure.await() as com.novoagentehb.app.gabi.GeminiLiveEvent.ConnectionFailed
+                assertTrue(event.reason.contains("401"))
+                assertFalse(event.retryable)
+                assertFalse(client.connected.value)
+                assertFalse(client.sendTextTurn("test"))
             } finally {
                 client.disconnect()
                 http.dispatcher.executorService.shutdownNow()
