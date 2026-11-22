@@ -33,3 +33,6 @@ __pycache__/
 Thumbs.db
 *.tmp
 *.bak
+
+# Entregas locais geradas, não publicar artefatos binários no repositório
+/entrega-r1-4-2/

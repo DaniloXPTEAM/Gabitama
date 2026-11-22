@@ -1,0 +1,5 @@
+# GitHub Actions — proposta, não executada
+
+Base 0ecdbe500648671d5eb2c02a81cd18af9d9c6ff4. Execução 44975081061 e seus resultados foram informados pelo proprietário, não validados nesta sessão. Nenhum commit, push ou execução CI novos foram feitos, conforme solicitado. O job original permanece; o artefato é rotulado LAUNCH_NOT_TESTED. Um job adicional compila os APKs e usa AVD API 34 x86_64 com KVM e teste Compose; sua viabilidade nesta combinação ainda não foi demonstrada.
+
+Consulta GitHub API nesta sessão: ReactiveCircus/android-emulator-runner não arquivado, última atualização 2026-08-26, release v2.38.0 em 2026-07-05. Isso não garante disponibilidade de KVM, SDK ou sucesso. Relatórios e screenshot de AVD descartável são enviados mesmo em falha quando disponíveis; não enviamos logcat bruto por privacidade. Build sem inicialização não é LAUNCH_PASS. A suíte é parcial e um job verde não comprova a matriz completa. Artifacts de ambos os jobs referem-se ao SHA do workflow; o APK do job original não foi verificado pelo emulador de outro job como o mesmo binário. Para vincular prova a hash, compare SHA256 ou utilize o APK do job do emulador numa futura melhoria.
