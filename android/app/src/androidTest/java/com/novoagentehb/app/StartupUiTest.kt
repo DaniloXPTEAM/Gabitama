@@ -2,6 +2,8 @@ package com.novoagentehb.app
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -39,6 +41,26 @@ class StartupUiTest {
             compose.onAllNodes(hasText("Chat com a Gabi")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Chat com a Gabi").assertIsDisplayed()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasText("Gabi · HB")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Gabi · HB").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Abrir Quarto da Gabi").performClick()
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasText("Pular")).fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodes(hasContentDescription("Fase da HB")).fetchSemanticsNodes().isNotEmpty()
+        }
+        if (compose.onAllNodes(hasText("Pular")).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText("Pular").performClick()
+        }
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasContentDescription("Fase da HB")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("Fase da HB").performClick()
+        compose.onNodeWithText("Fase da HB").assertIsDisplayed()
+        compose.onNodeWithText("Fechar").performClick()
+        compose.onNodeWithContentDescription("Fase da HB").assertIsDisplayed()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntil(30_000) {
             compose.onAllNodes(hasText("Gabi · HB")).fetchSemanticsNodes().isNotEmpty()

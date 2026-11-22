@@ -47,6 +47,10 @@ jobs:
       - name: Run Kotlin unit tests and build Debug APK
         run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --stacktrace
 
+      - name: Contagem de testes JVM
+        run: |
+          python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; print("::notice title=Unit tests::tests=%d failures=%d errors=%d skipped=%d" % tuple(sum(int(x.get(k,0)) for x in r) for k in ("tests","failures","errors","skipped")))'
+
       - name: Upload Debug APK artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -95,8 +99,12 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
+            sha256sum android/app/build/outputs/apk/debug/app-debug.apk | tee evidence-apk-sha256.txt
+            echo "::notice title=Emulator APK SHA256::$(cut -d' ' -f1 evidence-apk-sha256.txt)"
             scripts/android/emulator-smoke.sh
-            cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+            (cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace)
+            adb exec-out screencap -p > evidence-android/after-ui-test.png
+            echo '::notice title=UI test::connectedDebugAndroidTest passou; veja o relatório para a cobertura exata.'
       - name: Relatórios do emulador (sem logcat bruto)
         if: always()
         uses: actions/upload-artifact@v4
@@ -104,6 +112,8 @@ jobs:
           name: android-api34-evidence-${{ github.sha }}
           path: |
             evidence-android/
+            evidence-apk-sha256.txt
+            android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
           if-no-files-found: warn
