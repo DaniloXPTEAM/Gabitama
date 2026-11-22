@@ -96,6 +96,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun selectDiscoveredLiveModel(model: String) {
+        if (model !in _discoveredLiveModels.value) return
+        viewModelScope.launch {
+            prefs.setModels(prefs.chatModel.first(), prefs.screenOpModel.first(), prefs.visionModel.first(), model)
+            _statusBanner.value = "Modelo Live selecionado: $model. Confirme disponibilidade de áudio e custos antes de usar."
+        }
+    }
+
     fun discoverGeminiLiveModels() {
         viewModelScope.launch {
             _statusBanner.value = "Consultando modelos bidiGenerateContent na sua conta Gemini…"

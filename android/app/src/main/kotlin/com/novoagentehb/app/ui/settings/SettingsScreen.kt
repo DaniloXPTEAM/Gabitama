@@ -278,7 +278,7 @@ fun SettingsScreen(
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     liveModelInput = m
-                                                    viewModel.updateModels(chatModelInput, m)
+                                                    viewModel.selectDiscoveredLiveModel(m)
                                                 }
                                                 .padding(vertical = 3.dp)
                                         )
