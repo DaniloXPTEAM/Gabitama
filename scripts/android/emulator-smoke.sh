@@ -45,13 +45,17 @@ adb devices -l
 adb shell pm path android | grep -q '^package:'
 adb shell service check activity | grep -q 'found'
 adb shell getprop ro.build.version.sdk
-stage=install
+stage=check_candidate_hashes
 sha256sum -c candidate/SHA256SUMS
+stage=adb_install_app
 adb install -r candidate/app-debug.apk
+stage=locate_installed_app
 # Compare the actual installed base APK, not merely a file adjacent to the test.
 installed=$(adb shell pm path "$pkg" | tr -d '\r' | sed -n 's/^package://p')
 [ "$(printf '%s\n' "$installed" | wc -l)" -eq 1 ]
+stage=read_installed_app
 adb exec-out cat "$installed" > /tmp/gabitama-installed-app.apk
+stage=compare_installed_app
 cmp candidate/app-debug.apk /tmp/gabitama-installed-app.apk
 sha256sum /tmp/gabitama-installed-app.apk | cut -d' ' -f1 > evidence-android/installed-apk-sha256.txt
 echo "::notice title=Installed APK SHA256::$(cat evidence-android/installed-apk-sha256.txt)"
