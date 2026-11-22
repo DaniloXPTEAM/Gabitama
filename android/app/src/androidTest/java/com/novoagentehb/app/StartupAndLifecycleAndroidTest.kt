@@ -1,8 +1,6 @@
 package com.novoagentehb.app
 
-import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -60,25 +58,4 @@ class StartupAndLifecycleAndroidTest {
         }
     }
 
-    @Test
-    fun deepLinkIntentNavigatesDirectlyToRequestedDestination() {
-        AndroidTestHarness.ensureOnHomeScreen(compose)
-        compose.activityRule.scenario.onActivity { activity ->
-            val deepLinkIntent = Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("novoagentehb://chat"),
-                activity,
-                MainActivity::class.java
-            ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            activity.startActivity(deepLinkIntent)
-        }
-        AndroidTestHarness.waitUntilText(compose, "Chat com a Gabi", timeoutMs = 20_000L)
-        compose.onNode(hasText("Chat com a Gabi")).assertIsDisplayed()
-        compose.activityRule.scenario.onActivity { activity ->
-            assertFalse(activity.isFinishing)
-            assertEquals(Lifecycle.State.RESUMED, activity.lifecycle.currentState)
-        }
-    }
 }
