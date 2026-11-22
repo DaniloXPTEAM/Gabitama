@@ -293,7 +293,7 @@ class CapabilityRegistry @Inject constructor() {
         ToolDescriptor(
             name = "execute_workspace_program",
             description = "Executa uma expressão aritmética limitada para cada número e salva CSV. Não executa shell, Python ou comandos arbitrários.",
-            riskLevel = RiskLevel.EXTERNAL_SIDE_EFFECT,
+            riskLevel = RiskLevel.LOCAL_MUTATION,
             params = listOf(
                 ToolParamSpec("expression", "Expressão com x, números, + - * / e parênteses; exemplo x*2+1", required = true),
                 ToolParamSpec("inputs", "Números separados por vírgula ou linha", required = true)
