@@ -242,6 +242,50 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     }
 
     @Test
+    fun imageGenerationMockSavesValidImageAndRefusesWithoutConsent() = runBlocking {
+        val imageBuffer = java.io.ByteArrayOutputStream()
+        val bitmap = android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.RED)
+        assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, imageBuffer))
+        bitmap.recycle()
+        val encoded = java.util.Base64.getEncoder().encodeToString(imageBuffer.toByteArray())
+        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("127.0.0.1").build()
+        val serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
+        val clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()
+        val server = MockWebServer()
+        server.useHttps(serverCertificates.sslSocketFactory(), false)
+        server.enqueue(MockResponse().setBody("""{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"$encoded"}}]}}]}"""))
+        server.start(InetAddress.getByName("127.0.0.1"), 0)
+        val client = OkHttpClient.Builder().sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
+            .addInterceptor { chain ->
+                chain.proceed(chain.request().newBuilder().url(server.url("/image")).build())
+            }.build()
+        val storage = SafLibraryManager(context)
+        var path: String? = null
+        try {
+            try {
+                com.novoagentehb.app.agent.media.GeminiImageGeneration.generate(client, "synthetic-key", "fake-image", "maçã", false, storage)
+                throw AssertionError("Requisição sem consentimento foi aceita")
+            } catch (_: IllegalArgumentException) { }
+            assertEquals(0, server.requestCount)
+            val artifact = com.novoagentehb.app.agent.media.GeminiImageGeneration.generate(client, "synthetic-key", "fake-image", "maçã", true, storage)
+            path = artifact.path
+            assertEquals(1, server.requestCount)
+            assertEquals(64, artifact.sha256.length)
+            val saved = storage.listWorkspaceFiles().first { it.name == artifact.path }
+            assertEquals("image/png", saved.mimeType)
+            val decoded = android.graphics.BitmapFactory.decodeFile(saved.uriOrPath)
+            assertEquals(2, decoded.width)
+            assertEquals(2, decoded.height)
+            decoded.recycle()
+        } finally {
+            path?.let { storage.deleteWorkspaceFile(it) }
+            client.dispatcher.executorService.shutdownNow()
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
         // Ephemeral self-signed TLS, trusted only by this test client; never weaken app policy.
         val certificate = HeldCertificate.Builder()

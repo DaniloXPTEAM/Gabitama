@@ -291,6 +291,19 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Arquivo existe + SHA-256 conferido"
         ),
         ToolDescriptor(
+            name = "generate_image",
+            description = "Gera uma imagem por texto usando Gemini, com modelo informado explicitamente e confirmação de custo. Não suporta referência nem edição nesta versão.",
+            riskLevel = RiskLevel.PAID_API_CALL,
+            params = listOf(
+                ToolParamSpec("prompt", "Descrição da imagem", required = true),
+                ToolParamSpec("model", "Identificador de modelo Gemini com geração de imagem escolhido pela pessoa", required = true)
+            ),
+            runtimeTier = RuntimeSupportTier.HTTP_BYOK_OR_PUBLIC,
+            expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
+            requiredPermissionNote = "INTERNET, chave Gemini e autorização por geração",
+            postConditionNote = "Imagem válida salva e relida no workspace; visualização na Biblioteca"
+        ),
+        ToolDescriptor(
             name = "execute_workspace_program",
             description = "Executa uma expressão aritmética limitada para cada número e salva CSV. Não executa shell, Python ou comandos arbitrários.",
             riskLevel = RiskLevel.LOCAL_MUTATION,

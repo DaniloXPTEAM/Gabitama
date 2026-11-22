@@ -44,6 +44,11 @@ class PolicyGate @Inject constructor() {
             return PolicyDecision.Denied("Capacidade removida da arquitetura deste produto.")
         }
 
+        // Geração de imagem exige confirmação por pedido, inclusive se o opt-in genérico estiver ativo.
+        if (descriptor.name == "generate_image" && (!request.userConfirmed || !request.paidConsentGranted)) {
+            return PolicyDecision.RequireConfirmation("Enviar ao Gemini para gerar uma imagem? Modelo: ${request.args["model"].orEmpty().take(100)}. Descrição: ${request.args["prompt"].orEmpty().take(4000)}. Pode consumir créditos; confira preço e disponibilidade antes de autorizar.")
+        }
+
         // 3. Portão de custo: nunca presume gratuidade em chamadas pagas/ambíguas
         if (descriptor.riskLevel == RiskLevel.PAID_API_CALL && !request.paidConsentGranted && !allowPaidWithoutPrompt) {
             return PolicyDecision.RequireConfirmation(

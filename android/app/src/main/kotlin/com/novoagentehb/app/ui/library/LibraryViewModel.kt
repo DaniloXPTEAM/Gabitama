@@ -122,7 +122,11 @@ class LibraryViewModel @Inject constructor(
 
     fun openEntry(entry: LibraryEntry) {
         if (entry.scopeLabel.contains("Workspace")) {
-            _previewText.value = safManager.readWorkspaceFile(entry.name)
+            if (entry.mimeType.startsWith("image/")) {
+                if (!safManager.openWorkspaceFile(entry.name)) _statusNotice.value = "Nenhum aplicativo disponível para abrir a imagem."
+            } else {
+                _previewText.value = safManager.readWorkspaceFile(entry.name)
+            }
         } else if (entry.isDirectory) {
             enterSafFolder(entry)
         } else {

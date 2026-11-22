@@ -158,7 +158,7 @@ class AgentCoreUnitTest {
 
     @Test
     fun capabilitySemanticsSeparateHandoffNotificationPreviewAndUnimplemented() {
-        assertEquals(28, registry.capabilities.size)
+        assertEquals(29, registry.capabilities.size)
         val counts = registry.countByTier()
         assertTrue((counts[RuntimeSupportTier.NATIVE_LOCAL_VERIFIED] ?: 0) >= 6)
         assertTrue((counts[RuntimeSupportTier.ANDROID_BRIDGE_INTENT] ?: 0) >= 10)

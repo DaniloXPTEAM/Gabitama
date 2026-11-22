@@ -61,7 +61,10 @@ class SafLibraryManager @Inject constructor(
     }
 
     /** Create a new artifact only: never replace an existing user file. */
-    fun createWorkspaceFile(relativePath: String, content: String): WorkspaceWriteOutcome {
+    fun createWorkspaceFile(relativePath: String, content: String): WorkspaceWriteOutcome =
+        createWorkspaceBytes(relativePath, content.toByteArray(Charsets.UTF_8))
+
+    fun createWorkspaceBytes(relativePath: String, bytes: ByteArray): WorkspaceWriteOutcome {
         val sanitized = sanitizeRelative(relativePath)
         if (sanitized.isBlank()) return WorkspaceWriteOutcome(false, "", 0L, "", "Nome de arquivo inválido.")
         var created: File? = null
@@ -71,7 +74,6 @@ class SafLibraryManager @Inject constructor(
             check(workspaceTarget(sanitized) == target)
             check(target.createNewFile()) { "Arquivo já existe." }
             created = target
-            val bytes = content.toByteArray(Charsets.UTF_8)
             target.writeBytes(bytes)
             val readBack = target.readBytes()
             check(readBack.contentEquals(bytes))
@@ -112,6 +114,21 @@ class SafLibraryManager @Inject constructor(
         if (sanitized.isBlank()) return false
         val target = workspaceTarget(sanitized) ?: return false
         return target.exists() && target.delete()
+    }
+
+    fun openWorkspaceFile(relativePath: String): Boolean {
+        val sanitized = sanitizeRelative(relativePath)
+        if (sanitized.isBlank()) return false
+        val target = workspaceTarget(sanitized) ?: return false
+        if (!target.isFile) return false
+        return runCatching {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+            context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, guessMime(target.name))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            true
+        }.getOrDefault(false)
     }
 
     fun shareWorkspaceFile(relativePath: String): Boolean {

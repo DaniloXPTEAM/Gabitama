@@ -1,6 +1,8 @@
 package com.novoagentehb.app.agent.executor
 
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
+import com.novoagentehb.app.agent.media.GeminiImageGeneration
+import okhttp3.OkHttpClient
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsEngine
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsInput
 import com.novoagentehb.app.agent.memory.MemoryStore
@@ -42,13 +44,31 @@ class ToolExecutorAndVerifier @Inject constructor(
     private val feedEventDao: FeedEventDao,
     private val prefs: AppPreferences,
     private val modelRouter: ModelRouter,
-    private val diagnosticsEngine: DiagnosticsEngine
+    private val diagnosticsEngine: DiagnosticsEngine,
+    private val okHttpClient: OkHttpClient
 ) {
     var lastFailureSnapshot: ProviderFailure? = null
 
     suspend fun executeAndVerify(request: ToolExecutionRequest): ToolExecutionResult {
         val args = request.args
         return when (request.capabilityName) {
+            "generate_image" -> {
+                if (args.keys.any { it != "model" && it != "prompt" }) {
+                    ToolExecutionResult(false, false, "Referência, edição e parâmetros adicionais ainda não são suportados; nenhuma imagem foi solicitada.", errorCode = "IMAGE_ARGUMENT_UNSUPPORTED")
+                } else try {
+                    val artifact = GeminiImageGeneration.generate(okHttpClient, modelRouter.resolveApiKey(ProviderId.GEMINI),
+                        args["model"].orEmpty(), args["prompt"].orEmpty(), request.userConfirmed && request.paidConsentGranted, safLibraryManager)
+                    ToolExecutionResult(true, true, "Imagem criada e salva em ${artifact.path}; SHA-256 ${artifact.sha256}. Abra na Biblioteca.", payload = artifact.path)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: GeminiImageGeneration.ImageFailure) {
+                    ToolExecutionResult(false, false, e.message ?: "Erro de geração de imagem.", errorCode = "IMAGE_PROVIDER_FAILED")
+                } catch (e: IllegalArgumentException) {
+                    ToolExecutionResult(false, false, e.message ?: "Solicitação de imagem inválida.", errorCode = "IMAGE_REQUEST_INVALID")
+                } catch (_: Exception) {
+                    ToolExecutionResult(false, false, "Imagem não pôde ser validada ou salva.", errorCode = "IMAGE_SAVE_FAILED")
+                }
+            }
             "execute_workspace_program" -> {
                 try {
                     val result = WorkspaceProgram.execute(
