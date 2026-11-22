@@ -9,6 +9,7 @@ names = ['01_permissions_onboarding', '02_home', '03_feed', '04_chat', '05_quart
          '06_computer', '07_settings', '08_goals', '09_memory', '10_library',
          '11_permissions', '05b_quarto_stage_dialog']
 failed = False
+collected = []
 for name in names:
     path = f'evidence-android/test-screenshots/{name}.png'
     try:
@@ -26,8 +27,10 @@ for name in names:
             pos += 12+length
             if typ == b'IEND': break
         if not width or not height or b'IEND' not in chunks or not zlib.decompress(image): raise ValueError('invalid image')
-        print(f'::notice title=Screenshot collected::{name} {width}x{height} bytes={len(data)}')
+        collected.append(f'{name} {width}x{height} bytes={len(data)}')
     except (OSError, ValueError, struct.error, zlib.error) as exc:
         failed = True
         print(f'::error title=Screenshot missing or invalid::{name} ({type(exc).__name__})')
+if collected:
+    print('::notice title=Screenshots collected::' + '%0A'.join(collected))
 sys.exit(1 if failed else 0)

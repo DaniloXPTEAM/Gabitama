@@ -23,9 +23,12 @@ adb logcat -d -b crash -v brief > /tmp/gabitama-test-crash-private.txt 2>/dev/nu
 # Public diagnostics contain only app test evidence messages (path, dimensions, UID, size).
 adb logcat -d -s GabiTestEvidence:I '*:S' > /tmp/gabitama-screenshot-log-private.txt 2>/dev/null || :
 python3 scripts/android/validate-screenshots.py || status=1
-python3 - <<'PY'
+python3 - <<'PY' || status=1
 import glob,xml.etree.ElementTree as E
 files=glob.glob('android/app/build/outputs/androidTest-results/connected/**/*.xml',recursive=True)
+if not files:
+    print('::error title=Android tests::Nenhum XML de instrumentação encontrado.')
+    raise SystemExit(1)
 roots=[E.parse(f).getroot() for f in files]
 counts={k:sum(int(r.get(k,0)) for r in roots) for k in ('tests','failures','errors','skipped')}
 import os
