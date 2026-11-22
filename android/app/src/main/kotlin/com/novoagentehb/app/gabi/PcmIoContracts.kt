@@ -13,7 +13,7 @@ internal object PcmIoContracts {
     }
 
     /** Write all bytes, tolerating partial writes but not error or zero-progress loops. */
-    fun writeFully(size: Int, write: (offset: Int, remaining: Int) -> Int) {
+    inline fun writeFully(size: Int, write: (offset: Int, remaining: Int) -> Int) {
         var offset = 0
         while (offset < size) {
             val written = write(offset, size - offset)
