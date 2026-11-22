@@ -131,7 +131,7 @@ fun GoalsScreen(
                             }
                         }
 
-                        items(goals, key = { it.id }) { goal ->
+                        items(goals, key = { "goal:${it.id}" }) { goal ->
                             GabiFeaturedSurface(
                                 borderColor = GabiTokens.GoldAccent.copy(alpha = 0.25f),
                                 cornerRadius = 16.dp
@@ -197,7 +197,7 @@ fun GoalsScreen(
                             }
                         }
 
-                        items(reminders, key = { it.id }) { rem ->
+                        items(reminders, key = { "reminder:${it.id}" }) { rem ->
                             GabiFeaturedSurface(
                                 borderColor = if (rem.triggered) GabiTokens.Hairline else GabiTokens.AmberAccent.copy(alpha = 0.35f),
                                 cornerRadius = 16.dp
