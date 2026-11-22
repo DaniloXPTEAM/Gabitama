@@ -20,6 +20,7 @@ import com.novoagentehb.app.data.prefs.ProviderId
 import com.novoagentehb.app.data.prefs.VoiceModeId
 import com.novoagentehb.app.data.security.SecureKeyVault
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
@@ -184,6 +185,31 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             assertEquals("entrada,resultado\n2,7.0\n4,13.0\n", saf.readWorkspaceFile(result.path))
         } finally {
             assertTrue(saf.deleteWorkspaceFile(result.path))
+        }
+    }
+
+    @Test
+    fun taskModelsPersistAndRouterUsesSelectionForActiveProvider() = runBlocking {
+        val prefs = com.novoagentehb.app.data.prefs.AppPreferences(context)
+        val originalProvider = prefs.primaryProvider.first()
+        val oldChat = prefs.chatModel.first()
+        val oldScreen = prefs.screenOpModel.first()
+        val oldVision = prefs.visionModel.first()
+        val oldLive = prefs.liveVoiceModel.first()
+        try {
+            prefs.setPrimaryProvider(ProviderId.GROQ)
+            prefs.setModels("custom-chat", "custom-screen", "custom-vision", "live-unchanged")
+            val reopened = com.novoagentehb.app.data.prefs.AppPreferences(context)
+            val router = com.novoagentehb.app.agent.models.ModelRouter(OkHttpClient(), reopened, SecureKeyVault(context))
+            assertEquals("custom-chat", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.CHAT))
+            assertEquals("custom-screen", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.SCREEN_OP))
+            assertEquals("custom-vision", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.VISION))
+            assertEquals("live-unchanged", reopened.liveVoiceModel.first())
+            assertEquals("claude-sonnet-4-20250514", router.resolveModelForRole(ProviderId.ANTHROPIC, com.novoagentehb.app.agent.models.ModelRole.CHAT))
+            assertEquals("UNAVAILABLE_IN_CATALOGUE", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.MEDIA_GEN))
+        } finally {
+            prefs.setModels(oldChat, oldScreen, oldVision, oldLive)
+            prefs.setPrimaryProvider(originalProvider)
         }
     }
 

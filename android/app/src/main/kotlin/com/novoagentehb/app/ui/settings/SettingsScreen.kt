@@ -63,6 +63,8 @@ fun SettingsScreen(
     val primaryProvider by viewModel.primaryProvider.collectAsState()
     val chatModel by viewModel.chatModel.collectAsState()
     val liveModel by viewModel.liveVoiceModel.collectAsState()
+    val screenModel by viewModel.screenOpModel.collectAsState()
+    val visionModel by viewModel.visionModel.collectAsState()
     val discoveredLiveModels by viewModel.discoveredLiveModels.collectAsState()
     val voiceMode by viewModel.voiceMode.collectAsState()
     val prosodyProfile by viewModel.prosodyProfile.collectAsState()
@@ -83,6 +85,8 @@ fun SettingsScreen(
 
     var cityInput by remember(defaultCity) { mutableStateOf(defaultCity) }
     var chatModelInput by remember(chatModel) { mutableStateOf(chatModel) }
+    var screenModelInput by remember(screenModel) { mutableStateOf(screenModel) }
+    var visionModelInput by remember(visionModel) { mutableStateOf(visionModel) }
     var liveModelInput by remember(liveModel) { mutableStateOf(liveModel) }
     var showBibleDialog by remember { mutableStateOf(false) }
 
@@ -245,6 +249,18 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 OutlinedTextField(
+                                    value = screenModelInput, onValueChange = { screenModelInput = it },
+                                    label = { Text("Modelo para operação de tela") },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = visionModelInput, onValueChange = { visionModelInput = it },
+                                    label = { Text("Modelo para visão") },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
                                     value = liveModelInput,
                                     onValueChange = { liveModelInput = it },
                                     label = { Text("Modelo Gemini Live (bidiGenerateContent)") },
@@ -256,7 +272,7 @@ fun SettingsScreen(
                                 Spacer(Modifier.height(8.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
-                                        onClick = { viewModel.updateModels(chatModelInput, liveModelInput) },
+                                        onClick = { viewModel.updateModels(chatModelInput, screenModelInput, visionModelInput, liveModelInput) },
                                         shape = CircleShape,
                                         colors = ButtonDefaults.buttonColors(containerColor = GabiTokens.GoldAccent)
                                     ) {

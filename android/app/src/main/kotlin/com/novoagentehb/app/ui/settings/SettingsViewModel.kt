@@ -38,6 +38,12 @@ class SettingsViewModel @Inject constructor(
     val chatModel: StateFlow<String> = prefs.chatModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "gemini-2.5-flash")
 
+    val screenOpModel: StateFlow<String> = prefs.screenOpModel
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "gemini-2.5-flash")
+
+    val visionModel: StateFlow<String> = prefs.visionModel
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "gemini-2.5-flash")
+
     val liveVoiceModel: StateFlow<String> = prefs.liveVoiceModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_GEMINI_LIVE_MODEL)
 
@@ -89,9 +95,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun updateModels(chat: String, live: String) {
+    fun updateModels(chat: String, screen: String, vision: String, live: String) {
         viewModelScope.launch {
-            prefs.setModels(chat.trim(), chat.trim(), chat.trim(), live.trim())
+            prefs.setModels(chat.trim(), screen.trim(), vision.trim(), live.trim())
             _statusBanner.value = "Modelos atualizados."
         }
     }

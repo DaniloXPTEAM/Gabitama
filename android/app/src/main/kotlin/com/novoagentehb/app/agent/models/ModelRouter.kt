@@ -145,18 +145,22 @@ class ModelRouter @Inject constructor(
     }
 
     suspend fun resolveModelForRole(provider: ProviderId, role: ModelRole): String {
-        return when (provider) {
-            ProviderId.GEMINI -> when (role) {
-                ModelRole.CHAT, ModelRole.TASK_SYNTHESIS -> prefs.chatModel.first().ifBlank { "gemini-2.5-flash" }
-                ModelRole.SCREEN_OP -> prefs.screenOpModel.first().ifBlank { "gemini-2.5-flash" }
-                ModelRole.VISION -> prefs.visionModel.first().ifBlank { "gemini-2.5-flash" }
-                ModelRole.MEDIA_GEN -> "UNAVAILABLE_IN_CATALOGUE"
-            }
+        if (role == ModelRole.MEDIA_GEN) return "UNAVAILABLE_IN_CATALOGUE"
+        val fallback = when (provider) {
+            ProviderId.GEMINI -> "gemini-2.5-flash"
             ProviderId.GROQ -> "llama-3.3-70b-versatile"
             ProviderId.OPENROUTER -> "openrouter/free"
             ProviderId.DEEPSEEK -> "deepseek-chat"
             ProviderId.ANTHROPIC -> "claude-sonnet-4-20250514"
         }
+        // Explicitly requesting a different provider must not reuse a model ID saved for the active provider.
+        if (provider != prefs.primaryProvider.first()) return fallback
+        return when (role) {
+            ModelRole.CHAT, ModelRole.TASK_SYNTHESIS -> prefs.chatModel.first()
+            ModelRole.SCREEN_OP -> prefs.screenOpModel.first()
+            ModelRole.VISION -> prefs.visionModel.first()
+            ModelRole.MEDIA_GEN -> "UNAVAILABLE_IN_CATALOGUE"
+        }.ifBlank { fallback }
     }
 
     fun resolveApiKey(provider: ProviderId): String = when (provider) {
