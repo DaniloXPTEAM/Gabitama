@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 # Only run on the disposable CI emulator. Preserve the original test status.
-(cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace)
-status=$?
+(cd android && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace) 2>&1 | tee /tmp/gabitama-instrumentation-ci.log
+status=${PIPESTATUS[0]}
 mkdir -p evidence-android
 if adb shell test -d /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots; then
   adb pull /sdcard/Android/data/com.novoagentehb.app.debug/files/test-screenshots evidence-android/ || status=1
@@ -25,10 +25,20 @@ for root in roots:
             text=(failure.get('message','')+'\n'+(failure.text or ''))
             types=re.findall(r'(?:[a-zA-Z_$][\w$]*\.)*[\w$]*(?:Exception|Error)', text)
             if types: lines.append('Exception type: '+types[0])
+            if 'java.lang.IllegalArgumentException' in text:
+                # Emit only a fixed set of diagnostic phrases; never copy arbitrary values.
+                for phrase in ('No activities found', 'already exists', 'No value passed', 'must not be null', 'Failed requirement', 'Cannot round NaN', 'Only finite values', 'Navigation destination', 'Cannot navigate'):
+                    if phrase.lower() in text.lower(): lines.append('Reason category: '+phrase)
             frames=re.findall(r'at (com\.novoagentehb\.app\.[\w$.$]+\([\w.$]+(?::\d+)?\))', text)
             lines.extend('at '+frame for frame in frames[:8])
             for term in ('METAS','MEMÓRIA','ARQUIVOS','Permissões','Quarto da Gabi','DIAGNÓSTICO LOCAL','Diagnóstico','Ajustes','Avançar','Adicionar meta','Continuar','Gabi · HB','Avisos & Recibos'):
                 if term in text: lines.append('Mentioned selector: '+term)
+try:
+    log=open('/tmp/gabitama-instrumentation-ci.log',encoding='utf-8',errors='replace').read()
+    progress=re.findall(r'Tests? \d+/\d+ completed[^\n]*', log)
+    if progress: print('::notice title=Android runner progress::'+progress[-1].replace('%','%25'))
+except OSError:
+    pass
 if lines:
     print('::notice title=Android test case summary::'+'%0A'.join(lines))
 

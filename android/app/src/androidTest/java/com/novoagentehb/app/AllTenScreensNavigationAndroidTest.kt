@@ -89,6 +89,6 @@ class AllTenScreensNavigationAndroidTest {
         AndroidTestHarness.captureScreenshot("10_library")
         AndroidTestHarness.pressSystemBack(compose)
         AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
-        compose.onNode(hasText("Gabi · HB")).assertIsDisplayed()
+        compose.onNode(hasText("Gabi · HB")).performScrollTo().assertIsDisplayed()
     }
 }

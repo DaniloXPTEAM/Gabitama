@@ -224,6 +224,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         AndroidTestHarness.waitUntilText(compose, "Provedor ativo: Groq", substring = true)
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Google Gemini"))
         compose.onNode(hasText("Google Gemini")).performClick()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Provedor ativo: Google Gemini", substring = true))
         AndroidTestHarness.waitUntilText(compose, "Provedor ativo: Google Gemini", substring = true)
 
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Diagnóstico"))
