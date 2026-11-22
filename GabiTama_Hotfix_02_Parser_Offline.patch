@@ -1,0 +1,30 @@
+--- a/android/app/src/main/kotlin/com/novoagentehb/app/bridges/AndroidDeviceBridge.kt
++++ b/android/app/src/main/kotlin/com/novoagentehb/app/bridges/AndroidDeviceBridge.kt
+@@ -499,6 +499,9 @@
+         fun parseOfflineIntent(input: String): Pair<String, Map<String, String>>? {
+             val norm = normalize(input)
+             return when {
++                // Comando especifico antes de abertura generica de apps.
++                norm.contains("camera") || norm.contains("tirar foto") ->
++                    "take_photo" to emptyMap()
+                 norm.startsWith("abrir ") || norm.startsWith("abre ") -> {
+                     val app = input.trim().substringAfter(" ").trim()
+                     "open_app" to mapOf("app_name" to app)
+@@ -510,7 +513,7 @@
+                 norm.contains("agenda") || norm.contains("compromisso") ->
+                     "read_calendar" to emptyMap()
+                 norm.contains("lembrete") || norm.startsWith("lembra") -> {
+-                    val relMatch = Regex("(\\d+\\s*(?:min|minuto|minutos|h|hora|horas))", RegexOption.IGNORE_CASE).find(input)
++                    val relMatch = Regex("(\\d+\\s*(?:minutos|minuto|min|horas|hora|h)\\b)", RegexOption.IGNORE_CASE).find(input)
+                     val triggerAt = relMatch?.value?.trim() ?: "15 minutos"
+                     val cleanedSubject = input.trim()
+                         .replace(Regex("^(?i)(criar|cria|adicionar|adiciona|colocar|coloca|fazer|faz)?\\s*(um\\s+)?(lembrete|lembrar|lembra)(\\s+(de|da|do|para|pra))?\\s*"), "")
+@@ -528,8 +531,6 @@
+                     "bluetooth_connect" to emptyMap()
+                 norm.contains("configurac") || norm.contains("ajustes do aparelho") ->
+                     "open_settings" to emptyMap()
+-                norm.contains("camera") || norm.contains("tirar foto") ->
+-                    "take_photo" to emptyMap()
+                 norm.contains("compartilha") ->
+                     "share_content" to mapOf("text" to input.trim())
+                 norm.contains("gmail") || norm.contains("e-mail") || norm.contains("email") ->
