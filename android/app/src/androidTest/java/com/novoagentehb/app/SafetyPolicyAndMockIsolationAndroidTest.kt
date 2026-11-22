@@ -148,6 +148,26 @@ class SafetyPolicyAndMockIsolationAndroidTest {
     }
 
     @Test
+    fun workspaceRejectsSymlinkEscapingItsRoot() {
+        val saf = SafLibraryManager(context)
+        val workspace = File(context.filesDir, "agent_workspace").apply { mkdirs() }
+        val outside = File(context.cacheDir, "workspace-symlink-test").apply { mkdirs() }
+        val link = File(workspace, "outside-link-test")
+        val escaped = File(outside, "must-not-exist.txt")
+        try {
+            android.system.Os.symlink(outside.absolutePath, link.absolutePath)
+            assertFalse(saf.writeWorkspaceFile("outside-link-test/must-not-exist.txt", "test").success)
+            assertFalse(escaped.exists())
+            assertNull(saf.readWorkspaceFile("outside-link-test/must-not-exist.txt"))
+            assertFalse(saf.deleteWorkspaceFile("outside-link-test/must-not-exist.txt"))
+            assertFalse(saf.listWorkspaceFiles().any { it.name.startsWith("outside-link-test/") })
+        } finally {
+            link.delete()
+            outside.deleteRecursively()
+        }
+    }
+
+    @Test
     fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
         // Ephemeral self-signed TLS, trusted only by this test client; never weaken app policy.
         val certificate = HeldCertificate.Builder()

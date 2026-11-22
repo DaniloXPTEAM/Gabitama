@@ -41,7 +41,8 @@ class SafLibraryManager @Inject constructor(
         if (sanitized.isBlank()) {
             return WorkspaceWriteOutcome(false, "", 0L, "", "Nome de arquivo inválido.")
         }
-        val target = File(workspaceRoot, sanitized)
+        val target = workspaceTarget(sanitized)
+            ?: return WorkspaceWriteOutcome(false, sanitized, 0L, "", "Caminho fora do workspace.")
         return runCatching {
             target.parentFile?.mkdirs()
             target.writeText(content, Charsets.UTF_8)
@@ -62,13 +63,13 @@ class SafLibraryManager @Inject constructor(
     fun readWorkspaceFile(relativePath: String): String? {
         val sanitized = sanitizeRelative(relativePath)
         if (sanitized.isBlank()) return null
-        val target = File(workspaceRoot, sanitized)
+        val target = workspaceTarget(sanitized) ?: return null
         return if (target.exists() && target.isFile) target.readText(Charsets.UTF_8) else null
     }
 
     fun listWorkspaceFiles(): List<LibraryEntry> {
         return workspaceRoot.walkTopDown()
-            .filter { it.isFile }
+            .filter { it.isFile && workspaceTarget(it.relativeTo(workspaceRoot).path) != null }
             .sortedByDescending { it.lastModified() }
             .map {
                 LibraryEntry(
@@ -86,14 +87,14 @@ class SafLibraryManager @Inject constructor(
     fun deleteWorkspaceFile(relativePath: String): Boolean {
         val sanitized = sanitizeRelative(relativePath)
         if (sanitized.isBlank()) return false
-        val target = File(workspaceRoot, sanitized)
+        val target = workspaceTarget(sanitized) ?: return false
         return target.exists() && target.delete()
     }
 
     fun shareWorkspaceFile(relativePath: String): Boolean {
         val sanitized = sanitizeRelative(relativePath)
         if (sanitized.isBlank()) return false
-        val target = File(workspaceRoot, sanitized)
+        val target = workspaceTarget(sanitized) ?: return false
         if (!target.exists() || !target.isFile) return false
         return runCatching {
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
@@ -191,6 +192,13 @@ class SafLibraryManager @Inject constructor(
             true
         }.getOrDefault(false)
     }
+
+    /** Reject paths whose resolved target escapes the app-private workspace, including symlinks. */
+    private fun workspaceTarget(relative: String): File? = runCatching {
+        val root = workspaceRoot.canonicalFile
+        val target = File(root, relative).canonicalFile
+        target.takeIf { it.path.startsWith(root.path + File.separator) }
+    }.getOrNull()
 
     private fun sanitizeRelative(raw: String): String =
         raw.trim().replace("..", "").trimStart('/', '\\')
