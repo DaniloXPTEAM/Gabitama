@@ -208,8 +208,36 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             assertEquals("claude-sonnet-4-20250514", router.resolveModelForRole(ProviderId.ANTHROPIC, com.novoagentehb.app.agent.models.ModelRole.CHAT))
             assertEquals("UNAVAILABLE_IN_CATALOGUE", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.MEDIA_GEN))
         } finally {
-            prefs.setModels(oldChat, oldScreen, oldVision, oldLive)
             prefs.setPrimaryProvider(originalProvider)
+            prefs.setModels(oldChat, oldScreen, oldVision, oldLive)
+        }
+    }
+
+    @Test
+    fun providerSwitchPreservesEachProvidersTaskModelsAndLive() = runBlocking {
+        val prefs = com.novoagentehb.app.data.prefs.AppPreferences(context)
+        val previous = prefs.primaryProvider.first()
+        val original = listOf(prefs.chatModel.first(), prefs.screenOpModel.first(), prefs.visionModel.first(), prefs.liveVoiceModel.first())
+        try {
+            prefs.setPrimaryProvider(ProviderId.GEMINI)
+            prefs.setModels("gemini-chat-test", "gemini-screen-test", "gemini-vision-test", "live-test")
+            prefs.setPrimaryProvider(ProviderId.GROQ)
+            prefs.setModels("groq-chat-test", "groq-screen-test", "groq-vision-test", "live-test")
+            prefs.setPrimaryProvider(ProviderId.GEMINI)
+            val reopened = com.novoagentehb.app.data.prefs.AppPreferences(context)
+            assertEquals("gemini-chat-test", reopened.chatModel.first())
+            assertEquals("gemini-screen-test", reopened.screenOpModel.first())
+            assertEquals("gemini-vision-test", reopened.visionModel.first())
+            assertEquals("live-test", reopened.liveVoiceModel.first())
+            prefs.setPrimaryProvider(ProviderId.GROQ)
+            assertEquals("groq-chat-test", reopened.chatModel.first())
+            assertEquals("groq-screen-test", reopened.screenOpModel.first())
+            assertEquals("groq-vision-test", reopened.visionModel.first())
+            prefs.setPrimaryProvider(ProviderId.GROQ)
+            assertEquals("groq-chat-test", reopened.chatModel.first())
+        } finally {
+            prefs.setPrimaryProvider(previous)
+            prefs.setModels(original[0], original[1], original[2], original[3])
         }
     }
 

@@ -23,7 +23,15 @@ enum class ProviderId(val id: String, val displayName: String) {
     GROQ("groq", "Groq"),
     OPENROUTER("openrouter", "OpenRouter"),
     DEEPSEEK("deepseek", "DeepSeek"),
-    ANTHROPIC("anthropic", "Anthropic Claude")
+    ANTHROPIC("anthropic", "Anthropic Claude");
+
+    val defaultTextModel: String get() = when (this) {
+        GEMINI -> "gemini-2.5-flash"
+        GROQ -> "llama-3.3-70b-versatile"
+        OPENROUTER -> "openrouter/free"
+        DEEPSEEK -> "deepseek-chat"
+        ANTHROPIC -> "claude-sonnet-4-20250514"
+    }
 }
 
 enum class VoiceModeId(val id: String, val label: String) {
@@ -75,7 +83,20 @@ class AppPreferences @Inject constructor(
     val quartoSelectedStageId: Flow<String> = ds.data.map { it[KEY_QUARTO_STAGE_ID] ?: "young_child" }
 
     suspend fun setOnboardingCompleted(done: Boolean) = ds.edit { it[KEY_ONBOARDING] = done }
-    suspend fun setPrimaryProvider(provider: ProviderId) = ds.edit { it[KEY_PRIMARY_PROVIDER] = provider.name }
+    /** Preserve each provider's task models atomically; leave Live and credentials untouched. */
+    suspend fun setPrimaryProvider(provider: ProviderId) = ds.edit { settings ->
+        val previous = runCatching { ProviderId.valueOf(settings[KEY_PRIMARY_PROVIDER] ?: ProviderId.GEMINI.name) }
+            .getOrDefault(ProviderId.GEMINI)
+        if (previous != provider) {
+            val keys = listOf(KEY_CHAT_MODEL, KEY_SCREEN_MODEL, KEY_VISION_MODEL)
+            val roles = listOf("chat", "screen", "vision")
+            roles.zip(keys).forEach { (role, key) ->
+                settings[providerModelKey(previous, role)] = settings[key] ?: previous.defaultTextModel
+                settings[key] = settings[providerModelKey(provider, role)] ?: provider.defaultTextModel
+            }
+            settings[KEY_PRIMARY_PROVIDER] = provider.name
+        }
+    }
     suspend fun setModels(chat: String, screen: String, vision: String, live: String) = ds.edit {
         it[KEY_CHAT_MODEL] = chat
         it[KEY_SCREEN_MODEL] = screen
@@ -103,8 +124,11 @@ class AppPreferences @Inject constructor(
     suspend fun setQuartoSelectedStageId(stageId: String) = ds.edit { it[KEY_QUARTO_STAGE_ID] = stageId }
 
     companion object {
-        // Modelo candidato validado via descoberta `/v1beta/models` (bidiGenerateContent) no aparelho
+        // Padrão histórico; disponibilidade e compatibilidade reais devem ser verificadas na conta.
         const val DEFAULT_GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
+
+        private fun providerModelKey(provider: ProviderId, role: String) =
+            stringPreferencesKey("provider_model_${provider.id}_$role")
 
         private val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")
         private val KEY_PRIMARY_PROVIDER = stringPreferencesKey("primary_provider")

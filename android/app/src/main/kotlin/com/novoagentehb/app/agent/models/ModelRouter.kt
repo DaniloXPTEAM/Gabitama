@@ -146,13 +146,7 @@ class ModelRouter @Inject constructor(
 
     suspend fun resolveModelForRole(provider: ProviderId, role: ModelRole): String {
         if (role == ModelRole.MEDIA_GEN) return "UNAVAILABLE_IN_CATALOGUE"
-        val fallback = when (provider) {
-            ProviderId.GEMINI -> "gemini-2.5-flash"
-            ProviderId.GROQ -> "llama-3.3-70b-versatile"
-            ProviderId.OPENROUTER -> "openrouter/free"
-            ProviderId.DEEPSEEK -> "deepseek-chat"
-            ProviderId.ANTHROPIC -> "claude-sonnet-4-20250514"
-        }
+        val fallback = provider.defaultTextModel
         // Explicitly requesting a different provider must not reuse a model ID saved for the active provider.
         if (provider != prefs.primaryProvider.first()) return fallback
         return when (role) {

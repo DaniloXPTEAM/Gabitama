@@ -83,15 +83,8 @@ class SettingsViewModel @Inject constructor(
     fun selectProvider(provider: ProviderId) {
         viewModelScope.launch {
             prefs.setPrimaryProvider(provider)
-            val defaultModel = when (provider) {
-                ProviderId.GEMINI -> "gemini-2.5-flash"
-                ProviderId.GROQ -> "llama-3.3-70b-versatile"
-                ProviderId.OPENROUTER -> "openrouter/free"
-                ProviderId.DEEPSEEK -> "deepseek-chat"
-                ProviderId.ANTHROPIC -> "claude-sonnet-4-20250514"
-            }
-            prefs.setModels(defaultModel, defaultModel, defaultModel, prefs.liveVoiceModel.first())
-            _statusBanner.value = "Provedor ativo: ${provider.displayName} ($defaultModel)."
+            val selectedModel = prefs.chatModel.first()
+            _statusBanner.value = "Provedor ativo: ${provider.displayName} ($selectedModel)."
         }
     }
 
