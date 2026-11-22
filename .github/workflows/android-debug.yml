@@ -20,7 +20,9 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace || {
+          set -o pipefail
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee /tmp/gabitama-gradle.log || {
+            python3 -c 'import re; lines=open("/tmp/gabitama-gradle.log").read().splitlines(); [print("::error title=Gradle diagnostic::"+line.replace("%","%25").replace("\r","%0D").replace("\n","%0A")[:1000]) for line in lines if re.match(r"^(e: |error: |\* What went wrong:|Execution failed for task)",line)][:20]'
             python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; [print("::error title=JVM test failure::"+t.get("classname","")+"."+t.get("name","")+" "+(t.find("failure").get("message","")[:160] if t.find("failure") is not None else "")) for x in r for t in x.iter("testcase") if t.find("failure") is not None]'
             exit 1
           }
