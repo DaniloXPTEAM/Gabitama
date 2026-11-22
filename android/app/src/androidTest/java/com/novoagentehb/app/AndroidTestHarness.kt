@@ -131,9 +131,10 @@ object AndroidTestHarness {
         compose.waitForIdle()
         screen.assertIsDisplayed()
         heading.assertIsDisplayed()
-        // captureToImage uses PixelCopy on the node's own window (also works for dialogs).
-        // It synchronizes with rendering rather than merely observing a semantic node.
-        val rendered = heading.captureToImage()
+        // The dialog node's window cannot always be copied on API 26. Fence the
+        // activity surface in that case, keep the visible dialog assertion and
+        // capture the full display only after subsequent display frames.
+        val rendered = if (name == "05b_quarto_stage_dialog") screen.captureToImage() else heading.captureToImage()
         check(rendered.width > 0 && rendered.height > 0)
         val frames = CountDownLatch(1)
         Handler(Looper.getMainLooper()).post {

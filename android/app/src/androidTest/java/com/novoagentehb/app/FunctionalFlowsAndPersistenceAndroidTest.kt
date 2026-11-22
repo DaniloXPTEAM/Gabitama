@@ -229,8 +229,19 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         AndroidTestHarness.waitUntilText(compose, "Provedor ativo: Groq", substring = true)
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Google Gemini"))
         compose.onNode(hasText("Google Gemini")).performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Provedor ativo: Google Gemini", substring = true))
-        AndroidTestHarness.waitUntilText(compose, "Provedor ativo: Google Gemini", substring = true)
+        AndroidTestHarness.waitUntilText(compose, "✓ Google Gemini")
+        // The status banner is a lazy item, published asynchronously after the
+        // provider selection. Keep retrying its scroll until it exists, with a
+        // hard deadline; the final assertion is not suppressed.
+        compose.waitUntil(15_000) {
+            try {
+                compose.onNode(hasScrollAction()).performScrollToNode(hasText("Provedor ativo: Google Gemini", substring = true))
+                true
+            } catch (_: AssertionError) {
+                false
+            }
+        }
+        compose.onNode(hasText("Provedor ativo: Google Gemini", substring = true)).assertIsDisplayed()
 
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Diagnóstico"))
         compose.onNode(hasText("Diagnóstico") and hasClickAction()).performClick()
