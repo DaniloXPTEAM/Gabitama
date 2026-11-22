@@ -1,0 +1,53 @@
+package com.novoagentehb.app
+
+import com.google.gson.Gson
+import com.novoagentehb.app.gabi.GeminiLiveVoiceClient
+import okhttp3.OkHttpClient
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+
+class GeminiLiveHandshakeUnitTest {
+    @Test fun socketOpenIsNotAReadyLiveSession() {
+        MockWebServer().use { server ->
+            val remote = AtomicReference<WebSocket>()
+            val setupReceived = CountDownLatch(1)
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) { remote.set(webSocket) }
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (text.contains("\"setup\"")) setupReceived.countDown()
+                }
+            }))
+            server.start()
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                // Redirect only this JVM test to the local fake. No credentials or external network.
+                chain.proceed(chain.request().newBuilder().url(server.url("/")) .build())
+            }.build()
+            val client = GeminiLiveVoiceClient(http, Gson())
+            try {
+                assertTrue(client.connect("synthetic-key", systemInstruction = "test"))
+                assertTrue("setup was not sent", setupReceived.await(10, TimeUnit.SECONDS))
+                assertFalse("WebSocket open is not setupComplete", client.connected.value)
+                assertFalse("audio must not be sent before setupComplete", client.sendPcm16AudioChunk(byteArrayOf(1, 2)))
+                assertNotNull(remote.get())
+                assertTrue(remote.get().send("{\"setupComplete\":{}}"))
+                val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                while (!client.connected.value && System.nanoTime() < end) Thread.yield()
+                assertTrue("setupComplete must make session ready", client.connected.value)
+                assertTrue(client.sendPcm16AudioChunk(byteArrayOf(1, 2)))
+            } finally {
+                client.disconnect()
+                http.dispatcher.executorService.shutdownNow()
+            }
+        }
+    }
+}

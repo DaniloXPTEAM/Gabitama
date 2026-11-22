@@ -20,7 +20,10 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace || {
+            python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; [print("::error title=JVM test failure::"+t.get("classname","")+"."+t.get("name","")+" "+(t.find("failure").get("message","")[:160] if t.find("failure") is not None else "")) for x in r for t in x.iter("testcase") if t.find("failure") is not None]'
+            exit 1
+          }
           python3 -c 'import glob,xml.etree.ElementTree as E; r=[E.parse(f).getroot() for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]; assert r; print("::notice title=Unit tests::tests=%d failures=%d errors=%d skipped=%d" % tuple(sum(int(x.get(k,0)) for x in r) for k in ("tests","failures","errors","skipped")))'
       - name: Registrar binários e metadados
         run: |
@@ -38,6 +41,7 @@ jobs:
           path: candidate/
           if-no-files-found: error
   android-emulator:
+    if: ${{ !contains(github.event.head_commit.message, '[live-jvm]') }}
     name: Android API ${{ matrix.api }} — binário compartilhado
     needs: build-debug
     permissions:
