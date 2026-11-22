@@ -18,14 +18,18 @@ try:
 except OSError:
     text = ''
 if 'com.novoagentehb.app.debug' in text:
-    print('::error title=Android crash::Crash buffer mentions com.novoagentehb.app.debug; exception and frames follow if available')
+    # Single annotation avoids GitHub's per-step limit on error annotations.
+    lines = []
     for line in text.splitlines():
         match = re.search(r'(?:Caused by: )?([\w.$]+(?:Exception|Error))(?::|\s|$)', line)
         frame = re.search(r'\bat ([\w.$]+\([\w.$]+(?::\d+)?\))', line)
         if match:
-            print('::error title=Exception type::' + match.group(1))
+            lines.append(('Caused by: ' if 'Caused by:' in line else 'Exception: ') + match.group(1))
         elif frame:
-            print('::error title=Stack frame::' + frame.group(1))
+            lines.append('at ' + frame.group(1))
+    if lines:
+        print('::error title=Sanitized crash stack::' + '%0A'.join(lines[:200]))
+
 PY
   exit "$code"
 }
