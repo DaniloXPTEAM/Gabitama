@@ -73,7 +73,15 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          test -r /dev/kvm && test -w /dev/kvm
+          if [ ! -e /dev/kvm ]; then
+            echo "::error title=KVM indisponível::Runner sem /dev/kvm; não é falha comprovada do aplicativo."
+            exit 1
+          fi
+          sudo chmod a+rw /dev/kvm
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            echo "::error title=KVM sem acesso::Sem permissão de leitura e escrita em /dev/kvm."
+            exit 1
+          fi
       - name: Compilar APK e APK de testes
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
