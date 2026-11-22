@@ -1,0 +1,43 @@
+name: Recuperar APK já testado
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths: [.github/workflows/recover-tested-apk.yml]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar artefato original sem recompilar
+        uses: actions/download-artifact@v4
+        with:
+          name: shared-apks-d6c128e1b1c43047211079bc5d57e06973fe578c
+          run-id: 45044536043
+          github-token: ${{ github.token }}
+          path: candidate/
+      - name: Verificar binário original e exportar fragmentos imutáveis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo '3d6f5296e87153ad99279e97968dae40e1fa66b1d9b238328f7ee7a3be706c42  candidate/app-debug.apk' | sha256sum -c
+          echo "::notice title=Original APK size::$(stat -c %s candidate/app-debug.apk) bytes"
+          python3 - <<'PY'
+          import json, os, re
+          metadata = open('candidate/package-metadata.txt').read()
+          line = next(x for x in metadata.splitlines() if x.startswith('package:'))
+          print('::notice title=Original APK package::' + line)
+          print('::notice title=Original APK signing::' + '%0A'.join(open('candidate/signature.txt').read().splitlines()))
+          PY
+          python3 - <<'PY'
+          import base64, json, os, subprocess
+          hashes = []
+          with open('candidate/app-debug.apk', 'rb') as source:
+            while chunk := source.read(8 * 1024 * 1024):
+              req = json.dumps({'content':base64.b64encode(chunk).decode(), 'encoding':'base64'})
+              out = subprocess.run(['gh','api','-X','POST',f"repos/{os.environ['GITHUB_REPOSITORY']}/git/blobs",'--input','-'], input=req, text=True, capture_output=True, check=True)
+              hashes.append(json.loads(out.stdout)['sha'])
+          print('::notice title=Original APK chunks::' + ','.join(hashes))
+          PY

@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [arena/a142d5dd-gabitama]
+    paths-ignore:
+      - .github/workflows/recover-tested-apk.yml
 jobs:
   build-debug:
     name: JVM e APKs compartilhados
