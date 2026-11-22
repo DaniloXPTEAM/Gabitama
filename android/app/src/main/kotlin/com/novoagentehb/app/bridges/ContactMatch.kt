@@ -12,7 +12,8 @@ internal object ContactMatch {
         val wanted = normalize(query)
         if (wanted.isBlank()) return null
         val numbers = contacts.asSequence().filter { normalize(it.first) == wanted }
-            .map { it.second.replace(Regex("[^0-9]"), "") }.filter { it.isNotBlank() }.distinct().take(2).toList()
+            .map { it.second.trim() }.filter { it.any(Char::isDigit) }
+            .distinctBy { it.replace(Regex("[^0-9]"), "") }.take(2).toList()
         return numbers.singleOrNull()
     }
 }

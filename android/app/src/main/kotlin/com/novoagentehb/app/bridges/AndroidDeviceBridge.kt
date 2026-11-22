@@ -198,7 +198,7 @@ class AndroidDeviceBridge @Inject constructor(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             return BridgeOutcome(false, false, "Permissão de contatos necessária para identificar o destinatário.", "MISSING_READ_CONTACTS")
         }
-        val phone = findContactPhone(contactName)
+        val phone = findContactPhone(contactName)?.replace(Regex("[^0-9]"), "")
             ?: return BridgeOutcome(false, false, "Contato não encontrado exatamente ou possui números ambíguos; escolha o nome e número antes de continuar.", "CONTACT_AMBIGUOUS_OR_MISSING")
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$phone")).apply {
             setPackage(waPkg)

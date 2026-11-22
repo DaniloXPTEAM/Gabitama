@@ -7,7 +7,7 @@ import org.junit.Test
 class ContactMatchUnitTest {
     @Test fun matchesExactNameNotSimilarSubstring() {
         val contacts = listOf("Secretária Luciane" to "+55 11 2222", "Luciane" to "+55 11 1111")
-        assertEquals("55111111", ContactMatch.uniqueNumber("Luciane", contacts))
+        assertEquals("+55 11 1111", ContactMatch.uniqueNumber("Luciane", contacts))
         assertNull(ContactMatch.uniqueNumber("Luci", contacts))
         assertNull(ContactMatch.uniqueNumber("", contacts))
         assertNull(ContactMatch.uniqueNumber("Luciane", contacts.take(1)))
