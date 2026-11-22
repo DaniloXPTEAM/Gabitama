@@ -62,7 +62,7 @@ if ! adb logcat -c >/tmp/gabitama-logcat-clear-private.txt 2>&1; then
   echo '::warning title=Android logcat::Buffer não pôde ser limpo; usando delimitação temporal.'
 fi
 # Device clock, not runner clock: logcat -T reads entries after this time even if clear failed.
-log_start=$(adb shell date '+%m-%d %H:%M:%S.000' | tr -d '\r')
+log_start=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
 stage=start
 adb shell am start -W -n "$pkg/$activity" | tee evidence-android/start.txt
 if grep -Eq '(^Error:|^Exception|Status: (error|timeout))' evidence-android/start.txt; then exit 1; fi
@@ -73,13 +73,30 @@ stage=foreground
 adb shell dumpsys activity activities | grep -E "(mResumedActivity|topResumedActivity).*${pkg}"
 adb exec-out screencap -p > evidence-android/startup.png
 stage=crash-buffer
-if adb logcat -d -b crash -v threadtime -T "$log_start" > /tmp/gabitama-launch-crash-private.txt 2>/dev/null; then
-  if grep -Fq "Process: $pkg," /tmp/gabitama-launch-crash-private.txt; then
-    echo 'Crash do aplicativo detectado; coletar logcat completo em ambiente privado.' >&2
-    false
+# Read the whole buffer and filter on the runner. This avoids old logcat
+# implementations' inconsistent -T argument handling and does not rely on clear.
+if adb logcat -d -b crash -v threadtime > /tmp/gabitama-launch-crash-private.txt 2>/dev/null; then
+  if python3 - "$log_start" "$pkg" /tmp/gabitama-launch-crash-private.txt <<'PYLOG'
+import re, sys
+start, pkg, path = sys.argv[1:]
+if not re.fullmatch(r'\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}', start):
+    raise SystemExit(2)
+for line in open(path, encoding='utf-8', errors='replace'):
+    match = re.match(r'^(\d\d-\d\d \d\d:\d\d:\d\d\.\d{3})\s', line)
+    if match and match.group(1) >= start and ('Process: ' + pkg + ',') in line:
+        raise SystemExit(1)
+PYLOG
+  then
+    echo '::notice title=CRASH_LOG_VERIFIED::Buffer crash consultado; nenhum crash do aplicativo no intervalo do smoke.'
+  else
+    result=$?
+    if [ "$result" -eq 1 ]; then
+      echo '::error title=Crash::Crash do aplicativo detectado durante o smoke.'
+      exit 1
+    fi
+    echo '::warning title=CRASH_LOG_LIMITED::Não foi possível correlacionar temporalmente o buffer.'
   fi
-  echo '::notice title=Crash buffer::Sem crash do aplicativo no intervalo após abertura.'
 else
-  echo '::warning title=Crash buffer indisponível::Verificação de crash por logcat NÃO comprovada.'
+  echo '::warning title=CRASH_LOG_LIMITED::Buffer crash indisponível.'
 fi
 echo '::notice title=Smoke process alive::Processo vivo e Activity em primeiro plano após 8 segundos; UI ainda requer instrumentação.'

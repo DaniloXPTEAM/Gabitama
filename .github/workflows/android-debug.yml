@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [34]
+        api: [34, 29, 26]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
