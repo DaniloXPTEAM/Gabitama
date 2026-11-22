@@ -58,7 +58,6 @@ jobs:
           name: gabitama-debug-apk-LAUNCH_NOT_TESTED-${{ github.sha }}
           path: |
             android/app/build/outputs/apk/debug/*.apk
-            android/app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: warn
 
   android-emulator:
@@ -114,6 +113,4 @@ jobs:
             evidence-android/
             evidence-apk-sha256.txt
             android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/reports/androidTests/connected/
-            android/app/build/outputs/androidTest-results/connected/
           if-no-files-found: warn

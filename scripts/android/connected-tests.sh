@@ -13,6 +13,18 @@ import glob,xml.etree.ElementTree as E
 files=glob.glob('android/app/build/outputs/androidTest-results/connected/**/*.xml',recursive=True)
 roots=[E.parse(f).getroot() for f in files]
 counts={k:sum(int(r.get(k,0)) for r in roots) for k in ('tests','failures','errors','skipped')}
+import os
+os.makedirs('evidence-android', exist_ok=True)
+safe=E.Element('testsuites')
+for root in roots:
+    suite=E.SubElement(safe, 'testsuite', {k:root.get(k,'0') for k in ('tests','failures','errors','skipped')})
+    for case in root.iter('testcase'):
+        item=E.SubElement(suite, 'testcase', {'classname':case.get('classname',''), 'name':case.get('name','')})
+        if case.find('failure') is not None or case.find('error') is not None:
+            E.SubElement(item, 'failure', {'message':'Details intentionally omitted; see sanitized annotations.'})
+        elif case.find('skipped') is not None:
+            E.SubElement(item, 'skipped')
+E.ElementTree(safe).write('evidence-android/test-results-sanitized.xml', encoding='utf-8', xml_declaration=True)
 print('::notice title=Android tests::'+ ' '.join(f'{k}={v}' for k,v in counts.items()))
 import re
 lines=[]
@@ -54,6 +66,8 @@ except OSError:
     pass
 try:
     log=open('/tmp/gabitama-instrumentation-ci.log',encoding='utf-8',errors='replace').read()
+    diagnostics=re.findall(r'GABIDIAG checkpoint=[A-Za-z0-9_]+ inicio_clickable=\d+ home=\d+ goals=\d+ lifecycle=[A-Z]+', log)
+    if diagnostics: print('::notice title=Navigation diagnostics::'+'%0A'.join(diagnostics))
     progress=re.findall(r'Tests? \d+/\d+ completed[^\n]*', log)
     if progress: print('::notice title=Android runner progress::'+progress[-1].replace('%','%25'))
 except OSError:

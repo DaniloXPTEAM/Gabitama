@@ -2,6 +2,7 @@ package com.novoagentehb.app
 
 import android.graphics.Bitmap
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -88,6 +89,30 @@ object AndroidTestHarness {
         compose.onAllNodes(matcher, useUnmergedTree = false)
             .fetchSemanticsNodes()
             .isNotEmpty()
+
+
+    /** AVD-only diagnostic: tree structure and known screen labels, never arbitrary text. */
+    fun captureNavigationDiagnostic(compose: MainComposeRule, name: String) {
+        captureScreenshot(name)
+        val labels = listOf("Início", "Gabi · HB", "Metas & Lembretes", "Memória da Gabi", "Arquivos & SAF", "Continuar")
+        val root = compose.onRoot(useUnmergedTree = true).fetchSemanticsNode()
+        val lines = mutableListOf<String>()
+        fun walk(node: SemanticsNode, depth: Int) {
+            val matched = labels.filter { hasText(it).matches(node) }
+            lines.add("depth=$depth id=${node.id} bounds=${node.boundsInRoot} labels=${matched.joinToString()}")
+            node.children.forEach { walk(it, depth + 1) }
+        }
+        walk(root, 0)
+        val merged = compose.onAllNodes(hasText("Início") and hasClickAction()).fetchSemanticsNodes().size
+        val home = compose.onAllNodes(hasText("Gabi · HB")).fetchSemanticsNodes().size
+        val goals = compose.onAllNodes(hasText("Metas & Lembretes")).fetchSemanticsNodes().size
+        var state = "unknown"
+        compose.activityRule.scenario.onActivity { state = it.lifecycle.currentState.toString() }
+        val summary = "checkpoint=$name inicio_clickable=$merged home=$home goals=$goals lifecycle=$state"
+        val dir = requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("test-screenshots"))
+        File(dir, "$name-tree-sanitized.txt").writeText(summary + "\n" + lines.joinToString("\n"))
+        println("GABIDIAG $summary")
+    }
 
     fun captureScreenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

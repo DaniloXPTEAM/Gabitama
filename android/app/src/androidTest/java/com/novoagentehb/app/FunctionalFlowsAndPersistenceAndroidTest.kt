@@ -92,8 +92,15 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         compose.waitForIdle()
 
         // Memória: registrar fato, sair e retornar, depois remover
+        AndroidTestHarness.captureNavigationDiagnostic(compose, "goals_before_inicio")
         AndroidTestHarness.clickBottomTab(compose, "Início")
-        AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
+        AndroidTestHarness.captureNavigationDiagnostic(compose, "goals_after_inicio")
+        try {
+            AndroidTestHarness.waitUntilText(compose, "Gabi · HB")
+        } catch (failure: Throwable) {
+            AndroidTestHarness.captureNavigationDiagnostic(compose, "goals_timeout")
+            throw failure
+        }
         compose.onNode(hasText("MEMÓRIA")).performScrollTo().performClick()
         AndroidTestHarness.waitUntilText(compose, "Memória da Gabi")
 
