@@ -863,7 +863,7 @@ class VoiceEngineCoordinator @Inject constructor(
     }
 
     fun speak(text: String, allowPaidTtsConsent: Boolean = false) {
-        val clean = text.trim()
+        val clean = SpeechText.fromMarkdown(text)
         if (clean.isBlank()) return
 
         stopSpeaking()
