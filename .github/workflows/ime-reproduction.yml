@@ -1,0 +1,50 @@
+name: Reproduzir foco IME API 34 (baseline)
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths: [.github/workflows/ime-reproduction.yml]
+  workflow_dispatch:
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bc95dc43feb44c13f64a91596a4f7705046b1d44
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compilar binários de diagnóstico do commit original
+        working-directory: android
+        run: ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          sudo chmod a+rw /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            uid=$(id -u)
+            sudo iptables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT
+            sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT
+            trap 'sudo iptables -D OUTPUT -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT; sudo ip6tables -D OUTPUT -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT' EXIT
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            failed=0
+            for test in chatImeInputDiagnosticsPersistsAcrossRestartAndClears goalsRemindersMemoryAndLibraryPersistRealMutations; do
+              adb shell am instrument -w -r -e class "com.novoagentehb.app.FunctionalFlowsAndPersistenceAndroidTest#$test" com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > "/tmp/$test.log" 2>&1 || failed=1
+              TEST_NAME="$test" python3 -c 'import os; name=os.environ["TEST_NAME"]; s=open("/tmp/"+name+".log").read(); ok="OK (1 test)" in s and "FAILURES!!!" not in s; print(("::notice" if ok else "::error")+" title=Isolated API 34::"+name+" "+("PASS" if ok else "FAIL")+" root_focus_exception="+str("RootViewWithoutFocusException" in s)); raise SystemExit(0 if ok else 1)' || failed=1
+            done
+            exit "$failed"
