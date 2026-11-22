@@ -118,6 +118,7 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.coroutines.test)
     androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
     androidTestImplementation(libs.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -21,6 +21,8 @@ import com.novoagentehb.app.data.prefs.VoiceModeId
 import com.novoagentehb.app.data.security.SecureKeyVault
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -147,7 +149,12 @@ class SafetyPolicyAndMockIsolationAndroidTest {
 
     @Test
     fun mcpClientEnforcesOptInLanGateAndExecutesAgainstLocalMockServer(): Unit = runBlocking {
+        // Ephemeral self-signed TLS, trusted only by this test client; never weaken app policy.
+        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("127.0.0.1").build()
+        val serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
+        val clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()
         val server = MockWebServer()
+        server.useHttps(serverCertificates.sslSocketFactory(), false)
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val body = request.body.readUtf8()
@@ -172,7 +179,9 @@ class SafetyPolicyAndMockIsolationAndroidTest {
         }
         server.start(InetAddress.getByName("127.0.0.1"), 0)
         try {
-            val client = McpJsonRpcClient(OkHttpClient())
+            val client = McpJsonRpcClient(OkHttpClient.Builder().sslSocketFactory(
+                clientCertificates.sslSocketFactory(), clientCertificates.trustManager
+            ).build())
             val url = server.url("/mcp").toString()
 
             val defaultBlocked = client.handshakeAndListTools(url, allowLocalLan = false)
