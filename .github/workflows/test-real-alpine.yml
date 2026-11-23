@@ -1,0 +1,54 @@
+name: Testar extração do Alpine original
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths:
+      - scripts/android/alpine-fixture/**
+      - .github/workflows/test-real-alpine.yml
+      - android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
+permissions:
+  contents: read
+jobs:
+  alpine-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Baixar minirootfs original e verificar checksum publicado
+        run: |
+          set -euo pipefail
+          name=alpine-minirootfs-3.21.3-aarch64.tar.gz
+          base=https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/aarch64
+          mkdir -p /tmp/alpine-fixture android/app/src/androidTest/assets
+          curl -fsSL --retry 3 "$base/$name" -o "/tmp/alpine-fixture/$name"
+          curl -fsSL --retry 3 "$base/$name.sha256" -o /tmp/alpine-fixture/SHA256SUMS
+          cd /tmp/alpine-fixture
+          sha256sum -c SHA256SUMS
+          sha256sum "$name"
+          echo "::notice title=Alpine fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)"
+          cp "$name" "$GITHUB_WORKSPACE/android/app/src/androidTest/assets/alpine-3.21.3.tar.gz"
+          cp "$GITHUB_WORKSPACE/scripts/android/alpine-fixture/RealAlpineRootfsAndroidTest.kt" "$GITHUB_WORKSPACE/android/app/src/androidTest/java/com/novoagentehb/app/"
+      - name: Compilar APKs somente para teste
+        working-directory: android
+        run: ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          sudo chmod a+rw /dev/kvm
+      - name: Extrair Alpine no Android sem rede externa
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: scripts/android/alpine-fixture/run.sh

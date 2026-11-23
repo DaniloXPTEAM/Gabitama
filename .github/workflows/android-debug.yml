@@ -7,6 +7,8 @@ on:
       - .github/workflows/recover-tested-apk.yml
       - .github/workflows/reproduce-landscape-api34.yml
       - scripts/android/reproduce-landscape-api34.sh
+      - .github/workflows/test-real-alpine.yml
+      - scripts/android/alpine-fixture/**
 jobs:
   build-debug:
     name: JVM e APKs compartilhados
