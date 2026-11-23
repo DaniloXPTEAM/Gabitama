@@ -99,9 +99,9 @@ class IsolatedProbeService : Service() {
         }
         val directoryError = directoryOutcome.exceptionOrNull()?.let { failure ->
             val reason = when {
-                failure.message?.contains("EACCES") == true -> "EACCES"
+                (failure.message?.contains("EACCES") == true || failure.message?.contains("Permission denied", ignoreCase = true) == true) -> "EACCES"
                 failure.message?.contains("EPERM") == true -> "EPERM"
-                failure.message?.contains("ENOENT") == true -> "ENOENT"
+                (failure.message?.contains("ENOENT") == true || failure.message?.contains("No such file", ignoreCase = true) == true) -> "ENOENT"
                 else -> "other"
             }
             failure.javaClass.simpleName + ":" + reason
@@ -131,9 +131,9 @@ class IsolatedProbeService : Service() {
                 "writable"
             }.getOrElse { failure ->
                 val reason = when {
-                    failure.message?.contains("EACCES") == true -> "EACCES"
+                    (failure.message?.contains("EACCES") == true || failure.message?.contains("Permission denied", ignoreCase = true) == true) -> "EACCES"
                     failure.message?.contains("EPERM") == true -> "EPERM"
-                    failure.message?.contains("ENOENT") == true -> "ENOENT"
+                    (failure.message?.contains("ENOENT") == true || failure.message?.contains("No such file", ignoreCase = true) == true) -> "ENOENT"
                     else -> "other"
                 }
                 failure.javaClass.simpleName + ":" + reason

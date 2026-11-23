@@ -28,7 +28,7 @@ int main(void) {
     if (child == 0) {
         if (setsid() < 0 || prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != parent) _exit(114);
         if (setenv("PROOT_LOADER", loader, 1) != 0 || setenv("PROOT_NO_SECCOMP", "1", 1) != 0) _exit(115);
-        execl(proot, proot, "--kill-on-exit", "-r", "/", "--", target, (char *)NULL);
+        execl(proot, proot, "--kill-on-exit", "-r", "/", target, (char *)NULL);
         _exit(116);
     }
     int status = 0;
