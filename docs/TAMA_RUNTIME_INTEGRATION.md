@@ -126,3 +126,21 @@ incluindo o teste PTY). O script de execução só aceita um AVD ARM64 descartá
 e comandos fixos; ainda não foi executado. Os loaders vendorizados permanecem sem comprovação de fontes exatas;
 nenhum resultado de preparação constitui validação física ou autorização para
 distribuição.
+
+
+Em [45231567097](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45231567097),
+a Application Hilt real e o endpoint isolado foram testados nas APIs 26, 29 e
+34; o UID do endpoint foi distinto do principal. O processo isolado leu um
+pipe explicitamente concedido, não leu o arquivo privado fixo e não recebeu
+INTERNET. A tentativa de transferir um FD de diretório retornou
+`DeadObjectException` nas três APIs; não se sabe ainda a causa. Um único
+executável fixo `/system/bin/true` terminou com código zero nas APIs 26 e 29;
+na API 34 ocorreu `IOException`, ainda sem causa classificada. Isso não testa
+PRoot, ptrace, acesso a rootfs nem segurança de execução arbitrária. O erro
+anterior no teste API 26 foi causado pela limpeza de logcat na fixture, não
+por uma falha comprovada do serviço; a rotina agora tolera essa limitação.
+
+A fixture ARM64 compilou em [45231495275](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45231495275)
+com Alpine fixado e a adaptação experimental de status do offload aplicada apenas
+na cópia de build. O workflow não publica nem executa o APK de teste; o resultado
+não é validação ARM ou solução das obrigações de distribuição.
