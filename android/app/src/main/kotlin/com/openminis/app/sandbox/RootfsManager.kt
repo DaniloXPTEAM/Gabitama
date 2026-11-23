@@ -506,11 +506,27 @@ class RootfsManager private constructor(private val context: Context) {
 
         while (true) {
             val bytesRead = readFully(input, header)
-            if (bytesRead == 0) break
             require(bytesRead == 512) { "Cabeçalho tar incompleto." }
 
             // Check for end-of-archive (two consecutive zero blocks)
-            if (header.all { it == 0.toByte() }) break
+            if (header.all { it == 0.toByte() }) {
+                require(readFully(input, header) == 512 && header.all { it == 0.toByte() }) { "Fim de tar incompleto." }
+                // Consume to EOF: this also makes GZIPInputStream verify the CRC and length.
+                val trailing = ByteArray(8192)
+                var totalTrailing = 0L
+                while (true) {
+                    val n = input.read(trailing)
+                    if (n < 0) break
+                    require(n > 0 && (0 until n).all { trailing[it] == 0.toByte() }) { "Dados após o fim do tar." }
+                    totalTrailing += n
+                    require(totalTrailing <= 1_048_576) { "Preenchimento tar excessivo." }
+                }
+                break
+            }
+            val expectedChecksum = extractString(header, 148, 8).trim().toLongOrNull(8)
+                ?: throw IllegalArgumentException("Checksum tar inválido.")
+            val actualChecksum = header.indices.sumOf { i -> if (i in 148..155) 32L else (header[i].toInt() and 255).toLong() }
+            require(expectedChecksum == actualChecksum) { "Checksum tar incorreto." }
 
             val name = extractString(header, 0, 100)
             val modeOctal = extractString(header, 100, 8)
@@ -523,7 +539,7 @@ class RootfsManager private constructor(private val context: Context) {
             val prefix = extractString(header, 345, 155)
             val fullName = if (prefix.isNotEmpty()) "$prefix/$name" else name
 
-            if (fullName.isEmpty()) break
+            require(fullName.isNotEmpty()) { "Nome tar vazio." }
 
             // GabiTama: tar is treated as untrusted even when shipped as an APK asset.
             require(++entries <= 50_000) { "Entradas demais no rootfs." }
@@ -570,7 +586,7 @@ class RootfsManager private constructor(private val context: Context) {
                         while (remaining > 0) {
                             val toRead = minOf(buf.size.toLong(), remaining).toInt()
                             val n = input.read(buf, 0, toRead)
-                            require(n >= 0) { "Arquivo tar incompleto." }
+                            require(n > 0) { "Arquivo tar incompleto." }
                             output.write(buf, 0, n)
                             remaining -= n
                         }
@@ -600,7 +616,7 @@ class RootfsManager private constructor(private val context: Context) {
                     linkTarget.toFile().copyTo(outFile, overwrite = false)
                 }
                 else -> {
-                    // Unknown type, skip data
+                    throw IllegalArgumentException("Tipo tar não suportado: $typeFlag")
                 }
             }
 
@@ -627,6 +643,7 @@ class RootfsManager private constructor(private val context: Context) {
         while (offset < buf.size) {
             val n = input.read(buf, offset, buf.size - offset)
             if (n < 0) return offset
+            require(n > 0) { "Fluxo tar sem progresso." }
             offset += n
         }
         return offset
@@ -638,7 +655,7 @@ class RootfsManager private constructor(private val context: Context) {
         while (remaining > 0) {
             val toRead = minOf(buf.size.toLong(), remaining).toInt()
             val n = input.read(buf, 0, toRead)
-            require(n >= 0) { "Padding tar incompleto." }
+            require(n > 0) { "Padding tar incompleto." }
             remaining -= n
         }
     }

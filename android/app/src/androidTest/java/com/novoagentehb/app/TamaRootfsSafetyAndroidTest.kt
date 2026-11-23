@@ -23,6 +23,9 @@ class TamaRootfsSafetyAndroidTest {
             field(0, name); field(100, "0000755"); field(124, body.size.toString(8).padStart(11, '0'))
             h[156] = type.code.toByte()
             if (type == '2' || type == '1') field(157, value)
+            for (i in 148..155) h[i] = 32
+            val checksum = h.sumOf { (it.toInt() and 255).toLong() }
+            field(148, checksum.toString(8).padStart(6, '0') + "\u0000 ")
             out.write(h); out.write(body)
             if (body.size % 512 != 0) out.write(ByteArray(512 - body.size % 512))
         }
@@ -52,7 +55,10 @@ class TamaRootfsSafetyAndroidTest {
                 tar(Triple("../outside.txt", '0', "escape")),
                 tar(Triple("escape", '2', "../../outside")),
                 tar(Triple("link", '2', "internal"), Triple("link/file.txt", '0', "escape")),
-                tar(Triple("payload", '0', "abc")).copyOf(513)
+                tar(Triple("payload", '0', "abc")).copyOf(513),
+                tar(Triple("payload", '0', "abc")).copyOf(1024),
+                tar(Triple("payload", '0', "abc")).also { it[0] = 'X'.code.toByte() },
+                tar(Triple("payload", '0', "abc")).also { it[it.lastIndex] = 1 }
             )
             cases.forEachIndexed { index, data ->
                 val dir = File(parent, "test$index").apply { mkdirs() }
