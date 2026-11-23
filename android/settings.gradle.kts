@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NovoAgenteHB"
 include(":app")
+include(":computer-helper")

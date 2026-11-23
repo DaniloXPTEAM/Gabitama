@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Deliberately no INTERNET, no storage and no broad permissions. -->
+
+    <permission
+        android:name="com.novoagentehb.computerhelper.permission.USE_HELPER"
+        android:protectionLevel="signature" />
+
+    <application
+        android:allowBackup="false"
+        android:label="Computador auxiliar (PoC)"
+        android:extractNativeLibs="false">
+
+        <service
+            android:name=".HelperService"
+            android:exported="true"
+            android:permission="com.novoagentehb.computerhelper.permission.USE_HELPER">
+            <intent-filter>
+                <action android:name="com.novoagentehb.computerhelper.action.BIND" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

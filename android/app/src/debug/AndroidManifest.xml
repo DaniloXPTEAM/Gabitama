@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only experiment: lets this build bind the signature-protected computer helper PoC. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="com.novoagentehb.computerhelper.permission.USE_HELPER" />
+</manifest>
