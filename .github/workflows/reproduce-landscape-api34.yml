@@ -1,0 +1,39 @@
+name: Reproduzir landscape API 34 isolado
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths:
+      - .github/workflows/reproduce-landscape-api34.yml
+      - scripts/android/reproduce-landscape-api34.sh
+permissions:
+  actions: read
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recuperar os mesmos APKs do teste original
+        uses: actions/download-artifact@v4
+        with:
+          name: shared-apks-91ea012b8572d9f3967723b473f41a927e664d3b
+          path: candidate/
+          run-id: 45168158596
+          github-token: ${{ github.token }}
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          sudo chmod a+rw /dev/kvm
+      - name: Executar teste isolado no mesmo binário
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: scripts/android/reproduce-landscape-api34.sh

@@ -5,6 +5,8 @@ on:
     branches: [arena/a142d5dd-gabitama]
     paths-ignore:
       - .github/workflows/recover-tested-apk.yml
+      - .github/workflows/reproduce-landscape-api34.yml
+      - scripts/android/reproduce-landscape-api34.sh
 jobs:
   build-debug:
     name: JVM e APKs compartilhados
