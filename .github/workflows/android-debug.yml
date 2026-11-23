@@ -13,6 +13,8 @@ on:
       - scripts/android/shell-fixture/**
       - .github/workflows/test-isolated-process.yml
       - scripts/android/isolation-fixture/**
+      - .github/workflows/prepare-arm64-shell.yml
+      - scripts/android/arm64-shell-fixture/**
 jobs:
   build-debug:
     name: JVM e APKs compartilhados

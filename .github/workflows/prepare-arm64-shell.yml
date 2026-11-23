@@ -1,0 +1,32 @@
+name: Preparar fixture ARM64 do shell original
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths:
+      - scripts/android/arm64-shell-fixture/**
+      - .github/workflows/prepare-arm64-shell.yml
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Instalar NDK fixado
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          cmd=os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager')
+          subprocess.run([cmd, '--install', 'ndk;27.2.12479018'], input='y\n'*100, text=True, check=True)
+          PY
+      - name: Preparar fontes e assets descartáveis
+        run: scripts/android/arm64-shell-fixture/prepare-ci.sh
+      - name: Compilar teste ARM sem distribuição
+        working-directory: android
+        run: bash ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
