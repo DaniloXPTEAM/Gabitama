@@ -3,6 +3,7 @@ package com.novoagentehb.app
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.SessionDirectories
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -86,6 +87,30 @@ class TamaRootfsSafetyAndroidTest {
                 RootfsManager.getInstance(context).extractTar(GZIPInputStream(ByteArrayInputStream(gz)), corruptDir)
                 fail("Corrupted gzip checksum was accepted")
             } catch (_: java.util.zip.ZipException) { }
+        } finally { parent.deleteRecursively() }
+    }
+
+    @Test fun sessionDirectoriesRejectTraversalAndExistingSymlinks() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val parent = Files.createTempDirectory(context.cacheDir.toPath(), "session-safety-").toFile()
+        try {
+            val files = File(parent, "files").apply { mkdirs() }
+            val outside = File(parent, "outside").apply { mkdirs() }
+            for (id in listOf("", ".", "..", "../outside", "a/b", "a\\b")) {
+                try { SessionDirectories.ensure(files, id); fail("Invalid ID accepted: $id") }
+                catch (_: IllegalArgumentException) { }
+            }
+            SessionDirectories.ensure(files, "safe")
+            SessionDirectories.ensure(files, "safe")
+            assertTrue(File(files, "minis-sessions/safe/workspace").isDirectory)
+            Files.createSymbolicLink(File(files, "minis-sessions/link").toPath(), outside.toPath())
+            try { SessionDirectories.ensure(files, "link"); fail("Session symlink accepted") }
+            catch (_: IllegalArgumentException) { }
+            assertFalse(File(outside, "workspace").exists())
+            val victim = File(files, "minis-sessions/victim").apply { mkdir() }
+            Files.createSymbolicLink(File(victim, "attachments").toPath(), outside.toPath())
+            try { SessionDirectories.ensure(files, "victim"); fail("Child symlink accepted") }
+            catch (_: IllegalArgumentException) { }
         } finally { parent.deleteRecursively() }
     }
 
