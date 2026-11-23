@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.Message
 import android.os.Messenger
 import android.os.Process
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -42,18 +43,28 @@ class IsolatedProbeAndroidTest {
             bound = context.bindService(Intent(context, IsolatedProbeService::class.java), conn, Context.BIND_AUTO_CREATE)
             assertTrue("bind failed", bound)
             assertTrue("isolated service did not start", connected.await(30, TimeUnit.SECONDS))
-            val request = Message.obtain().apply { data.putString("probePath", file.absolutePath); replyTo = reply }
-            service.get().send(request)
+            val (readPipe, writePipe) = ParcelFileDescriptor.createPipe()
+            ParcelFileDescriptor.AutoCloseOutputStream(writePipe).use { it.write("fixture-pipe".toByteArray()) }
+            try {
+                val request = Message.obtain().apply {
+                    data.putString("probePath", file.absolutePath)
+                    data.putParcelable("readPipe", readPipe)
+                    replyTo = reply
+                }
+                service.get().send(request)
+            } finally { readPipe.close() }
             assertTrue("isolated service did not respond", answered.await(15, TimeUnit.SECONDS))
             val data = result.get()
             val distinct = data.getInt("uid") != Process.myUid()
             val read = data.getBoolean("canReadPrivate")
             val writable = data.getBoolean("ownDataDirWritable")
             val internet = data.getBoolean("internetPermission")
-            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet")
+            val grantedData = data.getBoolean("readGrantedData")
+            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData")
             assertTrue("isolated UID must be distinct", distinct)
             assertFalse("private target file was readable", read)
             assertFalse("isolated UID unexpectedly has INTERNET", internet)
+            assertTrue("isolated service could not read explicitly granted pipe", grantedData)
         } finally {
             if (bound) context.unbindService(conn)
             thread.quitSafely()
