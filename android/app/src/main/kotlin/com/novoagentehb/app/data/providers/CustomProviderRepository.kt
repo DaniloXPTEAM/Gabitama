@@ -24,7 +24,7 @@ class CustomProviderRepository @Inject constructor(private val prefs: AppPrefere
 
     suspend fun add(provider: CustomProvider, key: String): CustomProvider = mutex.withLock {
         val valid = CustomProviderFormat.validate(provider.name, provider.baseUrl, provider.chatModel, provider.screenModel, provider.visionModel, provider.id)
-        require(key.isNotBlank() && key.length <= 4096 && key.none { it == '\n' || it == '\r' }) { "Informe uma credencial válida." }
+        require(key.isNotBlank() && key.length <= 4096 && key.all { it.code in 33..126 }) { "Informe uma credencial válida." }
         val list = providers.first()
         require(list.none { it.id == valid.id }) { "Provedor já cadastrado." }
         require(list.size < 30) { "Limite de provedores atingido." }
@@ -39,7 +39,7 @@ class CustomProviderRepository @Inject constructor(private val prefs: AppPrefere
         // Any change needs renewed consent before sending future chat to the endpoint.
         if (activeId.first() == valid.id) prefs.activateCustomProvider("__needs_selection__")
         if (key.isNotBlank()) {
-            require(key.length <= 4096 && key.none { it == '\n' || it == '\r' }) { "Credencial inválida." }
+            require(key.length <= 4096 && key.all { it.code in 33..126 }) { "Credencial inválida." }
             vault.set("custom_provider_${valid.id}", key)
         }
         prefs.saveCustomProvidersJson(gson.toJson(list.map { if (it.id == valid.id) valid else it }))

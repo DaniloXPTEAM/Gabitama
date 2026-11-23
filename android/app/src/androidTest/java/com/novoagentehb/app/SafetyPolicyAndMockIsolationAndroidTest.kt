@@ -265,7 +265,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             val buffer = okio.Buffer(); request.body!!.writeTo(buffer)
             actualModel = com.google.gson.JsonParser.parseString(buffer.readUtf8()).asJsonObject.get("model").asString
             okhttp3.Response.Builder().request(request).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("OK")
-                .body(okhttp3.ResponseBody.create(null, """{"choices":[{"message":{"content":"resposta simulada"}}]}""")).build()
+                .body(okhttp3.ResponseBody.create(null, """{"model":"actual-routed-model","choices":[{"message":{"content":"resposta simulada"}}]}""")).build()
             }
         }.build()
         try {
@@ -284,7 +284,7 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             assertEquals("chosen-chat", actualModel)
             assertEquals("Bearer synthetic-custom-key", actualAuthorization)
             assertEquals(profile.id, (result as com.novoagentehb.app.agent.models.ModelTurnResult.TextReply).providerId)
-            assertEquals("chosen-chat", result.modelId)
+            assertEquals("actual-routed-model", result.modelId)
             router.generateTurn(com.novoagentehb.app.agent.models.ModelRole.VISION, "system", listOf(com.novoagentehb.app.agent.models.ModelChatMessage("user", "oi")), emptyList())
             assertEquals("chosen-vision", actualModel)
             repo.update(profile.copy(chatModel = "new-model"), "")

@@ -511,6 +511,8 @@ class ModelRouter @Inject constructor(
                 ?: return ModelTurnResult.Failure(
                     ProviderFailure(providerId, modelId, 200, FailureCategory.PROVIDER_ERROR, "JSON inválido.", "")
                 )
+            val reportedModel = runCatching { root.get("model")?.asString }.getOrNull()
+                ?.takeIf { it.matches(Regex("[A-Za-z0-9._:/-]{1,160}")) } ?: modelId
             val msg = root.getAsJsonArray("choices")?.firstOrNull()?.asJsonObject?.getAsJsonObject("message")
                 ?: return ModelTurnResult.Failure(
                     ProviderFailure(providerId, modelId, 200, FailureCategory.PROVIDER_ERROR, "Resposta sem choices.", "")
@@ -531,14 +533,14 @@ class ModelRouter @Inject constructor(
                 }
                 if (name.isNotBlank()) calls.add(ModelToolCall(id, name, parsedArgs))
             }
-            if (calls.isNotEmpty()) return ModelTurnResult.ToolCallReply(calls, providerId, modelId)
+            if (calls.isNotEmpty()) return ModelTurnResult.ToolCallReply(calls, providerId, reportedModel)
 
             val content = msg.get("content")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty()
             // Alguns modelos via Groq/DeepSeek colocam texto somente em reasoning_content
             val reasoningFallback = msg.get("reasoning_content")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty()
             val finalReply = content.ifBlank { reasoningFallback }
             return if (finalReply.isNotBlank()) {
-                ModelTurnResult.TextReply(finalReply, providerId, modelId)
+                ModelTurnResult.TextReply(finalReply, providerId, reportedModel)
             } else {
                 ModelTurnResult.Failure(
                     ProviderFailure(providerId, modelId, 200, FailureCategory.PROVIDER_ERROR, "Resposta vazia do provedor.", "")
