@@ -20,7 +20,9 @@ class OriginalShellRuntimeAndroidTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = RootfsManager.getInstance(context)
         assertFalse("AVD must start without any rootfs", root.rootfsDir.exists())
-        PRootKernel.boot(context)
+        coroutineScope {
+            List(4) { async(Dispatchers.IO) { PRootKernel.boot(context) } }.awaitAll()
+        }
         assertTrue(root.isInstalled)
         assertTrue(PRootKernel.isBooted)
         val shell = PersistentShell(context, "fixture-session", emptyMap())

@@ -14,6 +14,8 @@ import io.github.nanomuse.sandbox.FeedSandboxScope
 import java.io.File
 import java.util.TimeZone
 import kotlin.math.abs
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * PRoot configuration holder and command builder.
@@ -24,6 +26,7 @@ import kotlin.math.abs
 object PRootKernel {
 
     private const val TAG = "PRootKernel"
+    private val bootMutex = Mutex()
 
     var isBooted: Boolean = false
         private set
@@ -51,10 +54,10 @@ object PRootKernel {
     /**
      * Initialize the PRoot environment: install rootfs and proot binary.
      */
-    suspend fun boot(context: Context) {
+    suspend fun boot(context: Context) = bootMutex.withLock {
         if (isBooted) {
             Log.d(TAG, "Already booted")
-            return
+            return@withLock
         }
 
         rootfsManager = RootfsManager.getInstance(context)
@@ -177,6 +180,7 @@ object PRootKernel {
             "loader=$prootLoaderPath " +
             "bindMounts=${bindMounts.size} " +
             "offloadHandlers=${NativeOffloadServer.registeredHandlers.sorted()}")
+        Unit
     }
 
     fun addBindMount(linuxPath: String, hostPath: String) {
