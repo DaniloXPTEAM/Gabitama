@@ -377,7 +377,9 @@ class TerminalSession(private val context: Context) {
             old
         }
         if (fd >= 0) PtyBridge.closeFd(fd)
-        if (pid > 0) PtyBridge.sendSignal(pid, 15) // SIGTERM
+        // PRoot handles SIGQUIT by killing known tracees; SIGTERM would kill
+        // the tracer without guaranteeing that guest processes stop.
+        if (pid > 0) PtyBridge.sendSignal(pid, 3) // SIGQUIT; best effort, not isolation
         liveSessions.removeAll { it.get() === this || it.get() == null }
     }
 

@@ -97,6 +97,13 @@ class OriginalShellRuntimeAndroidTest {
             withTimeout(30000) { while (!terminal.isRunning) { if (terminal.state.value == TerminalSession.State.STOPPED) error("PTY stopped during boot"); delay(50) } }
             terminal.sendText("printf '%s%s\\n' PTY_FIXTURE _OK\n")
             withTimeout(30000) { while (!seen.get().contains("PTY_FIXTURE_OK")) delay(50) }
+            val ptyStarted = java.io.File(root.rootfsDir, "tmp/fixture-pty-started")
+            val ptyLate = java.io.File(root.rootfsDir, "tmp/fixture-pty-after-stop")
+            terminal.sendText(": > /tmp/fixture-pty-started; sleep 4; : > /tmp/fixture-pty-after-stop\n")
+            withTimeout(15000) { while (!ptyStarted.exists()) delay(50) }
+            terminal.stop()
+            delay(5000)
+            assertFalse("PTY guest continued after stop", ptyLate.exists())
         } finally {
             terminal.stop()
             collector.cancelAndJoin()
