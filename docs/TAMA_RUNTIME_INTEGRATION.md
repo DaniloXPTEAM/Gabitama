@@ -159,5 +159,7 @@ executou, no UID isolado das APIs 26, 29 e 34, um binário fixo descartável que
 cria um filho e verifica `PTRACE_TRACEME`, parada, `PTRACE_SYSCALL` e retomada;
 o resultado foi zero nas três APIs. Não é prova de que PRoot/Alpine funcionem:
 o rootfs ainda não é acessível e outros caminhos, ABI ARM, políticas e casos de
-segurança não foram testados. A sonda do PRoot somente com `--version` ainda é
-uma fixture de CI e não habilita execução de comandos no produto.
+segurança não foram testados. Em [45236756997](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45236756997),
+o PRoot x86 experimental empacotado numa fixture descartável retornou zero para
+`--version` sob UID isolado nas três APIs. Isto testa apenas seu arranque, não
+Alpine ou comandos, e não habilita execução no produto.
