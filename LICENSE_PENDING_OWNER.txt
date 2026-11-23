@@ -4,8 +4,8 @@ Proprietário e autoridade final: Danilo
 Data de criação desta base independente: 2026-11-21
 
 STATUS DE LICENCIAMENTO:
-Este projeto constitui uma implementação original e independente em preparação
-(identificador interno provisório NOVO_AGENTE_HB). Nenhuma licença final
+Este projeto combina a base GabiTama com os componentes originais identificados
+abaixo (identificador interno provisório NOVO_AGENTE_HB). Nenhuma licença final
 comercial ou open-source foi escolhida nem aplicada autonomamente pela equipe
 de implementação; a escolha e publicação da licença definitiva cabe exclusivamente
 ao proprietário (Danilo), após conclusão da auditoria jurídica/IP em
