@@ -21,6 +21,17 @@ class IsolatedProbeService : Service() {
         reply.data.putBoolean("canReadPrivate", runCatching { File(path).readText() == "fixture" }.getOrDefault(false))
         reply.data.putBoolean("ownDataDirWritable", runCatching { filesDir.canWrite() }.getOrDefault(false))
         reply.data.putBoolean("internetPermission", checkSelfPermission(android.Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED)
+        if (request.data.getBoolean("probeFixedExec")) {
+            // One fixed OS binary, no parameters or user-supplied commands.
+            val execution = runCatching {
+                val child = ProcessBuilder("/system/bin/true").redirectErrorStream(true).start()
+                try {
+                    if (child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) "exit:" + child.exitValue()
+                    else "timeout"
+                } finally { if (child.isAlive) child.destroyForcibly() }
+            }
+            reply.data.putString("fixedExec", execution.getOrElse { it.javaClass.simpleName })
+        }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")
         val readGrantedData = runCatching {

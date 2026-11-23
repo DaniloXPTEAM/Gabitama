@@ -71,6 +71,7 @@ class IsolatedProbeAndroidTest {
                 val request = Message.obtain().apply {
                     data.putString("probePath", file.absolutePath)
                     data.putParcelable("readPipe", readPipe)
+                    data.putBoolean("probeFixedExec", true)
                     replyTo = reply
                 }
                 service.get().send(request)
@@ -82,7 +83,8 @@ class IsolatedProbeAndroidTest {
             val writable = data.getBoolean("ownDataDirWritable")
             val internet = data.getBoolean("internetPermission")
             val grantedData = data.getBoolean("readGrantedData")
-            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData")
+            val fixedExec = data.getString("fixedExec").orEmpty()
+            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData fixedSystemTrue=$fixedExec")
             assertTrue("isolated UID must be distinct", distinct)
             assertFalse("private target file was readable", read)
             assertFalse("isolated UID unexpectedly has INTERNET", internet)
