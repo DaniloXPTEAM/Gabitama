@@ -645,16 +645,23 @@ class PersistentShell(
      */
     fun stop() {
         if (nmParallel) {
-            val (writer, child) = synchronized(lifecycleLock) {
+            val (writer, child, pid) = synchronized(lifecycleLock) {
                 permanentlyStopped = true
+                val old = Triple(stdinWriter, process, peerPid)
                 // Revoke before cancelling media attempts or letting a new shell start.
                 releasePeerLocked()
-                val old = stdinWriter to process
                 stdinWriter = null
                 process = null
                 old
             }
-            child?.destroyForcibly()
+            // PRoot handles SIGQUIT by killing all known tracees. SIGKILL on PRoot
+            // alone detaches its guests and can leave a timed-out command running.
+            // This is best-effort cleanup, not an isolation or process-tree guarantee.
+            if (child != null && pid != null && child.isAlive) {
+                runCatching { android.system.Os.kill(pid, android.system.OsConstants.SIGQUIT) }
+                runCatching { child.waitFor(1500, java.util.concurrent.TimeUnit.MILLISECONDS) }
+            }
+            if (child?.isAlive == true) child.destroyForcibly()
             try { writer?.close() } catch (_: Exception) {}
         } else {
             try { stdinWriter?.close() } catch (_: Exception) {}
