@@ -63,3 +63,17 @@ necessário resolver inicialização sem acesso a credenciais, provisionamento e
 limpeza de rootfs próprio, IPC autenticado e limitado, quotas, disponibilidade
 nativa e testes adversariais. Não compartilhar os diretórios privados do app
 com o processo executor apenas para contornar essa falha.
+
+Na fixture isolada subsequente [45210360551](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45210360551),
+um pipe explicitamente entregue por Binder pôde ser lido pelo UID isolado,
+enquanto o arquivo privado fixo permaneceu inacessível. Isso demonstra somente
+um canal de transferência de dados concedido, não a instalação ou execução de
+Alpine/PRoot nem contenção de processos.
+
+O servidor de offload agora recusa, antes de ler o protocolo, conexões sem peer
+PRoot registrado pelo host. A sessão PTY original ainda não registra seu peer;
+por isso seu offload está indisponível por segurança, sem afetar o código de UI
+existente, que ainda não usa este runtime. Foram adicionados limites de workers,
+leitura e tamanho acumulado da requisição; o timeout de leitura não é prazo
+absoluto para toda a requisição, e os limites não constituem isolamento. A
+verificação ponta a ponta dessas últimas mudanças permanece pendente em CI.
