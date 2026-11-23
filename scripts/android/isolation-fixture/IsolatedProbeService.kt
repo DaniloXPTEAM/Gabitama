@@ -43,6 +43,8 @@ class IsolatedProbeService : Service() {
             reply.data.putString("fixedPtrace", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-ptrace.so").absolutePath))
             // PRoot version only: no guest shell, no user input, no filesystem mount.
             reply.data.putString("fixedProotVersion", runFixed(File(applicationInfo.nativeLibraryDir, "libproot.so").absolutePath, "--version"))
+            // Wrapper has fixed argv, a process-group kill deadline and no user input.
+            reply.data.putString("fixedProotExec", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-proot.so").absolutePath))
         }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")

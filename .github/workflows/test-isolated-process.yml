@@ -50,6 +50,7 @@ jobs:
           mkdir -p android/app/src/main/jniLibs/x86_64
           "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang" -fPIE -pie -O2 scripts/android/isolation-fixture/fixture-exec.c -o android/app/src/main/jniLibs/x86_64/libfixture-exec.so
           "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang" -fPIE -pie -O2 -Wall -Wextra scripts/android/isolation-fixture/fixture-ptrace.c -o android/app/src/main/jniLibs/x86_64/libfixture-ptrace.so
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang" -fPIE -pie -O2 -Wall -Wextra scripts/android/isolation-fixture/fixture-proot.c -o android/app/src/main/jniLibs/x86_64/libfixture-proot.so
       - name: Compilar PRoot x86 em cópia descartável
         run: scripts/android/shell-fixture/build-native.sh
       - name: Construir APKs descartáveis
