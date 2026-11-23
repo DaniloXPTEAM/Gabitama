@@ -3,6 +3,9 @@ package com.novoagentehb.app
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.PRootKernel
+import ai.tama.sandbox.OffloadPeerBindings
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import com.openminis.app.sandbox.NativeOffloadServer
 import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.OffloadReplyFiles
@@ -48,6 +51,46 @@ class OriginalShellRuntimeAndroidTest {
             untrusted.connect(android.net.LocalSocketAddress(NativeOffloadServer.socketName))
             untrusted.soTimeout = 5000
             assertEquals("unregistered offload socket should close", -1, untrusted.inputStream.read())
+        }
+        // Use only fixed test protocol bytes and a host-owned PID registration.
+        // A guest cannot register itself or select its own peer identity.
+        val lease = OffloadPeerBindings.register(android.os.Process.myPid(), "fixture-protocol") { true }
+        val held = mutableListOf<android.net.LocalSocket>()
+        fun connect(): android.net.LocalSocket = android.net.LocalSocket().apply {
+            connect(android.net.LocalSocketAddress(NativeOffloadServer.socketName))
+            soTimeout = 15_000
+        }
+        fun java.io.OutputStream.le(value: Int) {
+            write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value).array())
+        }
+        try {
+            repeat(16) {
+                val socket = connect()
+                held.add(socket)
+                socket.outputStream.le(0x46464F4E) // partial request holds a worker
+            }
+            withTimeout(10_000) { while (NativeOffloadServer.availableWorkerSlotsForTest() != 0) delay(25) }
+            connect().use { excess -> assertEquals("excess socket not refused", -1, excess.inputStream.read()) }
+            held.forEach { it.close() }
+            held.clear()
+            withTimeout(10_000) { while (NativeOffloadServer.availableWorkerSlotsForTest() != 16) delay(25) }
+            connect().use { large ->
+                val out = large.outputStream
+                out.le(0x46464F4E); out.le(1); out.le(1); out.le(5)
+                val chunk = ByteArray(1024 * 1024) { 'x'.code.toByte() }
+                repeat(4) { out.le(chunk.size); out.write(chunk) }
+                out.le(chunk.size) // fifth string exceeds the cumulative 4 MiB budget
+                out.flush()
+                assertEquals("oversized socket not refused", -1, large.inputStream.read())
+            }
+            connect().use { stalled ->
+                stalled.outputStream.le(0x46464F4E)
+                assertEquals("stalled socket not timed out", -1, stalled.inputStream.read())
+            }
+            withTimeout(10_000) { while (NativeOffloadServer.availableWorkerSlotsForTest() != 16) delay(25) }
+        } finally {
+            held.forEach { runCatching { it.close() } }
+            OffloadPeerBindings.release(android.os.Process.myPid(), lease)
         }
         assertNull(PRootKernel.resolveHostPath("/../../outside"))
         assertNull(PRootKernel.resolveSessionHostPath("../outside", "/var/minis/workspace/file", context))

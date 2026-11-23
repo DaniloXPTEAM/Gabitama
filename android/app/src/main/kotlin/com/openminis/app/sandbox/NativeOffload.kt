@@ -85,6 +85,7 @@ object NativeOffloadServer {
 
     // Limit stalled or oversized protocol requests even from registered peers.
     private val workerSlots = Semaphore(16)
+    internal fun availableWorkerSlotsForTest(): Int = workerSlots.availablePermits()
     private const val REQUEST_BYTES_LIMIT = 4 * 1024 * 1024
     private const val READ_TIMEOUT_MS = 10_000
     private val handlers = ConcurrentHashMap<String, NativeOffloadHandler>()
