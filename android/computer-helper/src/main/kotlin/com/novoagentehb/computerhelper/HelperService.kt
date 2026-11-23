@@ -60,6 +60,9 @@ class HelperService : Service() {
         }
     }
 
+    /** Outcome of one operation: result code, short text, and optional bytes. */
+    private data class OpResult(val code: Int, val text: String, val bytes: ByteArray = ByteArray(0))
+
     /** Fixed reply layout for every transaction: exception header, code, text, bytes. */
     private fun writeReply(reply: Parcel, result: OpResult) {
         reply.writeNoException()
