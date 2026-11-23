@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.ExecutionCoordinator
+import com.openminis.app.sandbox.NativeOffloadServer
+import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.PRootKernel
 import com.openminis.app.sandbox.PersistentShell
 import com.openminis.app.sandbox.RootfsManager
@@ -29,6 +31,9 @@ class Arm64OriginalShellAndroidTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = RootfsManager.getInstance(context)
         assertFalse("only a fresh disposable test app is allowed", root.rootfsDir.exists())
+        NativeOffloadServer.register("arm-fixture-offload-error") {
+            NativeOffloadResult(7, "ARM_OFFLOAD_ERROR_OK\n")
+        }
         PRootKernel.boot(context)
         assertTrue(root.isInstalled)
         val shell = PersistentShell(context, "fixture-arm64", emptyMap())
@@ -42,6 +47,9 @@ class Arm64OriginalShellAndroidTest {
             assertEquals(external.first, 0, external.second)
             assertTrue(external.first.contains("ARM_EXTERNAL_OK"))
             assertEquals(1, shell.executeCommand("false", 30000).second)
+            val offloadFailure = shell.executeCommand("arm-fixture-offload-error", 30000)
+            assertEquals(offloadFailure.first, 7, offloadFailure.second)
+            assertTrue(offloadFailure.first.contains("ARM_OFFLOAD_ERROR_OK"))
         } finally { shell.stop() }
         ExecutionCoordinator.init(context)
         try {

@@ -5,6 +5,9 @@ set -euo pipefail
 root="$PWD"
 work="$RUNNER_TEMP/tama-arm64-original"
 cp -a third_party/tama-runtime/android "$work"
+# The source remains original in the repository. Apply the tested status
+# adaptation only in this disposable ARM build; no production package is made.
+python3 "$root/scripts/android/shell-fixture/adapt-offload-status.py" "$work/deps/proot/src"
 (
  cd "$work"
  export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
@@ -20,4 +23,4 @@ cp "$RUNNER_TEMP/$name" android/app/src/main/assets/alpine-minirootfs.tar.gz
 cp scripts/android/arm64-shell-fixture/Arm64OriginalShellAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
 sed -i 's/<application$/<application android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
 "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h android/app/src/main/jniLibs/arm64-v8a/libproot.so | grep 'AArch64'
-echo '::notice title=ARM64 fixture::Original PRoot and pinned Alpine prepared for compilation only; no device execution or distribution.'
+echo '::notice title=ARM64 fixture::Original PRoot with experimental offload-status adaptation and pinned Alpine prepared for compilation only; no execution or distribution.'
