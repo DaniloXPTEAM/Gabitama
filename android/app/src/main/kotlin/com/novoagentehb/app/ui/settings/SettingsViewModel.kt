@@ -7,6 +7,10 @@ import com.novoagentehb.app.agent.diagnostics.DiagnosticsInput
 import com.novoagentehb.app.agent.models.ModelRouter
 import com.novoagentehb.app.agent.orchestrator.TaskOrchestrator
 import com.novoagentehb.app.data.migration.ExplicitDataExporter
+import com.novoagentehb.app.data.providers.CustomProvider
+import com.novoagentehb.app.data.providers.CustomProviderFormat
+import com.novoagentehb.app.data.providers.CustomProviderRepository
+import com.novoagentehb.app.data.providers.ProviderNetwork
 import com.novoagentehb.app.data.prefs.AppPreferences
 import com.novoagentehb.app.data.prefs.ProviderId
 import com.novoagentehb.app.data.prefs.VoiceModeId
@@ -29,8 +33,55 @@ class SettingsViewModel @Inject constructor(
     private val exporter: ExplicitDataExporter,
     private val diagnosticsEngine: DiagnosticsEngine,
     private val orchestrator: TaskOrchestrator,
-    private val modelRouter: ModelRouter
+    private val modelRouter: ModelRouter,
+    private val customProviders: CustomProviderRepository,
+    private val providerNetwork: ProviderNetwork
 ) : ViewModel() {
+
+    val customProviderList = customProviders.providers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val activeCustomId = customProviders.activeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    private val _customModels = MutableStateFlow<List<String>>(emptyList())
+    val customModels = _customModels.asStateFlow()
+    private val _customNotice = MutableStateFlow<String?>(null)
+    val customNotice = _customNotice.asStateFlow()
+
+    fun saveCustomProvider(existingId: String?, name: String, url: String, chat: String, screen: String, vision: String, key: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val profile = if (existingId == null) CustomProviderFormat.validate(name, url, chat, screen, vision)
+                    else CustomProviderFormat.validate(name, url, chat, screen, vision, existingId)
+                if (existingId == null) customProviders.add(profile, key) else customProviders.update(profile, key)
+                _customNotice.value = "Provedor salvo no cofre. Após editar, reative para autorizar o uso."
+                onSuccess()
+            } catch (e: IllegalArgumentException) { _customNotice.value = e.message ?: "Configuração inválida." }
+            catch (_: Exception) { _customNotice.value = "Não foi possível salvar o provedor." }
+        }
+    }
+    fun activateCustomProvider(id: String) {
+        viewModelScope.launch {
+            try { customProviders.activate(id); _customNotice.value = "Provedor selecionado para futuras conversas. Uso pode gerar custos." }
+            catch (_: Exception) { _customNotice.value = "Não foi possível selecionar o provedor." }
+        }
+    }
+    fun removeCustomProvider(id: String) {
+        viewModelScope.launch {
+            try { customProviders.remove(id); _customNotice.value = "Provedor removido." }
+            catch (_: Exception) { _customNotice.value = "Não foi possível remover o provedor." }
+        }
+    }
+    fun discoverCustomModels(provider: CustomProvider) {
+        viewModelScope.launch {
+            _customModels.value = emptyList()
+            _customNotice.value = "Consultando catálogo; capacidade e preço não são verificados…"
+            try {
+                _customModels.value = providerNetwork.discover(provider, customProviders.key(provider.id))
+                _customNotice.value = "${_customModels.value.size} modelo(s) listado(s). Verifique função, acesso e custo antes de usar."
+            } catch (e: IllegalStateException) { _customNotice.value = e.message ?: "Falha na descoberta." }
+            catch (_: Exception) { _customNotice.value = "Falha na descoberta." }
+        }
+    }
+    fun clearCustomModels() { _customModels.value = emptyList() }
+    fun customImportError(message: String) { _customNotice.value = message }
 
     val primaryProvider: StateFlow<ProviderId> = prefs.primaryProvider
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProviderId.GEMINI)

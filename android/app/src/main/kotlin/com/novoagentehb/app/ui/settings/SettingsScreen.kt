@@ -61,6 +61,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val primaryProvider by viewModel.primaryProvider.collectAsState()
+    val activeCustomId by viewModel.activeCustomId.collectAsState()
     val chatModel by viewModel.chatModel.collectAsState()
     val liveModel by viewModel.liveVoiceModel.collectAsState()
     val screenModel by viewModel.screenOpModel.collectAsState()
@@ -88,7 +89,10 @@ fun SettingsScreen(
     var screenModelInput by remember(screenModel) { mutableStateOf(screenModel) }
     var visionModelInput by remember(visionModel) { mutableStateOf(visionModel) }
     var liveModelInput by remember(liveModel) { mutableStateOf(liveModel) }
+    var showProviderManager by remember { mutableStateOf(false) }
     var showBibleDialog by remember { mutableStateOf(false) }
+
+    if (showProviderManager) ProviderManagerDialog(viewModel) { showProviderManager = false }
 
     Scaffold(
         containerColor = GabiTokens.NightBg,
@@ -130,6 +134,12 @@ fun SettingsScreen(
                             }
                         }
 
+                        item {
+                            GabiFeaturedSurface(borderColor = GabiTokens.Hairline) {
+                                Text("Gerenciamento de provedores", style = MaterialTheme.typography.titleMedium)
+                                OutlinedButton(onClick = { showProviderManager = true }) { Text("Adicionar, importar e gerenciar") }
+                            }
+                        }
                         // Cartão oficial R1.4 da Bíblia Visual & Identidade HB
                         item {
                             GabiFeaturedSurface(borderColor = GabiTokens.CopperAccent.copy(alpha = 0.45f)) {
@@ -167,7 +177,7 @@ fun SettingsScreen(
                                 Text("Provedor principal (Gemini padrão)", style = MaterialTheme.typography.titleMedium, color = GabiTokens.GoldAccent)
                                 Spacer(Modifier.height(6.dp))
                                 ProviderId.entries.forEach { p ->
-                                    val selected = p == primaryProvider
+                                    val selected = p == primaryProvider && activeCustomId.isBlank()
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = if (selected) GabiTokens.GoldAccent.copy(alpha = 0.16f) else GabiTokens.NightBg,

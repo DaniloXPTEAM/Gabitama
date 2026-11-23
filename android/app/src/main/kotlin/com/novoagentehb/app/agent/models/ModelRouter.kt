@@ -4,6 +4,8 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.novoagentehb.app.agent.orchestrator.ToolDescriptor
+import com.novoagentehb.app.data.providers.CustomProviderRepository
+import com.novoagentehb.app.data.providers.ProviderNetwork
 import com.novoagentehb.app.data.prefs.AppPreferences
 import com.novoagentehb.app.data.prefs.ProviderId
 import com.novoagentehb.app.data.security.SecureKeyVault
@@ -33,6 +35,7 @@ enum class FailureCategory(val label: String) {
     RATE_LIMITED("Limite de requisições (429)"),
     NETWORK_OR_TIMEOUT("Sem rede ou tempo esgotado"),
     PROVIDER_ERROR("Erro do provedor"),
+    MODEL_NOT_FOUND("Modelo ou endpoint inexistente"),
     NO_KEY_CONFIGURED("Chave não configurada")
 }
 
@@ -83,7 +86,9 @@ sealed class ModelTurnResult {
 class ModelRouter @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val prefs: AppPreferences,
-    private val keyVault: SecureKeyVault
+    private val keyVault: SecureKeyVault,
+    private val customProviders: CustomProviderRepository,
+    private val providerNetwork: ProviderNetwork
 ) {
     suspend fun generateTurn(
         role: ModelRole,
@@ -92,6 +97,21 @@ class ModelRouter @Inject constructor(
         tools: List<ToolDescriptor>,
         explicitProvider: ProviderId? = null
     ): ModelTurnResult {
+        if (explicitProvider == null && customProviders.activeId.first().isNotBlank()) {
+            val custom = customProviders.active()
+                ?: return ModelTurnResult.Failure(ProviderFailure("custom", "", null, FailureCategory.PROVIDER_ERROR, "Provedor inativo ou alterado; selecione e autorize um provedor em Ajustes.", ""))
+            val model = when (role) {
+                ModelRole.CHAT, ModelRole.TASK_SYNTHESIS -> custom.chatModel
+                ModelRole.SCREEN_OP -> custom.screenModel
+                ModelRole.VISION -> custom.visionModel
+                ModelRole.MEDIA_GEN -> return ModelTurnResult.Failure(ProviderFailure(custom.id, "", null, FailureCategory.PROVIDER_ERROR, "Este provedor não tem rota de mídia configurada.", ""))
+            }
+            val key = customProviders.key(custom.id)
+            if (key.isBlank()) return ModelTurnResult.Failure(ProviderFailure(custom.id, model, null, FailureCategory.NO_KEY_CONFIGURED, "Credencial não configurada para ${custom.name}.", ""))
+            return withContext(Dispatchers.IO) {
+                callOpenAiCompatible(custom.id, "${custom.baseUrl}/chat/completions", key, model, systemPrompt, history, tools, providerNetwork.client, true)
+            }
+        }
         val provider = explicitProvider ?: prefs.primaryProvider.first()
         val model = resolveModelForRole(provider, role)
         val apiKey = resolveApiKey(provider)
@@ -219,7 +239,9 @@ class ModelRouter @Inject constructor(
         model: String,
         systemPrompt: String,
         history: List<ModelChatMessage>,
-        tools: List<ToolDescriptor>
+        tools: List<ToolDescriptor>,
+        client: OkHttpClient = okHttpClient,
+        privateErrors: Boolean = false
     ): ModelTurnResult {
         val body = buildOpenAiRequestJson(model, systemPrompt, history, tools)
         val req = Request.Builder()
@@ -230,10 +252,10 @@ class ModelRouter @Inject constructor(
             .build()
 
         return runCatching {
-            okHttpClient.newCall(req).execute().use { resp ->
+            client.newCall(req).execute().use { resp ->
                 val raw = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) {
-                    return@use ModelTurnResult.Failure(classifyHttpFailure(providerId, model, resp.code, raw))
+                    return@use ModelTurnResult.Failure(classifyHttpFailure(providerId, model, resp.code, if (privateErrors) "" else raw))
                 }
                 parseOpenAiResponse(providerId, model, raw)
             }
@@ -245,7 +267,7 @@ class ModelRouter @Inject constructor(
                     httpStatus = null,
                     category = FailureCategory.NETWORK_OR_TIMEOUT,
                     userSummary = "Falha de rede ao consultar $providerId.",
-                    sanitizedDetail = SecureKeyVault.redactSecrets(err.message ?: "Erro de rede")
+                    sanitizedDetail = if (privateErrors) "Falha de rede ou resposta inválida." else SecureKeyVault.redactSecrets(err.message ?: "Erro de rede")
                 )
             )
         }
@@ -323,6 +345,7 @@ class ModelRouter @Inject constructor(
                     FailureCategory.QUOTA_OR_CREDIT
                 statusCode == 403 -> FailureCategory.ACCESS_DENIED
                 statusCode == 402 -> FailureCategory.QUOTA_OR_CREDIT
+                statusCode == 404 -> FailureCategory.MODEL_NOT_FOUND
                 statusCode == 413 -> FailureCategory.PAYLOAD_TOO_LARGE
                 statusCode == 429 && (lower.contains("insufficient_quota") || lower.contains("billing")) ->
                     FailureCategory.QUOTA_OR_CREDIT
@@ -333,6 +356,7 @@ class ModelRouter @Inject constructor(
                 FailureCategory.AUTH_REJECTED -> "Chave rejeitada pelo provedor ($providerId). Verifique em Ajustes."
                 FailureCategory.ACCESS_DENIED -> "Acesso negado para o modelo $modelId ($providerId HTTP 403)."
                 FailureCategory.QUOTA_OR_CREDIT -> "Cota ou saldo insuficiente reportado por $providerId."
+                FailureCategory.MODEL_NOT_FOUND -> "Modelo ou endpoint não encontrado em $providerId (HTTP 404)."
                 FailureCategory.PAYLOAD_TOO_LARGE -> "Contexto/prompt excedeu o limite do modelo (HTTP 413)."
                 FailureCategory.RATE_LIMITED -> "Limite temporário de requisições atingido em $providerId (HTTP 429)."
                 else -> "Provedor $providerId retornou HTTP $statusCode."

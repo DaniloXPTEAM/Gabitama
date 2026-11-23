@@ -47,6 +47,11 @@ class AppPreferences @Inject constructor(
 ) {
     private val ds = context.appDataStore
 
+    val customProvidersJson: Flow<String> = ds.data.map { it[KEY_CUSTOM_PROVIDERS] ?: "[]" }
+    val activeCustomProviderId: Flow<String> = ds.data.map { it[KEY_ACTIVE_CUSTOM_PROVIDER] ?: "" }
+    suspend fun saveCustomProvidersJson(json: String) = ds.edit { it[KEY_CUSTOM_PROVIDERS] = json }
+    suspend fun activateCustomProvider(id: String) = ds.edit { it[KEY_ACTIVE_CUSTOM_PROVIDER] = id }
+
     val onboardingCompleted: Flow<Boolean> = ds.data.map { it[KEY_ONBOARDING] ?: false }
     val primaryProvider: Flow<ProviderId> = ds.data.map {
         runCatching { ProviderId.valueOf(it[KEY_PRIMARY_PROVIDER] ?: ProviderId.GEMINI.name) }
@@ -85,6 +90,7 @@ class AppPreferences @Inject constructor(
     suspend fun setOnboardingCompleted(done: Boolean) = ds.edit { it[KEY_ONBOARDING] = done }
     /** Preserve each provider's task models atomically; leave Live and credentials untouched. */
     suspend fun setPrimaryProvider(provider: ProviderId) = ds.edit { settings ->
+        settings.remove(KEY_ACTIVE_CUSTOM_PROVIDER)
         val previous = runCatching { ProviderId.valueOf(settings[KEY_PRIMARY_PROVIDER] ?: ProviderId.GEMINI.name) }
             .getOrDefault(ProviderId.GEMINI)
         if (previous != provider) {
@@ -130,6 +136,8 @@ class AppPreferences @Inject constructor(
         private fun providerModelKey(provider: ProviderId, role: String) =
             stringPreferencesKey("provider_model_${provider.id}_$role")
 
+        private val KEY_CUSTOM_PROVIDERS = stringPreferencesKey("custom_providers_v1")
+        private val KEY_ACTIVE_CUSTOM_PROVIDER = stringPreferencesKey("active_custom_provider_v1")
         private val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")
         private val KEY_PRIMARY_PROVIDER = stringPreferencesKey("primary_provider")
         private val KEY_CHAT_MODEL = stringPreferencesKey("chat_model")

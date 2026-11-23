@@ -200,7 +200,10 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             prefs.setPrimaryProvider(ProviderId.GROQ)
             prefs.setModels("custom-chat", "custom-screen", "custom-vision", "live-unchanged")
             val reopened = com.novoagentehb.app.data.prefs.AppPreferences(context)
-            val router = com.novoagentehb.app.agent.models.ModelRouter(OkHttpClient(), reopened, SecureKeyVault(context))
+            val vault = SecureKeyVault(context)
+            val router = com.novoagentehb.app.agent.models.ModelRouter(OkHttpClient(), reopened, vault,
+                com.novoagentehb.app.data.providers.CustomProviderRepository(reopened, vault),
+                com.novoagentehb.app.data.providers.ProviderNetwork(OkHttpClient()))
             assertEquals("custom-chat", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.CHAT))
             assertEquals("custom-screen", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.SCREEN_OP))
             assertEquals("custom-vision", router.resolveModelForRole(ProviderId.GROQ, com.novoagentehb.app.agent.models.ModelRole.VISION))
@@ -238,6 +241,48 @@ class SafetyPolicyAndMockIsolationAndroidTest {
         } finally {
             prefs.setPrimaryProvider(previous)
             prefs.setModels(original[0], original[1], original[2], original[3])
+        }
+    }
+
+    @Test
+    fun importedCustomProviderPersistsAndRouterUsesSelectedModelWithMock(): Unit = runBlocking {
+        val prefs = com.novoagentehb.app.data.prefs.AppPreferences(context)
+        val vault = SecureKeyVault(context)
+        val repo = com.novoagentehb.app.data.providers.CustomProviderRepository(prefs, vault)
+        val previous = prefs.primaryProvider.first()
+        val previousCustom = prefs.activeCustomProviderId.first()
+        val json = """{"format":"gabitama-openai-provider-v1","name":"Teste","base_url":"https://api.example.com/v1","chat_model":"chosen-chat","screen_model":"chosen-screen","vision_model":"chosen-vision"}"""
+        val profile = com.novoagentehb.app.data.providers.CustomProviderFormat.importJson(json)
+        var actualModel = ""
+        var actualAuthorization = ""
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            actualAuthorization = request.header("Authorization").orEmpty()
+            val buffer = okio.Buffer(); request.body!!.writeTo(buffer)
+            actualModel = com.google.gson.JsonParser.parseString(buffer.readUtf8()).asJsonObject.get("model").asString
+            okhttp3.Response.Builder().request(request).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("OK")
+                .body(okhttp3.ResponseBody.create(null, """{"choices":[{"message":{"content":"resposta simulada"}}]}""")).build()
+        }.build()
+        try {
+            repo.add(profile, "synthetic-custom-key")
+            repo.activate(profile.id)
+            val reopened = com.novoagentehb.app.data.providers.CustomProviderRepository(com.novoagentehb.app.data.prefs.AppPreferences(context), SecureKeyVault(context))
+            assertEquals(profile, reopened.active())
+            assertEquals("synthetic-custom-key", reopened.key(profile.id))
+            assertFalse(prefs.customProvidersJson.first().contains("synthetic-custom-key"))
+            val router = com.novoagentehb.app.agent.models.ModelRouter(client, prefs, vault, reopened, com.novoagentehb.app.data.providers.ProviderNetwork(client))
+            val result = router.generateTurn(com.novoagentehb.app.agent.models.ModelRole.CHAT, "system", listOf(com.novoagentehb.app.agent.models.ModelChatMessage("user", "oi")), emptyList())
+            assertTrue(result is com.novoagentehb.app.agent.models.ModelTurnResult.TextReply)
+            assertEquals("chosen-chat", actualModel)
+            assertEquals("Bearer synthetic-custom-key", actualAuthorization)
+            assertEquals(profile.id, (result as com.novoagentehb.app.agent.models.ModelTurnResult.TextReply).providerId)
+            assertEquals("chosen-chat", result.modelId)
+            repo.update(profile.copy(chatModel = "new-model"), "")
+            assertEquals("__needs_selection__", prefs.activeCustomProviderId.first())
+        } finally {
+            repo.remove(profile.id)
+            if (previousCustom.isNotBlank()) prefs.activateCustomProvider(previousCustom) else prefs.setPrimaryProvider(previous)
+            client.dispatcher.executorService.shutdownNow()
         }
     }
 
