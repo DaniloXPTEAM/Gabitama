@@ -102,6 +102,46 @@ class IsolatedProbeAndroidTest {
             assertFalse("isolated UID unexpectedly has INTERNET", internet)
             assertTrue("isolated service could not read explicitly granted pipe", grantedData)
 
+            // Test a directory FD via an authenticated, fixture-only local socket.
+            // Kernel peer UID must match the already observed isolated service UID.
+            val socketName = "tama-fixture-" + java.util.UUID.randomUUID()
+            val server = android.net.LocalServerSocket(socketName)
+            val socketReply = CountDownLatch(1)
+            val socketResult = AtomicReference<android.os.Bundle>()
+            val socketMessenger = Messenger(Handler(thread.looper) { msg ->
+                socketResult.set(msg.data); socketReply.countDown(); true
+            })
+            val socketDirectory = ParcelFileDescriptor.open(directory, ParcelFileDescriptor.MODE_READ_ONLY)
+            val sent = CountDownLatch(1)
+            val transferStatus = AtomicReference("not-sent")
+            val sender = kotlin.concurrent.thread(isDaemon = true, name = "fixture-directory-sender") {
+                try {
+                    server.accept().use { socket ->
+                        check(socket.peerCredentials.uid == data.getInt("uid")) { "unexpected socket peer" }
+                        socket.setFileDescriptorsForSend(arrayOf(socketDirectory.fileDescriptor))
+                        socket.outputStream.write(1)
+                        transferStatus.set("sent")
+                    }
+                } catch (failure: Exception) { transferStatus.set(failure.javaClass.simpleName) }
+                finally { sent.countDown() }
+            }
+            try {
+                val request = Message.obtain().apply {
+                    this.data.putString("directorySocket", socketName)
+                    replyTo = socketMessenger
+                }
+                service.get().send(request)
+                assertTrue("Unix directory probe did not respond", socketReply.await(15, TimeUnit.SECONDS))
+                assertTrue("Unix directory sender did not finish", sent.await(5, TimeUnit.SECONDS))
+                val outcome = socketResult.get().getString("unixDirectory").orEmpty()
+                if (outcome == "writable") assertTrue(File(directory, "isolated-unix.txt").exists())
+                Log.i("TamaIsolationFixture", "unixDirectory=$outcome unixTransfer=${transferStatus.get()}")
+            } finally {
+                server.close()
+                sender.join(1000)
+                socketDirectory.close()
+            }
+
             // Separate exploratory transaction: Android may refuse transfer of a
             // directory descriptor or terminate the peer. Neither result is proof
             // that an isolated rootfs can be provisioned safely.
@@ -136,6 +176,7 @@ class IsolatedProbeAndroidTest {
             thread.quitSafely()
             file.delete()
             File(directory, "isolated-fixture.txt").delete()
+            File(directory, "isolated-unix.txt").delete()
             android.system.Os.chmod(directory.absolutePath, 448) // 0700
             directory.delete()
         }

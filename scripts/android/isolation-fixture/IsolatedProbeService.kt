@@ -101,6 +101,38 @@ class IsolatedProbeService : Service() {
         reply.data.putBoolean("directoryPresent", directory != null)
         reply.data.putBoolean("directoryWrite", directoryOutcome.getOrDefault(false))
         reply.data.putString("directoryError", directoryError)
+        request.data.getString("directorySocket")?.let { socketName ->
+            // Fixture-only Unix FD transfer; no arbitrary paths or commands.
+            val transfer = runCatching {
+                android.net.LocalSocket().use { socket ->
+                    socket.soTimeout = 5000
+                    socket.connect(android.net.LocalSocketAddress(socketName))
+                    check(socket.inputStream.read() == 1)
+                    val descriptors = socket.ancillaryFileDescriptors.orEmpty()
+                    check(descriptors.size == 1)
+                    val received = ParcelFileDescriptor.dup(descriptors[0])
+                    try {
+                        File("/proc/self/fd/${received.fd}/isolated-unix.txt").let {
+                            it.writeText("fixture-unix-directory")
+                            check(it.readText() == "fixture-unix-directory")
+                        }
+                    } finally {
+                        received.close()
+                        android.system.Os.close(descriptors[0])
+                    }
+                }
+                "writable"
+            }.getOrElse { failure ->
+                val reason = when {
+                    failure.message?.contains("EACCES") == true -> "EACCES"
+                    failure.message?.contains("EPERM") == true -> "EPERM"
+                    failure.message?.contains("ENOENT") == true -> "ENOENT"
+                    else -> "other"
+                }
+                failure.javaClass.simpleName + ":" + reason
+            }
+            reply.data.putString("unixDirectory", transfer)
+        }
         request.replyTo.send(reply)
         true
     })
