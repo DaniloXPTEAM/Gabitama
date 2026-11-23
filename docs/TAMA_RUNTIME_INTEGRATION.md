@@ -25,3 +25,16 @@ O repositório upstream não contém `libproot.so` nem o minirootfs Alpine pront
 O upstream identifica nanoMuse como GPL-3.0-or-later e sua base Android OpenMinis como GPL-3.0. O próprio documento `LICENCIAMENTO_TAMA.md` adverte que a MIT do proprietário cobre apenas suas contribuições próprias, não toda a árvore. Cópias dos textos GPL, `NOTICE`, avisos de terceiros e licença MIT estão em `android/app/src/main/assets/licenses/tama-runtime/`; o código-fonte integrado permanece neste repositório. O upstream lista PRoot como GPL-2.0, talloc estático como LGPL-3.0-or-later e Alpine como conjunto de licenças, inclusive BusyBox GPL-2.0; as licenças específicas e a compatibilidade de cada build ainda precisam ser verificadas no código e materiais efetivamente distribuídos. Esta nota não substitui revisão jurídica nem comprova cumprimento de todas as obrigações do pacote final. A licença final do conjunto continua pendente de definição e revisão do proprietário antes de distribuição.
 
 Não houve inclusão de E2B, VPS, serviço pago, rootfs ou executável PRoot no APK. Os loaders de origem Termux permanecem apenas em `third_party`, e a fonte correspondente exata ainda precisa ser identificada antes de distribuição. Não há alegação de isolamento comprovado; PRoot não deve ser tratado como barreira de segurança suficiente para executar scripts não confiáveis com privilégios do app.
+
+## Portabilidade das sessões originais (em andamento)
+
+`PRootKernel`, `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`,
+`ShellExecutor`, as políticas de timeout/seccomp, o servidor de offload e suas
+dependências de repositório e privacidade foram trazidos do mesmo commit upstream.
+Foram adaptados o namespace de `BuildConfig`, a serialização Kotlin e o modo de
+proteção de sessões/privacidade do upstream, habilitado para este aplicativo.
+A integração de preferências de mirrors upstream ainda está pendente; não foi
+iniciada descoberta automática de mirrors. O código portado não é registrado na
+interface nem como ferramenta do agente. PRoot e rootfs ainda não são incluídos
+no APK de produção, e o isolamento de execução de entrada arbitrária, controles
+de permissão e testes arm64 permanecem obrigatórios antes da ativação.

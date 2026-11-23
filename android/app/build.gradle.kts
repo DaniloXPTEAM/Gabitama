@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -116,6 +117,7 @@ dependencies {
 
     implementation(libs.datastore.preferences)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.documentfile)
     implementation(libs.coroutines.android)
     implementation(libs.gson)
