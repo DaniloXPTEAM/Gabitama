@@ -29,13 +29,14 @@ jobs:
           curl -fsSL --retry 3 "$base/$name.sha256" -o /tmp/alpine-fixture/SHA256SUMS
           cd /tmp/alpine-fixture
           sha256sum -c SHA256SUMS
+          echo "ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea  $name" | sha256sum -c -
           sha256sum "$name"
           echo "::notice title=Alpine fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)"
           cp "$name" "$GITHUB_WORKSPACE/android/app/src/androidTest/assets/alpine-3.21.3.tar.gz"
           cp "$GITHUB_WORKSPACE/scripts/android/alpine-fixture/RealAlpineRootfsAndroidTest.kt" "$GITHUB_WORKSPACE/android/app/src/androidTest/java/com/novoagentehb/app/"
       - name: Compilar APKs somente para teste
         working-directory: android
-        run: ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+        run: bash ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
