@@ -30,14 +30,24 @@ class IsolatedProbeService : Service() {
         // Fixed fixture directory FD only; never receives or executes commands.
         @Suppress("DEPRECATION")
         val directory = request.data.getParcelable<ParcelFileDescriptor>("directoryFd")
-        val directoryWrite = runCatching {
+        val directoryOutcome = runCatching {
             directory != null && File("/proc/self/fd/${directory.fd}/isolated-fixture.txt").let {
                 it.writeText("fixture-directory")
                 it.readText() == "fixture-directory"
             }
-        }.getOrDefault(false)
+        }
+        val directoryError = directoryOutcome.exceptionOrNull()?.let { failure ->
+            val reason = when {
+                failure.message?.contains("EACCES") == true -> "EACCES"
+                failure.message?.contains("EPERM") == true -> "EPERM"
+                failure.message?.contains("ENOENT") == true -> "ENOENT"
+                else -> "other"
+            }
+            failure.javaClass.simpleName + ":" + reason
+        }.orEmpty()
         directory?.close()
-        reply.data.putBoolean("directoryWrite", directoryWrite)
+        reply.data.putBoolean("directoryWrite", directoryOutcome.getOrDefault(false))
+        reply.data.putString("directoryError", directoryError)
         request.replyTo.send(reply)
         true
     })
