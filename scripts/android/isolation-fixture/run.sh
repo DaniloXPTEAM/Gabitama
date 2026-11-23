@@ -11,7 +11,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk || { echo '::er
 adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk || { echo '::error title=Isolation setup::Test APK installation failed'; exit 1; }
 # API 26 can deny clearing log buffers; the AVD is fresh and output is filtered.
 adb logcat -c || echo '::warning title=Isolation fixture::Could not clear emulator log buffer; using filtered logs.'
-if adb shell am instrument -w -r -e class com.novoagentehb.app.IsolatedProbeAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/tama-isolation.txt 2>&1; then
+if adb shell am instrument -w -r -e class com.novoagentehb.app.IsolatedProbeAndroidTest,com.novoagentehb.app.RootfsGrantAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/tama-isolation.txt 2>&1; then
   export ISOLATION_INSTRUMENT_STATUS=0
 else
   export ISOLATION_INSTRUMENT_STATUS=$?
@@ -26,7 +26,7 @@ s=Path('/tmp/tama-isolation.txt').read_text(errors='replace')
 for line in Path('/tmp/tama-isolation-log.txt').read_text(errors='replace').splitlines():
  if 'TamaIsolationFixture:' in line:
   print('::notice title=Isolation fixture::'+line.split('TamaIsolationFixture:',1)[1].strip())
-if os.environ['ISOLATION_INSTRUMENT_STATUS'] != '0' or not re.search(r'OK \(1 test\)',s) or 'FAILURES!!!' in s:
+if os.environ['ISOLATION_INSTRUMENT_STATUS'] != '0' or not re.search(r'OK \(2 tests\)',s) or 'FAILURES!!!' in s:
  print('::error title=Isolation fixture::FAIL; instrumentation exit=' + os.environ['ISOLATION_INSTRUMENT_STATUS'])
  for line in Path('/tmp/tama-isolation-crash.txt').read_text(errors='replace').splitlines():
   if re.search(r'FATAL EXCEPTION|Process:|Exception:|Error:|at com\.novoagentehb|Caused by:', line):

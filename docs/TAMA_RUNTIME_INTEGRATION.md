@@ -185,3 +185,31 @@ transferência de um diretório por Binder retornou `DeadObjectException`; a
 sonda alternativa de socket Unix foi recusada com `EACCES` antes de enviar o
 FD nas três APIs. Esses resultados não identificam uma solução de rootfs seguro,
 nem provam proteção contra todos os ataques ou disponibilidade ARM.
+
+## Acesso controlado ao rootfs por concessão (incremento atual)
+
+Causa do `DeadObjectException` na transferência de FD de diretório: **não comprovada**. Os logs
+completos dos runs de CI (`45244920147`, `45265071225`) não puderam ser baixados nesta sessão
+(erro EOF no armazenamento de logs), então nenhuma causa foi inferida daqueles logs.
+
+Protocolo adotado em vez de entregar um diretório ao UID isolado:
+
+- `RootfsGrantPolicy` (JVM, sem Android): aceita apenas caminho relativo a um arquivo regular;
+  recusa caminho absoluto, `.`/`..`, barras repetidas, barra invertida, NUL, profundidade acima de
+  16 componentes, tamanho acima de 1024 caracteres, qualquer componente que seja link simbólico
+  (inclusive intermediário e final), raiz que não seja diretório real, diretórios e entradas ausentes.
+- `RootfsGrantBroker` (processo principal): abre o arquivo validado em somente-leitura e confirma por
+  `/proc/self/fd/<n>` que o caminho real do descritor é o caminho validado. Se o objeto foi trocado
+  por link entre validação e abertura, a concessão é recusada e o descritor fechado.
+- Ao UID isolado é enviado somente o descritor concedido. Nenhum caminho, diretório ou comando.
+
+Testes: `RootfsGrantPolicyTest` (JVM) cobre traversal, links finais/intermediários/internos, raiz
+simbólica, diretórios, limites e caminho válido. `RootfsGrantAndroidTest` (fixture descartável, CI
+API 26/29/34) verifica que o UID isolado lê o descritor concedido, não lê o mesmo arquivo por caminho,
+e que o broker recusa os casos de traversal e link antes de enviar qualquer descritor.
+
+Limites explícitos: a corrida entre validação e abertura fica mitigada pela verificação de
+`/proc`, mas não eliminada para hard links nem para mudanças de conteúdo; o rootfs ainda não é
+provisionado, nenhuma execução foi habilitada, ARM64 não foi testado e o broker não está ligado a
+nenhuma tela ou serviço de produção. Isto não comprova isolamento completo nem segurança contra
+processos concorrentes com o mesmo UID.

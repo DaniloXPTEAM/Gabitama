@@ -140,6 +140,18 @@ class IsolatedProbeService : Service() {
             }
             reply.data.putString("unixDirectory", transfer)
         }
+        // Broker-granted regular-file descriptor only; no path is needed to read it.
+        @Suppress("DEPRECATION")
+        val grantedFile = request.data.getParcelable<ParcelFileDescriptor>("grantFd")
+        if (grantedFile != null) {
+            reply.data.putBoolean("grantRead", runCatching {
+                ParcelFileDescriptor.AutoCloseInputStream(grantedFile).bufferedReader().use { it.readText() } == "grant-data"
+            }.getOrDefault(false))
+        }
+        request.data.getString("grantPath")?.let { path ->
+            // Same file by path: must NOT be readable by the isolated UID.
+            reply.data.putBoolean("grantPathReadable", runCatching { File(path).readText() == "grant-data" }.getOrDefault(false))
+        }
         request.replyTo.send(reply)
         true
     })
