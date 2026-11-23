@@ -56,7 +56,7 @@ verificável a partir deste ambiente.
 |---|---|---|
 | A. PRoot no processo do app (original) | Rootfs e shell com UID do app | **Rejeitada**: expõe dados privados da Gabi ao shell. |
 | B. Diretório passado por FD ao worker | Concessão de diretório via Binder/socket | **Bloqueada**: falha medida em `47b7bb1`. |
-| C. Árvore Alpine dentro do armazenamento do worker, populada por tar em pipe | Extração com validação de caminhos no próprio worker | **Depende de teste**: exige que o UID isolado consiga atravessar e gravar em seu próprio storage. Sonda adicionada nesta fase (`storageProbe`). |
+| C. Árvore Alpine dentro do armazenamento do worker, populada por tar em pipe | Extração com validação de caminhos no próprio worker | **Bloqueada por H1 refutada** (ver seção 8). |
 | D. Worker com app separado (outro APK/UID) | Mover o shell para outro pacote | Mudança de arquitetura do produto; exige decisão do proprietário. |
 | E. Permissões amplas em storage compartilhado | Qualquer `chmod` ou pasta pública | **Rejeitada** pelas restrições do projeto. |
 
@@ -81,3 +81,41 @@ traversal/links, coberta por `TamaRootfsSafetyAndroidTest`. Deve ser reutilizado
   `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`) é chamado pela UI; eles compilam
   mas estão dormentes.
 - ARM64 real, isolamento completo e licenças: **não comprovados**.
+
+## 8. Resultado da hipótese H1 (CI `45287297033`, commit `7bedc54`)
+
+Sonda `storageProbe` no worker isolado (UID 99010), APIs 26 e 29 (job 34 com falha de configuração,
+ver abaixo):
+
+- `filesDir exists=false traverse=false read=false write=false`
+- `cacheDir exists=false traverse=false read=false write=false`
+- `codeCacheDir exists=false traverse=false read=false write=false`
+- `noBackupFilesDir exists=false traverse=false read=false write=false`
+- `/data/local/tmp exists=true traverse=false read=false write=false`
+- `cacheWrite=FileNotFoundException: .../cache/storage-probe/block.bin: open failed: EACCES`
+
+**H1 refutada.** O UID isolado não atravessa nenhum storage próprio do app nem a área temporária
+compartilhada. A opção C não é viável. Nenhum diretório gravável está disponível ao worker, portanto
+não há como colocar a árvore Alpine sob o processo isolado sem conceder acesso ao diretório de dados
+do app ou a um diretório público, o que é vedado.
+
+Falha da API 34 (`isolation (34)`, job `138086808468`): erro de configuração do Gradle no
+`setup-java`/download, antes de qualquer teste. Não está relacionada ao código de produção. Já havia
+ocorrido em `45276475836`. Não confirmada como transitória; a próxima execução com código alterado
+deve confirmar.
+
+## 9. Decisão necessária do proprietário
+
+O bloqueio é arquitetural: um único APK não pode executar o PRoot com árvore gravável e, ao mesmo
+tempo, isolar o shell dos dados privados da Gabi. As opções viáveis são:
+
+1. **Shell em pacote separado (recomendado para avaliação).** O shell roda em outro APK com UID
+   próprio e árvore Alpine em seu `filesDir`. A Gabi se comunica por Binder com permissão
+   assinatura. É o modelo usado por Termux e exige decisão sobre distribuição, assinatura, licenças
+   GPL/LGPL e mais um APK. Pode ser testado em CI sem alteração de produção.
+2. **Manter a execução desabilitada** e tratar o computador como funcionalidade futura. Não há
+   shell operacional nesta arquitetura.
+3. **Executar o PRoot no processo do app (desenho original).** Rejeitado: expõe dados privados
+   da Gabi ao shell.
+
+Recomendação: opção 1 como experimento de viabilidade em branch separada, após aprovação.
