@@ -110,16 +110,14 @@ class IsolatedProbeService : Service() {
                     check(socket.inputStream.read() == 1)
                     val descriptors = socket.ancillaryFileDescriptors.orEmpty()
                     check(descriptors.size == 1)
-                    val received = ParcelFileDescriptor.dup(descriptors[0])
                     try {
-                        File("/proc/self/fd/${received.fd}/isolated-unix.txt").let {
-                            it.writeText("fixture-unix-directory")
-                            check(it.readText() == "fixture-unix-directory")
+                        ParcelFileDescriptor.dup(descriptors[0]).use { received ->
+                            File("/proc/self/fd/${received.fd}/isolated-unix.txt").let {
+                                it.writeText("fixture-unix-directory")
+                                check(it.readText() == "fixture-unix-directory")
+                            }
                         }
-                    } finally {
-                        received.close()
-                        android.system.Os.close(descriptors[0])
-                    }
+                    } finally { android.system.Os.close(descriptors[0]) }
                 }
                 "writable"
             }.getOrElse { failure ->
