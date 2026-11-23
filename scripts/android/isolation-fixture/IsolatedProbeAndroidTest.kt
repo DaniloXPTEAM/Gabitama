@@ -19,6 +19,10 @@ import com.novoagentehb.app.computer.runtime.IsolatedRuntimeService
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeHealth
 import com.novoagentehb.app.app.NovoAgenteApplication
 import com.novoagentehb.app.app.IsolatedUid
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +51,21 @@ class IsolatedProbeAndroidTest {
             IsolatedRuntimeHealth(refusingContext).isStartedAndIsolated()
         })
         assertEquals("unbound a service that was never bound", 0, failedUnbinds.get())
+        val fakeBound = CountDownLatch(1)
+        val cancelledUnbinds = java.util.concurrent.atomic.AtomicInteger()
+        val hangingContext = object : android.content.ContextWrapper(context) {
+            override fun bindService(service: Intent, connection: ServiceConnection, flags: Int): Boolean {
+                fakeBound.countDown()
+                return true
+            }
+            override fun unbindService(connection: ServiceConnection) { cancelledUnbinds.incrementAndGet() }
+        }
+        kotlinx.coroutines.runBlocking {
+            val probe = launch(Dispatchers.Default) { IsolatedRuntimeHealth(hangingContext).isStartedAndIsolated() }
+            assertTrue("fake binding did not start", withContext(Dispatchers.IO) { fakeBound.await(5, TimeUnit.SECONDS) })
+            probe.cancelAndJoin()
+        }
+        assertEquals("cancelled binding was not cleaned up exactly once", 1, cancelledUnbinds.get())
         val runtimeReady = CountDownLatch(1)
         val runtimeBinder = AtomicReference<IBinder>()
         val runtimeConnection = object : ServiceConnection {
