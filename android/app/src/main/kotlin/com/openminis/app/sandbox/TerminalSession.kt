@@ -90,8 +90,10 @@ class TerminalSession(private val context: Context) {
     private val _clearVersion = MutableStateFlow(0)
     val clearVersion: StateFlow<Int> = _clearVersion.asStateFlow()
 
-    private var masterFd: Int = -1
-    private var childPid: Int = 0
+    private val lifecycleLock = Any()
+    @Volatile private var generation = 0L
+    @Volatile private var masterFd: Int = -1
+    @Volatile private var childPid: Int = 0
     private var readerJob: Job? = null
 
     /**
@@ -121,17 +123,20 @@ class TerminalSession(private val context: Context) {
      * target geometry — otherwise boots at 80×24 and expects a resize callback.
      */
     fun start(sessionId: String? = null, initialCols: Int = DEFAULT_COLS, initialRows: Int = DEFAULT_ROWS) {
-        if (_state.value == State.RUNNING) return
-        _state.value = State.BOOTING
-        cols = initialCols
-        rows = initialRows
-        // Fresh per PTY incarnation, so a retry is judged on its own output
-        // rather than inheriting the dead attempt's.
-        sawOutput = false
+        val thisGeneration = synchronized(lifecycleLock) {
+            if (_state.value == State.RUNNING || _state.value == State.BOOTING) return
+            generation += 1
+            _state.value = State.BOOTING
+            cols = initialCols
+            rows = initialRows
+            sawOutput = false
+            generation
+        }
 
         scope.launch {
             try {
                 PRootKernel.boot(context)
+                if (generation != thisGeneration) return@launch
 
                 if (sessionId != null) {
                     ExecutionCoordinator.envVarRepository?.allAsDict()?.let { envVars ->
@@ -174,28 +179,42 @@ class TerminalSession(private val context: Context) {
                 val outPid = IntArray(1)
                 val fd = PtyBridge.forkExec(cmd, argv, envp, cwd, cols, rows, outPid)
                 if (fd < 0) {
-                    Log.e(TAG, "forkExec failed: errno=${-fd}")
-                    _outputBytes.emit("Failed to start PTY: errno=${-fd}\r\n".toByteArray())
-                    _state.value = State.STOPPED
+                    if (generation == thisGeneration) {
+                        Log.e(TAG, "forkExec failed: errno=${-fd}")
+                        _outputBytes.emit("Failed to start PTY: errno=${-fd}\r\n".toByteArray())
+                        synchronized(lifecycleLock) {
+                            if (generation == thisGeneration) _state.value = State.STOPPED
+                        }
+                    }
                     return@launch
                 }
-                masterFd = fd
-                childPid = outPid[0]
-                _state.value = State.RUNNING
-                liveSessions.add(WeakReference(this@TerminalSession))
-                Log.i(TAG, "PTY started: fd=$fd pid=$childPid cols=$cols rows=$rows")
-
-                if (sessionId != null) {
-                    kotlinx.coroutines.delay(300)
-                    writeInput("cd /var/minis && clear\n".toByteArray())
+                val pid = outPid[0]
+                val accepted = synchronized(lifecycleLock) {
+                    if (generation != thisGeneration) false else {
+                        masterFd = fd
+                        childPid = pid
+                        _state.value = State.RUNNING
+                        liveSessions.add(WeakReference(this@TerminalSession))
+                        readerJob = scope.launch { readLoop(fd, thisGeneration) }
+                        true
+                    }
                 }
+                if (!accepted) {
+                    PtyBridge.closeFd(fd)
+                    PtyBridge.sendSignal(pid, 9)
+                    PtyBridge.waitFor(pid)
+                    return@launch
+                }
+                Log.i(TAG, "PTY started: fd=$fd pid=$pid cols=$cols rows=$rows")
 
-                readerJob = scope.launch { readLoop() }
-
-                // Wait for child exit in a sibling coroutine.
+                // Reap exactly this child, even if a later session starts.
                 val spawnedAt = System.currentTimeMillis()
                 scope.launch {
-                    val status = PtyBridge.waitFor(childPid)
+                    val status = PtyBridge.waitFor(pid)
+                    synchronized(lifecycleLock) {
+                        if (generation == thisGeneration && childPid == pid) childPid = 0
+                    }
+                    if (generation != thisGeneration) return@launch
                     Log.i(TAG, "Child exited: status=$status")
 
                     // [T-android-seccomp-selfheal / GH#186] PtyBridge reports a
@@ -216,36 +235,54 @@ class TerminalSession(private val context: Context) {
                             TAG,
                             SeccompFallbackPolicy.retryLogLine(-status, aliveMs, "interactive terminal"),
                         )
-                        useNoSeccomp = true
-                        masterFd = -1
-                        childPid = 0
-                        readerJob?.cancel()
-                        readerJob = null
-                        start(sessionId, cols, rows)
+                        synchronized(lifecycleLock) {
+                            if (generation == thisGeneration) {
+                                useNoSeccomp = true
+                                if (masterFd >= 0) PtyBridge.closeFd(masterFd)
+                                masterFd = -1
+                                childPid = 0
+                                readerJob?.cancel()
+                                readerJob = null
+                                _state.value = State.STOPPED
+                                start(sessionId, cols, rows)
+                            }
+                        }
                         return@launch
                     }
 
-                    _outputBytes.emit("\r\n[Process exited: $status]\r\n".toByteArray())
-                    _state.value = State.STOPPED
+                    if (generation == thisGeneration) {
+                        _outputBytes.emit("\r\n[Process exited: $status]\r\n".toByteArray())
+                        synchronized(lifecycleLock) {
+                            if (generation == thisGeneration) _state.value = State.STOPPED
+                        }
+                    }
+                }
+                if (sessionId != null) {
+                    kotlinx.coroutines.delay(300)
+                    if (generation == thisGeneration) writeInput("cd /var/minis && clear\n".toByteArray())
                 }
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to start PTY session", t)
-                _outputBytes.emit("Error: ${t.message}\r\n".toByteArray())
-                _state.value = State.STOPPED
+                if (generation == thisGeneration) {
+                    Log.e(TAG, "Failed to start PTY session", t)
+                    _outputBytes.emit("Error starting PTY session\r\n".toByteArray())
+                    synchronized(lifecycleLock) {
+                        if (generation == thisGeneration) _state.value = State.STOPPED
+                    }
+                }
             }
         }
     }
 
-    private suspend fun readLoop() {
-        val fd = masterFd
+    private suspend fun readLoop(fd: Int, thisGeneration: Long) {
         val buf = ByteArray(READ_BUFFER_SIZE)
-        while (_state.value == State.RUNNING) {
+        while (_state.value == State.RUNNING && generation == thisGeneration) {
             val n = PtyBridge.readBytes(fd, buf, 0, buf.size)
             if (n <= 0) {
                 // EOF or error → child exited / fd closed
                 if (n < 0) Log.d(TAG, "readBytes returned errno=${-n}")
                 break
             }
+            if (generation != thisGeneration) break
             sawOutput = true
             _outputBytes.emit(buf.copyOf(n))
         }
@@ -329,15 +366,18 @@ class TerminalSession(private val context: Context) {
     }
 
     fun stop() {
-        readerJob?.cancel()
-        readerJob = null
-        val fd = masterFd
-        val pid = childPid
-        masterFd = -1
-        childPid = 0
+        val (fd, pid) = synchronized(lifecycleLock) {
+            generation += 1
+            readerJob?.cancel()
+            readerJob = null
+            val old = masterFd to childPid
+            masterFd = -1
+            childPid = 0
+            _state.value = State.STOPPED
+            old
+        }
         if (fd >= 0) PtyBridge.closeFd(fd)
         if (pid > 0) PtyBridge.sendSignal(pid, 15) // SIGTERM
-        if (_state.value != State.STOPPED) _state.value = State.STOPPED
         liveSessions.removeAll { it.get() === this || it.get() == null }
     }
 

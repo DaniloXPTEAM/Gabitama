@@ -30,6 +30,13 @@ class OriginalShellRuntimeAndroidTest {
         val escape = java.io.File(root.rootfsDir, "tmp/fixture-escape")
         java.nio.file.Files.createSymbolicLink(escape.toPath(), context.filesDir.parentFile.toPath())
         assertNull(PRootKernel.resolveHostPath("/tmp/fixture-escape/anything"))
+        repeat(10) {
+            val interrupted = TerminalSession(context)
+            interrupted.start()
+            interrupted.stop()
+            delay(50)
+            assertEquals(TerminalSession.State.STOPPED, interrupted.state.value)
+        }
         val shell = PersistentShell(context, "fixture-session", emptyMap())
         try {
             val first = shell.executeCommand("export FIXTURE_VALUE=works; cd /tmp; printf 'FIRST\\n'", 30000)
