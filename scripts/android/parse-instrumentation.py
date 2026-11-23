@@ -40,7 +40,7 @@ for line in raw.splitlines():
     elif last_key == 'stack' and not line.startswith('INSTRUMENTATION_'):
         status[last_key] += '\n' + line
 
-expected = int(os.environ.get('GABITAMA_EXPECTED_TESTS', '24'))
+expected = int(os.environ.get('GABITAMA_EXPECTED_TESTS', '26'))
 if (len(started) != expected or set(completed) != started or
         not re.search(r'^INSTRUMENTATION_CODE: -1\s*$', raw, re.M) or
         re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)):
