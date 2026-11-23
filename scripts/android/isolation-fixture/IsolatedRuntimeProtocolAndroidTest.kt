@@ -34,7 +34,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class IsolatedRuntimeProtocolAndroidTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private val client get() = IsolatedRuntimeClient(context)
+    private val client = IsolatedRuntimeClient(context)
 
     private fun newRoot(): File = File(context.noBackupFilesDir, "runtime-probe-" + UUID.randomUUID()).apply { mkdirs() }
 
@@ -83,6 +83,7 @@ class IsolatedRuntimeProtocolAndroidTest {
                 diagDir.delete()
             }
         } finally {
+            client.close()
             links.forEach { Files.deleteIfExists(it.toPath()) }
             root.deleteRecursively()
         }
@@ -103,11 +104,16 @@ class IsolatedRuntimeProtocolAndroidTest {
             val cancelled = launch(Dispatchers.IO) { client.probeGrantedFile(root, "probe.txt") }
             cancelled.cancelAndJoin()
 
+            // Same shared binding -> same worker instance; after close, a new instance must be isolated.
             val first = client.status()
             val second = client.status()
-            assertEquals("uid changed across reconnect", first.uid, second.uid)
+            assertEquals("worker instance changed while binding was shared", first.pid, second.pid)
+            client.close()
+            val third = client.status()
+            assertTrue("reconnected worker UID not isolated", IsolatedUid.isIsolated(third.uid))
             assertEquals("worker not reachable after cancellation", IsolatedRuntimeService.CODE_OK, client.probeGrantedFile(root, "probe.txt").code)
         } finally {
+            client.close()
             root.deleteRecursively()
         }
     }
