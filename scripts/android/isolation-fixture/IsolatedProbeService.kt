@@ -25,9 +25,36 @@ class IsolatedProbeService : Service() {
             // Two fixed, parameter-free binaries. No user-supplied commands.
             fun runFixed(path: String, vararg args: String): String = runCatching {
                 val child = ProcessBuilder(listOf(path) + args).redirectErrorStream(true).start()
+                val capture = java.io.ByteArrayOutputStream()
+                val drain = kotlin.concurrent.thread(isDaemon = true, name = "fixture-drain") {
+                    runCatching {
+                        child.inputStream.use { input ->
+                            val bytes = ByteArray(1024)
+                            while (true) {
+                                val n = input.read(bytes)
+                                if (n < 0) break
+                                synchronized(capture) {
+                                    val accepted = minOf(n, 16384 - capture.size())
+                                    if (accepted > 0) capture.write(bytes, 0, accepted)
+                                }
+                            }
+                        }
+                    }
+                }
                 try {
-                    if (child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) "exit:" + child.exitValue()
-                    else "timeout"
+                    if (!child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) "timeout"
+                    else {
+                        drain.join(500)
+                        val output = synchronized(capture) { capture.toString("UTF-8") }
+                        val reason = when {
+                            output.contains("PROOT_TMP_DIR", ignoreCase = true) -> "tmp"
+                            output.contains("Permission denied", ignoreCase = true) -> "EACCES"
+                            output.contains("No such file or directory", ignoreCase = true) -> "ENOENT"
+                            output.contains("ptrace", ignoreCase = true) -> "ptrace"
+                            else -> "other"
+                        }
+                        "exit:" + child.exitValue() + if (child.exitValue() != 0) ":" + reason else ""
+                    }
                 } finally { if (child.isAlive) child.destroyForcibly() }
             }.getOrElse { failure ->
                 val reason = when {
