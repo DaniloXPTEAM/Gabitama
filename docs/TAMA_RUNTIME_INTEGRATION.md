@@ -77,3 +77,12 @@ existente, que ainda não usa este runtime. Foram adicionados limites de workers
 leitura e tamanho acumulado da requisição; o timeout de leitura não é prazo
 absoluto para toda a requisição, e os limites não constituem isolamento. A
 verificação ponta a ponta dessas últimas mudanças permanece pendente em CI.
+
+A gravação de respostas de offload no `/tmp` compartilhado ainda usa nome
+previsível e `writeText`, seguindo o upstream. Um convidado que possa modificar
+essa árvore pode tentar trocar o destino por um symlink: é uma pendência de
+segurança, não uma interface apropriada para entrada não confiável. Além disso,
+a rejeição de peers e os limites de protocolo não resolvem corridas no filesystem,
+revogação de operações já iniciadas nem esgotamento por pedidos lentos de peers
+admitidos. A ativação segue bloqueada até revisar e testar esses casos com uma
+fronteira de UID apropriada.
