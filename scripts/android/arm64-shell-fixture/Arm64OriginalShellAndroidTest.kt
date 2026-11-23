@@ -45,6 +45,8 @@ class Arm64OriginalShellAndroidTest {
         val timeout = PersistentShell(context, "fixture-arm64-timeout", emptyMap())
         val late = File(root.rootfsDir, "tmp/arm-fixture-late")
         try {
+            timeout.ensureStarted()
+            assertTrue(timeout.isAlive)
             val result = timeout.executeCommand("touch /tmp/arm-fixture-started; sleep 4; touch /tmp/arm-fixture-late", 2000)
             assertEquals(result.first, 124, result.second)
             assertTrue(File(root.rootfsDir, "tmp/arm-fixture-started").exists())
