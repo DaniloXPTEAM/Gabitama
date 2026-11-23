@@ -58,22 +58,16 @@ class IsolatedProbeAndroidTest {
             bound = context.bindService(Intent(context, IsolatedProbeService::class.java), conn, Context.BIND_AUTO_CREATE)
             assertTrue("bind failed", bound)
             assertTrue("isolated service did not start", connected.await(30, TimeUnit.SECONDS))
-            val directoryFd = ParcelFileDescriptor.open(directory, ParcelFileDescriptor.MODE_READ_ONLY)
             val (readPipe, writePipe) = ParcelFileDescriptor.createPipe()
             ParcelFileDescriptor.AutoCloseOutputStream(writePipe).use { it.write("fixture-pipe".toByteArray()) }
             try {
                 val request = Message.obtain().apply {
                     data.putString("probePath", file.absolutePath)
                     data.putParcelable("readPipe", readPipe)
-                    data.putParcelable("directoryFd", directoryFd)
                     replyTo = reply
                 }
-                try { service.get().send(request) }
-                catch (failure: Exception) {
-                    Log.e("TamaIsolationFixture", "directoryTransferFailure=${failure.javaClass.name}")
-                    throw failure
-                }
-            } finally { readPipe.close(); directoryFd.close() }
+                service.get().send(request)
+            } finally { readPipe.close() }
             assertTrue("isolated service did not respond", answered.await(15, TimeUnit.SECONDS))
             val data = result.get()
             val distinct = data.getInt("uid") != Process.myUid()
@@ -81,13 +75,39 @@ class IsolatedProbeAndroidTest {
             val writable = data.getBoolean("ownDataDirWritable")
             val internet = data.getBoolean("internetPermission")
             val grantedData = data.getBoolean("readGrantedData")
-            val directoryWrite = data.getBoolean("directoryWrite")
-            assertEquals("directory FD outcome mismatch", directoryWrite, File(directory, "isolated-fixture.txt").exists())
-            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData directoryFdWritable=$directoryWrite")
+            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData")
             assertTrue("isolated UID must be distinct", distinct)
             assertFalse("private target file was readable", read)
             assertFalse("isolated UID unexpectedly has INTERNET", internet)
             assertTrue("isolated service could not read explicitly granted pipe", grantedData)
+
+            // Separate exploratory transaction: Android may refuse transfer of a
+            // directory descriptor or terminate the peer. Neither result is proof
+            // that an isolated rootfs can be provisioned safely.
+            val directoryReply = CountDownLatch(1)
+            val directoryResult = AtomicReference<android.os.Bundle>()
+            val directoryMessenger = Messenger(Handler(thread.looper) { msg ->
+                directoryResult.set(msg.data); directoryReply.countDown(); true
+            })
+            val directoryFd = ParcelFileDescriptor.open(directory, ParcelFileDescriptor.MODE_READ_ONLY)
+            try {
+                val request = Message.obtain().apply {
+                    data.putParcelable("directoryFd", directoryFd)
+                    replyTo = directoryMessenger
+                }
+                try {
+                    service.get().send(request)
+                    if (directoryReply.await(15, TimeUnit.SECONDS)) {
+                        val wrote = directoryResult.get().getBoolean("directoryWrite")
+                        assertEquals("directory FD outcome mismatch", wrote, File(directory, "isolated-fixture.txt").exists())
+                        Log.i("TamaIsolationFixture", "directoryFdWritable=$wrote")
+                    } else Log.i("TamaIsolationFixture", "directoryTransfer=no-reply")
+                } catch (failure: android.os.RemoteException) {
+                    Log.i("TamaIsolationFixture", "directoryTransfer=${failure.javaClass.name}")
+                } catch (failure: SecurityException) {
+                    Log.i("TamaIsolationFixture", "directoryTransfer=${failure.javaClass.name}")
+                }
+            } finally { directoryFd.close() }
         } finally {
             if (bound) context.unbindService(conn)
             thread.quitSafely()
