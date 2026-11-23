@@ -163,3 +163,12 @@ segurança não foram testados. Em [45236756997](https://github.com/DaniloXPTEAM
 o PRoot x86 experimental empacotado numa fixture descartável retornou zero para
 `--version` sob UID isolado nas três APIs. Isto testa apenas seu arranque, não
 Alpine ou comandos, e não habilita execução no produto.
+
+
+[45238088913](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45238088913)
+foi além de `--version`: a fixture x86 invocou o PRoot original experimental
+sob UID isolado para executar apenas um binário nativo fixo e sem entrada, com
+limite de tempo e limpeza do grupo de processos. O PRoot retornou código 1 nas
+APIs 26, 29 e 34. A causa exata ainda está em investigação; o teste não usa
+Alpine e não comprova que um comando arbitrário seja seguro. O código de
+produção não expõe essa fixture ao usuário ou ao agente.
