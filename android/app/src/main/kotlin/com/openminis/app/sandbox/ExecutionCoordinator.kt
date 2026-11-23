@@ -104,6 +104,7 @@ object ExecutionCoordinator {
         timeout: Long = 600_000L,
         lineCallback: ((String) -> Unit)? = null
     ): CommandResult {
+        require(ai.tama.net.NativeOffloadSession.valid(true, sessionId)) { "Invalid session ID" }
         // nanoMuse: capture before waiting for a session slot; Stop invalidates
         // this exact object even when a later command opens the same session.
         val job = currentCoroutineContext()[Job]
@@ -299,6 +300,7 @@ object ExecutionCoordinator {
      * Called when a session is closed. Stops and removes the shell.
      */
     fun sessionDidTerminate(sessionId: String) {
+        require(ai.tama.net.NativeOffloadSession.valid(true, sessionId)) { "Invalid session ID" }
         val shell = synchronized(shellRegistryLock) {
             if (nmParallel) shellEpochs.remove(sessionId)?.current = false
             shells.remove(sessionId)
@@ -320,6 +322,7 @@ object ExecutionCoordinator {
      */
     fun stopCurrentCommand(sessionId: String? = null) {
         if (sessionId != null) {
+            require(ai.tama.net.NativeOffloadSession.valid(true, sessionId)) { "Invalid session ID" }
             val shell = synchronized(shellRegistryLock) {
                 if (nmParallel) shellEpochs.remove(sessionId)?.current = false
                 shells.remove(sessionId)

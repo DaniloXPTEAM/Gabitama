@@ -28,6 +28,7 @@ object PRootKernel {
     private const val TAG = "PRootKernel"
     private val bootMutex = Mutex()
 
+    @Volatile
     var isBooted: Boolean = false
         private set
 
@@ -684,6 +685,7 @@ object PRootKernel {
      * shared subdirs (memory/skills/shared) which don't depend on sessionId.
      */
     fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? {
+        if (!ai.tama.net.NativeOffloadSession.valid(true, sessionId) || !validGuestPath(linuxPath)) return null
         if (!linuxPath.startsWith("/var/minis/")) return resolveHostPath(linuxPath)
         val rest = linuxPath.removePrefix("/var/minis/")
         val slash = rest.indexOf('/')
@@ -691,32 +693,40 @@ object PRootKernel {
         if (subdir !in perSessionSubdirs) return resolveHostPath(linuxPath)
         val sessionBase = File(context.filesDir, "minis-sessions/$sessionId/$subdir")
         val tail = if (slash < 0) "" else rest.substring(slash + 1)
-        return if (tail.isEmpty()) sessionBase else File(sessionBase, tail)
+        return containedPath(sessionBase, tail)
     }
+
+    private fun validGuestPath(path: String): Boolean =
+        path.startsWith("/") && !path.contains('\u0000') && path.split('/').none { it == ".." }
+
+    // Resolve links and reject escape from the selected mount. This protects ordinary
+    // lookups, not races against a concurrently changing filesystem with the same UID.
+    private fun containedPath(base: File, relative: String): File? = runCatching {
+        val root = base.canonicalFile.toPath()
+        val candidate = (if (relative.isEmpty()) base else File(base, relative)).canonicalFile.toPath()
+        if (candidate.startsWith(root)) candidate.toFile() else null
+    }.getOrNull()
 
     /**
      * Resolve a Linux path to a host filesystem File by checking bind mounts.
      * Returns null if no matching mount is found.
      */
     fun resolveHostPath(linuxPath: String): File? {
+        if (!validGuestPath(linuxPath)) return null
         // Check bind mounts (longest prefix match)
         val sorted = bindMounts.keys.sortedByDescending { it.length }
         for (mountPoint in sorted) {
             if (linuxPath == mountPoint || linuxPath.startsWith("$mountPoint/")) {
                 val hostBase = bindMounts[mountPoint]!!
                 val relativePath = linuxPath.removePrefix(mountPoint).removePrefix("/")
-                return if (relativePath.isEmpty()) {
-                    File(hostBase)
-                } else {
-                    File(hostBase, relativePath)
-                }
+                return containedPath(File(hostBase), relativePath)
             }
         }
 
         // Fallback: resolve relative to rootfs
         if (!::rootfsManager.isInitialized) return null
         val stripped = linuxPath.removePrefix("/")
-        return if (stripped.isEmpty()) rootfsManager.rootfsDir else File(rootfsManager.rootfsDir, stripped)
+        return containedPath(rootfsManager.rootfsDir, stripped)
     }
 
     /**

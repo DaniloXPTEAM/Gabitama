@@ -619,6 +619,8 @@ class PersistentShell(
         previousKeys: Set<String> = emptySet(),
     ) {
         if (!isAlive) return
+        val validName = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
+        require((envVars.keys + previousKeys).all { validName.matches(it) }) { "Invalid environment variable name" }
         val writer = stdinWriter ?: return
         withContext(Dispatchers.IO) {
             try {
