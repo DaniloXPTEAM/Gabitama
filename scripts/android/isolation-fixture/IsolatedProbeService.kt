@@ -30,7 +30,15 @@ class IsolatedProbeService : Service() {
                     else "timeout"
                 } finally { if (child.isAlive) child.destroyForcibly() }
             }
-            reply.data.putString("fixedExec", execution.getOrElse { it.javaClass.simpleName })
+            reply.data.putString("fixedExec", execution.getOrElse { failure ->
+                val reason = when {
+                    failure.message?.contains("error=13") == true -> "EACCES"
+                    failure.message?.contains("error=1,") == true -> "EPERM"
+                    failure.message?.contains("error=2,") == true -> "ENOENT"
+                    else -> "other"
+                }
+                failure.javaClass.simpleName + ":" + reason
+            })
         }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")
