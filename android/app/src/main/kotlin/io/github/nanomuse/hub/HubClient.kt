@@ -217,14 +217,14 @@ class HubClient(
                 if (stopped || ws != null) return
                 onState(false, "connecting")
                 if (stopped || ws != null) return
-                val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "TAMA-AI-Android/${Hub.VERSION}").build()
+                val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "TAMA-AI-Android/${com.novoagentehb.app.BuildConfig.VERSION_NAME}").build()
                 ws = http.newWebSocket(req, listener)
             }
             return
         }
         if (stopped) return
         onState(false, "connecting")
-        val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "TAMA-AI-Android/${Hub.VERSION}").build()
+        val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "TAMA-AI-Android/${com.novoagentehb.app.BuildConfig.VERSION_NAME}").build()
         ws = http.newWebSocket(req, listener)
     }
 

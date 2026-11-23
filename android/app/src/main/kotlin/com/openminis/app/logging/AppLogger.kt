@@ -304,7 +304,7 @@ object AppLogger {
         // nanoMuse: in the parallel app these upstream categories can contain raw
         // endpoint URLs, provider fields or tool arguments, even after key redaction.
         if (!ai.tama.net.ProviderLogPrivacy.allow(category,
-                com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")) return
+                true)) return
         val now = Date()
         val today = dateFormat.format(now)
         val timestamp = timestampFormat.format(now)
