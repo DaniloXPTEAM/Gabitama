@@ -38,6 +38,9 @@ class OriginalShellRuntimeAndroidTest {
             val second = shell.executeCommand("printf '%s:%s\\n' \"\$FIXTURE_VALUE\" \"\$PWD\"", 30000)
             assertEquals("persistent command: ${second.first}", 0, second.second)
             assertTrue(second.first.contains("works:/tmp"))
+            val external = shell.executeCommand("/bin/busybox echo EXTERNAL_OK", 30000)
+            assertEquals("external result=${external.first}; shell exit=${shell.lastExitCode}", 0, external.second)
+            assertTrue(external.first.contains("EXTERNAL_OK"))
             val failure = shell.executeCommand("false", 30000)
             assertEquals(1, failure.second)
         } finally {
