@@ -1,0 +1,39 @@
+name: Compilar PRoot original do Tama (arm64)
+on:
+  push:
+    branches: [arena/a142d5dd-gabitama]
+    paths:
+      - third_party/tama-runtime/**
+      - .github/workflows/build-tama-proot.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar NDK fixado pelo projeto original
+        run: |
+          python3 - <<'PYTHON'
+          import os, subprocess
+          tool = os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager')
+          subprocess.run([tool, '--install', 'ndk;27.2.12479018'], input='y\n' * 100, text=True, check=True)
+          PYTHON
+          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+      - name: Compilar com o script original e verificar os loaders
+        run: |
+          cd third_party/tama-runtime/android
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          export GIT_CEILING_DIRECTORIES="$GITHUB_WORKSPACE/third_party/tama-runtime"
+          bash deps/build_proot.sh
+          sha256sum src/android/app/src/main/jniLibs/arm64-v8a/libproot*.so | tee /tmp/tama-proot-sha256.txt
+          echo '::notice title=PRoot arm64 build::Compilado e verificado; não executado em dispositivo nem incluído no APK.'
+      - name: Guardar binários de teste internos
+        uses: actions/upload-artifact@v4
+        with:
+          name: tama-proot-arm64-${{ github.sha }}
+          path: |
+            third_party/tama-runtime/android/src/android/app/src/main/jniLibs/arm64-v8a/libproot*.so
+            /tmp/tama-proot-sha256.txt
+          if-no-files-found: error

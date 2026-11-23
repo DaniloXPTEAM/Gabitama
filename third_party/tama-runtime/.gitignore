@@ -1,0 +1,13 @@
+/android/deps/build/
+/android/deps/proot/src/**/*.o
+/android/deps/proot/src/**/*.d
+/android/deps/proot/src/*.o
+/android/deps/proot/src/*.d
+/android/deps/proot/src/proot
+/android/deps/proot/src/build.h
+/android/deps/proot/src/.check_*
+/android/deps/proot/src/licenses
+/android/deps/proot/src/loader/loader
+/android/deps/proot/src/loader/loader-m32
+/android/src/android/app/src/main/assets/
+/android/src/android/app/src/main/jniLibs/arm64-v8a/libproot.so
