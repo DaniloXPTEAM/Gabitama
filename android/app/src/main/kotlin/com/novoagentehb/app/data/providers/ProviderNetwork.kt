@@ -16,11 +16,13 @@ import javax.inject.Singleton
 class ProviderNetwork @Inject constructor(client: OkHttpClient) {
     val client: OkHttpClient = client.newBuilder().proxy(Proxy.NO_PROXY)
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
-        .dns { host ->
-            val addresses = Dns.SYSTEM.lookup(host)
-            if (addresses.isEmpty() || addresses.any { !CustomProviderFormat.isPublicAddress(it) }) throw UnknownHostException("Endereço não público bloqueado")
-            addresses
-        }.build()
+        .dns(object : Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> {
+                val addresses = Dns.SYSTEM.lookup(hostname)
+                if (addresses.isEmpty() || addresses.any { !CustomProviderFormat.isPublicAddress(it) }) throw UnknownHostException("Endereço não público bloqueado")
+                return addresses
+            }
+        }).build()
 
     suspend fun discover(provider: CustomProvider, key: String): List<String> = withContext(Dispatchers.IO) {
         require(key.isNotBlank()) { "Credencial ausente." }
