@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.PRootKernel
 import com.openminis.app.sandbox.NativeOffloadServer
 import com.openminis.app.sandbox.NativeOffloadResult
+import com.openminis.app.sandbox.OffloadReplyFiles
 import com.openminis.app.sandbox.PersistentShell
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.TerminalSession
@@ -31,6 +32,15 @@ class OriginalShellRuntimeAndroidTest {
             List(4) { async(Dispatchers.IO) { PRootKernel.boot(context) } }.awaitAll()
         }
         assertTrue(root.isInstalled)
+        // Existing symlink at the final component must not redirect host writes.
+        val victim = java.io.File(context.cacheDir, "offload-victim").apply { writeText("unchanged") }
+        val link = java.io.File(root.rootfsDir, "tmp/offload-symlink-fixture")
+        java.nio.file.Files.createSymbolicLink(link.toPath(), victim.toPath())
+        try {
+            try { OffloadReplyFiles.writeExclusive(link, "changed"); fail("followed reply symlink") }
+            catch (_: android.system.ErrnoException) { }
+            assertEquals("unchanged", victim.readText())
+        } finally { link.delete(); victim.delete() }
         assertTrue(PRootKernel.isBooted)
         // A process not registered as a PRoot peer must be disconnected before
         // the server parses any protocol bytes or dispatches a handler.

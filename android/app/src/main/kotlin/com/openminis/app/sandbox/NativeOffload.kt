@@ -337,8 +337,7 @@ object NativeOffloadServer {
         val tmpDir = rootfsTmpDir ?: throw IllegalStateException("server not started")
         tmpDir.mkdirs()
         val seq = counter.incrementAndGet()
-        val tmpHost = File(tmpDir, "$REPLY_PREFIX$pid-$seq")
-        tmpHost.writeText(result.output)
+        val tmpHost = OffloadReplyFiles.writeNew(tmpDir, REPLY_PREFIX, result.output)
         val tmpGuest = "/tmp/${tmpHost.name}"
 
         // [T-android-offload-tmp-leak] Bound growth WITHIN a long-running
