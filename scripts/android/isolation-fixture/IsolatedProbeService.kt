@@ -27,6 +27,17 @@ class IsolatedProbeService : Service() {
             pipe != null && ParcelFileDescriptor.AutoCloseInputStream(pipe).bufferedReader().use { it.readText() } == "fixture-pipe"
         }.getOrDefault(false)
         reply.data.putBoolean("readGrantedData", readGrantedData)
+        // Fixed fixture directory FD only; never receives or executes commands.
+        @Suppress("DEPRECATION")
+        val directory = request.data.getParcelable<ParcelFileDescriptor>("directoryFd")
+        val directoryWrite = runCatching {
+            directory != null && File("/proc/self/fd/${directory.fd}/isolated-fixture.txt").let {
+                it.writeText("fixture-directory")
+                it.readText() == "fixture-directory"
+            }
+        }.getOrDefault(false)
+        directory?.close()
+        reply.data.putBoolean("directoryWrite", directoryWrite)
         request.replyTo.send(reply)
         true
     })

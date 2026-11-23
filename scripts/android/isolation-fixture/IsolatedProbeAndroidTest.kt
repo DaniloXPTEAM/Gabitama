@@ -42,6 +42,7 @@ class IsolatedProbeAndroidTest {
         try { assertTrue("production isolated runtime failed to start", runtimeReady.await(30, TimeUnit.SECONDS)) }
         finally { context.unbindService(runtimeConnection) }
         val file = File.createTempFile("isolated-probe-", ".txt", context.cacheDir).apply { writeText("fixture") }
+        val directory = createFixtureDirectory(context)
         val connected = CountDownLatch(1)
         val answered = CountDownLatch(1)
         val service = AtomicReference<Messenger>()
@@ -57,16 +58,18 @@ class IsolatedProbeAndroidTest {
             bound = context.bindService(Intent(context, IsolatedProbeService::class.java), conn, Context.BIND_AUTO_CREATE)
             assertTrue("bind failed", bound)
             assertTrue("isolated service did not start", connected.await(30, TimeUnit.SECONDS))
+            val directoryFd = ParcelFileDescriptor.open(directory, ParcelFileDescriptor.MODE_READ_ONLY)
             val (readPipe, writePipe) = ParcelFileDescriptor.createPipe()
             ParcelFileDescriptor.AutoCloseOutputStream(writePipe).use { it.write("fixture-pipe".toByteArray()) }
             try {
                 val request = Message.obtain().apply {
                     data.putString("probePath", file.absolutePath)
                     data.putParcelable("readPipe", readPipe)
+                    data.putParcelable("directoryFd", directoryFd)
                     replyTo = reply
                 }
                 service.get().send(request)
-            } finally { readPipe.close() }
+            } finally { readPipe.close(); directoryFd.close() }
             assertTrue("isolated service did not respond", answered.await(15, TimeUnit.SECONDS))
             val data = result.get()
             val distinct = data.getInt("uid") != Process.myUid()
@@ -74,7 +77,9 @@ class IsolatedProbeAndroidTest {
             val writable = data.getBoolean("ownDataDirWritable")
             val internet = data.getBoolean("internetPermission")
             val grantedData = data.getBoolean("readGrantedData")
-            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData")
+            val directoryWrite = data.getBoolean("directoryWrite")
+            assertEquals("directory FD outcome mismatch", directoryWrite, File(directory, "isolated-fixture.txt").exists())
+            Log.i("TamaIsolationFixture", "distinctUid=$distinct privateReadable=$read ownDataDirWritable=$writable internetPermission=$internet grantedPipeReadable=$grantedData directoryFdWritable=$directoryWrite")
             assertTrue("isolated UID must be distinct", distinct)
             assertFalse("private target file was readable", read)
             assertFalse("isolated UID unexpectedly has INTERNET", internet)
@@ -83,6 +88,16 @@ class IsolatedProbeAndroidTest {
             if (bound) context.unbindService(conn)
             thread.quitSafely()
             file.delete()
+            File(directory, "isolated-fixture.txt").delete()
+            android.system.Os.chmod(directory.absolutePath, 448) // 0700
+            directory.delete()
         }
+    }
+
+    private fun createFixtureDirectory(context: Context): File {
+        val dir = java.nio.file.Files.createTempDirectory(context.cacheDir.toPath(), "isolated-dir-").toFile()
+        // Only this synthetic directory is writable; its app-private parent is not shared.
+        android.system.Os.chmod(dir.absolutePath, 511) // 0777, test only
+        return dir
     }
 }
