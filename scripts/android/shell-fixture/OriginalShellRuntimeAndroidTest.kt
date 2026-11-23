@@ -3,6 +3,7 @@ package com.novoagentehb.app
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.ExecutionCoordinator
 import ai.tama.sandbox.OffloadPeerBindings
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -131,6 +132,25 @@ class OriginalShellRuntimeAndroidTest {
         } finally {
             shell.stop()
         }
+        // Exercise the original coordinator on the same disposable kernel, not
+        // an alternate executor. Only hard-coded fixture commands are used.
+        ExecutionCoordinator.init(context)
+        val coordinatorSession = "fixture-coordinator"
+        try {
+            val a = ExecutionCoordinator.execute(coordinatorSession, "export COORD_FIXTURE=OK; cd /tmp", 30000)
+            assertEquals("coordinator startup: ${a.output}", 0, a.exitCode)
+            val b = ExecutionCoordinator.execute(coordinatorSession, "printf '%s:%s\\n' \"\$COORD_FIXTURE\" \"\$PWD\"", 30000)
+            assertEquals("coordinator persistence: ${b.output}", 0, b.exitCode)
+            assertTrue(b.output.contains("OK:/tmp"))
+            val error = ExecutionCoordinator.execute(coordinatorSession, "false", 30000)
+            assertEquals(1, error.exitCode)
+            assertTrue(error.output.contains("exit code: 1"))
+            assertTrue(ExecutionCoordinator.hasShell(coordinatorSession))
+        } finally {
+            ExecutionCoordinator.sessionDidTerminate(coordinatorSession)
+        }
+        assertFalse(ExecutionCoordinator.hasShell(coordinatorSession))
+
         // Verify a timed-out command cannot mutate the guest later. This uses fixed,
         // synthetic files in a disposable AVD, never user-provided shell text.
         val timeoutShell = PersistentShell(context, "fixture-timeout", emptyMap())
