@@ -3,6 +3,8 @@ package com.novoagentehb.app
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.NativeOffloadServer
+import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.PersistentShell
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.TerminalSession
@@ -20,6 +22,11 @@ class OriginalShellRuntimeAndroidTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = RootfsManager.getInstance(context)
         assertFalse("AVD must start without any rootfs", root.rootfsDir.exists())
+        val offloadSession = AtomicReference<String?>(null)
+        NativeOffloadServer.register("fixture-offload") { request ->
+            offloadSession.set(request.sessionId)
+            NativeOffloadResult(0, "OFFLOAD_FIXTURE_OK\n")
+        }
         coroutineScope {
             List(4) { async(Dispatchers.IO) { PRootKernel.boot(context) } }.awaitAll()
         }
@@ -53,6 +60,10 @@ class OriginalShellRuntimeAndroidTest {
             val external = shell.executeCommand("/bin/busybox echo EXTERNAL_OK", 30000)
             assertEquals("external result=${external.first}; shell exit=${shell.lastExitCode}", 0, external.second)
             assertTrue(external.first.contains("EXTERNAL_OK"))
+            val offload = shell.executeCommand("MINIS_CHAT_SESSION_ID=forged fixture-offload", 30000)
+            assertEquals("native offload result: ${offload.first}", 0, offload.second)
+            assertTrue(offload.first.contains("OFFLOAD_FIXTURE_OK"))
+            assertEquals("fixture-session", offloadSession.get())
             val registers = shell.executeCommand("/tmp/fork_regs", 30000)
             assertEquals("fork register check: ${registers.first}", 0, registers.second)
             val failure = shell.executeCommand("false", 30000)

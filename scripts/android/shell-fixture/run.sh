@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 s=Path('/tmp/tama-shell-instrument.txt').read_text(errors='replace')
 if re.search(r'OK \(1 test\)',s) and 'FAILURES!!!' not in s:
- print('::notice title=Original shell runtime::PASS: experimental patched PRoot x86 boot, external process, fork registers, timeout, cancellation and PTY')
+ print('::notice title=Original shell runtime::PASS: experimental patched PRoot x86 boot, external process, offload peer identity, fork registers, timeout, cancellation and PTY')
 else:
  print('::error title=Original shell runtime::FAIL')
  for line in Path('/tmp/tama-shell-stderr.txt').read_text(errors='replace').splitlines()[-30:]:
