@@ -67,5 +67,6 @@ jobs:
           arch: x86_64
           target: google_apis
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 600
           disable-animations: true
           script: scripts/android/isolation-fixture/run.sh
