@@ -105,10 +105,12 @@ retornada pelo serviço não é autenticação contra um processo comprometido.
 validou na fixture x86 o `ExecutionCoordinator` original sobre PRoot e shell
 persistente: criação, estado persistente, erro e encerramento. Isso não conecta
 o coordenador à UI, não valida ARM nem justifica executar comandos não confiáveis.
-A tentativa exploratória de passar um FD de diretório produziu
-`DeadObjectException` em AVD; ainda não está estabelecido se a causa foi a
-transferência, morte do serviço ou outro limite Binder. Um pipe de dados fixos
-foi transferido, mas não é um filesystem executável.
+Na fixture corrigida [45230243304](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45230243304),
+o envio de um FD de diretório retornou `DeadObjectException` nas APIs 29 e 34;
+a causa exata (transferência, morte do serviço ou outro limite Binder) ainda não
+foi estabelecida. Um pipe de dados fixos foi transferido, mas não é um filesystem
+executável. Resultados anteriores que indicaram FD de diretório ausente eram
+inválidos: a fixture havia colocado o FD no Bundle errado; isso foi corrigido.
 
 O PRoot upstream recebe `exit_code` do offload, mas o código reescreve o comando
 como `/bin/cat` e não devolve esse código ao shell. A fixture x86 aplica uma
@@ -119,6 +121,8 @@ PRoot de produção e precisa de revisão de compatibilidade, segurança e ARM.
 
 A preparação de um teste ARM64 fixo está em `scripts/android/arm64-shell-fixture/`;
 o workflow só prepara e compila uma fixture descartável, sem publicá-la nem
-executá-la. Os loaders vendorizados permanecem sem comprovação de fontes exatas;
+executá-la ([45229478136](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45229478136),
+incluindo o teste PTY). O script de execução só aceita um AVD ARM64 descartável
+e comandos fixos; ainda não foi executado. Os loaders vendorizados permanecem sem comprovação de fontes exatas;
 nenhum resultado de preparação constitui validação física ou autorização para
 distribuição.
