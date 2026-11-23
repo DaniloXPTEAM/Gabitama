@@ -11,6 +11,7 @@ import com.novoagentehb.app.agent.skills.McpRemoteTool
 import com.novoagentehb.app.agent.skills.SkillAndMcpRegistry
 import com.novoagentehb.app.agent.tools.CapabilityRegistry
 import com.novoagentehb.app.data.local.SkillRecordEntity
+import com.novoagentehb.app.computer.runtime.IsolatedRuntimeClient
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeHealth
 import com.novoagentehb.app.gabi.HBCharacterController
 import com.novoagentehb.app.gabi.HBState
@@ -29,7 +30,8 @@ class ComputerViewModel @Inject constructor(
     private val capabilityRegistry: CapabilityRegistry,
     private val orchestrator: TaskOrchestrator,
     private val hbController: HBCharacterController,
-    private val isolatedRuntimeHealth: IsolatedRuntimeHealth
+    private val isolatedRuntimeHealth: IsolatedRuntimeHealth,
+    private val isolatedRuntimeClient: IsolatedRuntimeClient
 ) : ViewModel() {
 
     val skills: StateFlow<List<SkillRecordEntity>> = skillRegistry.observeAll()
@@ -50,6 +52,10 @@ class ComputerViewModel @Inject constructor(
 
     private val _statusNotice = MutableStateFlow<String?>(null)
     val statusNotice: StateFlow<String?> = _statusNotice.asStateFlow()
+    private val _runtimeStatus = MutableStateFlow<IsolatedRuntimeClient.Status?>(null)
+    /** Last status reported by the production isolated worker (null until diagnosed or unavailable). */
+    val runtimeStatus: StateFlow<IsolatedRuntimeClient.Status?> = _runtimeStatus.asStateFlow()
+
     private val _runtimeNotice = MutableStateFlow<String?>(null)
     val runtimeNotice: StateFlow<String?> = _runtimeNotice.asStateFlow()
 
@@ -170,6 +176,7 @@ class ComputerViewModel @Inject constructor(
         orchestrator.submitUserMessage("/diagnostico")
         _statusNotice.value = "Comando /diagnostico enviado para a fila do orquestrador."
         viewModelScope.launch {
+            _runtimeStatus.value = runCatching { isolatedRuntimeClient.status() }.getOrNull()
             _runtimeNotice.value = if (isolatedRuntimeHealth.isStartedAndIsolated()) {
                 "Serviço isolado iniciado. O shell original ainda não está disponível."
             } else {

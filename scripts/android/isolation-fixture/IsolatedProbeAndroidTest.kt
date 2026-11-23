@@ -83,7 +83,7 @@ class IsolatedProbeAndroidTest {
             try {
                 request.writeInterfaceToken(IsolatedRuntimeService.DESCRIPTOR)
                 assertFalse("unexpected execution or other IPC is exposed", runtimeBinder.get().transact(
-                    IsolatedRuntimeService.TRANSACTION_IDENTITY + 1, request, response, 0,
+                    IsolatedRuntimeService.TRANSACTION_IDENTITY + 100, request, response, 0,
                 ))
             } finally { request.recycle(); response.recycle() }
         }

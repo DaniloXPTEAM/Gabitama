@@ -33,6 +33,7 @@ jobs:
           cp scripts/android/isolation-fixture/IsolatedProbeService.kt android/app/src/main/kotlin/com/novoagentehb/app/isolationfixture/
           cp scripts/android/isolation-fixture/IsolatedProbeAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
           cp scripts/android/isolation-fixture/RootfsGrantAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
+          cp scripts/android/isolation-fixture/IsolatedRuntimeProtocolAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
