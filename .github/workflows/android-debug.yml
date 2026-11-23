@@ -11,6 +11,8 @@ on:
       - scripts/android/alpine-fixture/**
       - .github/workflows/test-original-shell.yml
       - scripts/android/shell-fixture/**
+      - .github/workflows/test-isolated-process.yml
+      - scripts/android/isolation-fixture/**
 jobs:
   build-debug:
     name: JVM e APKs compartilhados
