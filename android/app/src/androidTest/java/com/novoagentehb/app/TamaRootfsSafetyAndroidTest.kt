@@ -127,7 +127,11 @@ class TamaRootfsSafetyAndroidTest {
             Files.createSymbolicLink(File(root, "loop").toPath(), root.toPath())
             assertEquals(5L, RootfsSize.measure(root))
             assertEquals(0L, RootfsSize.measure(File(root, "external")))
-        } finally { parent.deleteRecursively() }
+        } finally {
+            Files.deleteIfExists(File(parent, "root/loop").toPath())
+            Files.deleteIfExists(File(parent, "root/external").toPath())
+            parent.deleteRecursively()
+        }
     }
 
 }
