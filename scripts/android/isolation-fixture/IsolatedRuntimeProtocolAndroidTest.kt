@@ -92,7 +92,7 @@ class IsolatedRuntimeProtocolAndroidTest {
                 Log.i("TamaRuntimeProtocol", "directoryDiagnostic:\n" + report)
             // Evidence only: can the isolated UID traverse its own storage roots at all?
             val storage = try { client.storageDiagnostic() } catch (failure: RemoteException) { "transfer=" + failure.javaClass.simpleName }
-            Log.i("TamaRuntimeProtocol", "storageProbe:\n" + storage)
+            Log.i("TamaIsolationFixture", "storageProbe=" + storage.replace("\n", " | "))
             } finally {
                 File(diagDir, IsolatedRuntimeService.DIAGNOSTIC_FILE).delete()
                 diagDir.delete()
