@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.novoagentehb.app.isolationfixture.IsolatedProbeService
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeService
 import com.novoagentehb.app.app.NovoAgenteApplication
+import com.novoagentehb.app.app.IsolatedUid
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,12 +35,18 @@ class IsolatedProbeAndroidTest {
         assertNotNull(application.taskOrchestrator)
         assertNotNull(application.hbCharacterController)
         val runtimeReady = CountDownLatch(1)
+        val runtimeBinder = AtomicReference<IBinder>()
         val runtimeConnection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) { runtimeReady.countDown() }
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) { runtimeBinder.set(binder); runtimeReady.countDown() }
             override fun onServiceDisconnected(name: ComponentName?) = Unit
         }
         assertTrue(context.bindService(Intent(context, IsolatedRuntimeService::class.java), runtimeConnection, Context.BIND_AUTO_CREATE))
-        try { assertTrue("production isolated runtime failed to start", runtimeReady.await(30, TimeUnit.SECONDS)) }
+        try {
+            assertTrue("production isolated runtime failed to start", runtimeReady.await(30, TimeUnit.SECONDS))
+            val workerUid = IsolatedRuntimeService.endpointUid(runtimeBinder.get())
+            assertNotEquals("production service shares host UID", Process.myUid(), workerUid)
+            assertTrue("production service UID is not isolated", IsolatedUid.isIsolated(workerUid))
+        }
         finally { context.unbindService(runtimeConnection) }
         val file = File.createTempFile("isolated-probe-", ".txt", context.cacheDir).apply { writeText("fixture") }
         val directory = createFixtureDirectory(context)
