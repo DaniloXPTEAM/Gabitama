@@ -23,8 +23,8 @@ class IsolatedProbeService : Service() {
         reply.data.putBoolean("internetPermission", checkSelfPermission(android.Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED)
         if (request.data.getBoolean("probeFixedExec")) {
             // Two fixed, parameter-free binaries. No user-supplied commands.
-            fun runFixed(path: String): String = runCatching {
-                val child = ProcessBuilder(path).redirectErrorStream(true).start()
+            fun runFixed(path: String, vararg args: String): String = runCatching {
+                val child = ProcessBuilder(listOf(path) + args).redirectErrorStream(true).start()
                 try {
                     if (child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) "exit:" + child.exitValue()
                     else "timeout"
@@ -41,6 +41,8 @@ class IsolatedProbeService : Service() {
             reply.data.putString("fixedExec", runFixed("/system/bin/true"))
             reply.data.putString("fixedNativeExec", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-exec.so").absolutePath))
             reply.data.putString("fixedPtrace", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-ptrace.so").absolutePath))
+            // PRoot version only: no guest shell, no user input, no filesystem mount.
+            reply.data.putString("fixedProotVersion", runFixed(File(applicationInfo.nativeLibraryDir, "libproot.so").absolutePath, "--version"))
         }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")
