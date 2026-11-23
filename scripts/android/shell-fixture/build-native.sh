@@ -3,7 +3,13 @@ set -euo pipefail
 : "${ANDROID_HOME:?}"
 root="$PWD"
 ndk="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
-src="$root/third_party/tama-runtime/android/deps/proot/src"
+# Keep the exact Tama fork in the repository unchanged. This x86-only test applies
+# the newer Termux fix experimentally in a disposable copy, not in the app build.
+source_tree="$root/third_party/tama-runtime/android/deps/proot"
+cp -a "$source_tree" "$RUNNER_TEMP/proot-x86-fixture"
+git -C "$RUNNER_TEMP/proot-x86-fixture" apply "$root/scripts/android/shell-fixture/termux-fork-sigsys.patch"
+python3 "$root/scripts/android/shell-fixture/adapt-fork-registers.py" "$RUNNER_TEMP/proot-x86-fixture/src"
+src="$RUNNER_TEMP/proot-x86-fixture/src"
 talloc="$root/third_party/tama-runtime/android/deps/talloc"
 build="$RUNNER_TEMP/tama-x86-native"
 mkdir -p "$build" android/app/src/main/jniLibs/x86_64

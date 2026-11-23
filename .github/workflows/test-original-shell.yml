@@ -29,14 +29,17 @@ jobs:
           import os, subprocess
           subprocess.run([os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager'), '--install', 'ndk;27.2.12479018'], input=('y'+chr(10))*100, text=True, check=True)
           PY
-      - name: Compilar PRoot upstream para AVD x86_64
+      - name: Instalar compilador para teste de registradores do fork
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - name: Compilar PRoot upstream com correção experimental x86 para AVD
         run: scripts/android/shell-fixture/build-native.sh
       - name: Preparar Alpine e fixture descartáveis
         run: |
           set -euo pipefail
           name=alpine-minirootfs-3.21.3-x86_64.tar.gz
           base=https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64
-          mkdir -p /tmp/alpine-shell android/app/src/main/assets
+          mkdir -p /tmp/alpine-shell android/app/src/main/assets android/app/src/androidTest/assets
+          musl-gcc -static -O2 scripts/android/shell-fixture/fork_regs.c -o android/app/src/androidTest/assets/fork_regs.bin
           curl -fsSL --retry 3 "$base/$name" -o "/tmp/alpine-shell/$name"
           curl -fsSL --retry 3 "$base/$name.sha256" -o /tmp/alpine-shell/SHA256SUMS
           (cd /tmp/alpine-shell && sha256sum -c SHA256SUMS && echo "1a694899e406ce55d32334c47ac0b2efb6c06d7e878102d1840892ad44cd5239  $name" | sha256sum -c - && echo "::notice title=Alpine x86_64 fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)")

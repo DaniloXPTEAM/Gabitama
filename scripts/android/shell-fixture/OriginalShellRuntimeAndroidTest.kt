@@ -37,6 +37,11 @@ class OriginalShellRuntimeAndroidTest {
             delay(50)
             assertEquals(TerminalSession.State.STOPPED, interrupted.state.value)
         }
+        val forkTest = java.io.File(root.rootfsDir, "tmp/fork_regs")
+        InstrumentationRegistry.getInstrumentation().context.assets.open("fork_regs.bin").use { source ->
+            forkTest.outputStream().use { source.copyTo(it) }
+        }
+        assertTrue(forkTest.setExecutable(true, false))
         val shell = PersistentShell(context, "fixture-session", emptyMap())
         try {
             val first = shell.executeCommand("export FIXTURE_VALUE=works; cd /tmp; printf 'FIRST\\n'", 30000)
@@ -48,6 +53,8 @@ class OriginalShellRuntimeAndroidTest {
             val external = shell.executeCommand("/bin/busybox echo EXTERNAL_OK", 30000)
             assertEquals("external result=${external.first}; shell exit=${shell.lastExitCode}", 0, external.second)
             assertTrue(external.first.contains("EXTERNAL_OK"))
+            val registers = shell.executeCommand("/tmp/fork_regs", 30000)
+            assertEquals("fork register check: ${registers.first}", 0, registers.second)
             val failure = shell.executeCommand("false", 30000)
             assertEquals(1, failure.second)
         } finally {
