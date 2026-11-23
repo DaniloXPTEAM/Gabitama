@@ -18,7 +18,7 @@ if re.search(r'OK \(1 test\)', s) and 'FAILURES!!!' not in s:
 else:
     print('::error title=Real Alpine extraction::FAIL')
     for line in s.splitlines():
-        if re.match(r'^\s*(?:java\.lang\.\w+Exception|java\.util\.zip\.\w+Exception|at com\.openminis\.app\.sandbox\.RootfsManager\.|at com\.novoagentehb\.app\.RealAlpineRootfsAndroidTest\.)', line):
+        if re.match(r'^\s*(?:java\.(?:lang|io|util\.zip)\.\w+Exception|at com\.openminis\.app\.sandbox\.RootfsManager\.|at com\.novoagentehb\.app\.RealAlpineRootfsAndroidTest\.)', line):
             print('::error title=Alpine diagnostic::' + line.strip()[:400].replace('%', '%25'))
     raise SystemExit(1)
 PY
