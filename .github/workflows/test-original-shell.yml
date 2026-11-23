@@ -6,6 +6,10 @@ on:
       - scripts/android/shell-fixture/**
       - .github/workflows/test-original-shell.yml
       - android/app/src/main/kotlin/com/openminis/app/sandbox/**
+      - android/app/src/main/kotlin/com/openminis/app/diagnostics/**
+      - android/app/src/main/kotlin/com/openminis/app/logging/**
+      - android/app/src/main/kotlin/ai/tama/sandbox/**
+      - android/app/src/main/kotlin/ai/tama/net/**
 permissions:
   contents: read
 jobs:
