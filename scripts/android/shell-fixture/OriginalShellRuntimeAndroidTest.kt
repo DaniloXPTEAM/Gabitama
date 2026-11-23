@@ -32,6 +32,7 @@ class OriginalShellRuntimeAndroidTest {
             offloadSession.set(request.sessionId)
             NativeOffloadResult(0, "OFFLOAD_FIXTURE_OK\n")
         }
+        NativeOffloadServer.register("fixture-failure") { NativeOffloadResult(7, "OFFLOAD_ERROR_FIXTURE\n") }
         coroutineScope {
             List(4) { async(Dispatchers.IO) { PRootKernel.boot(context) } }.awaitAll()
         }
@@ -125,6 +126,9 @@ class OriginalShellRuntimeAndroidTest {
             assertEquals("native offload result: ${offload.first}", 0, offload.second)
             assertTrue(offload.first.contains("OFFLOAD_FIXTURE_OK"))
             assertEquals("fixture-session", offloadSession.get())
+            val offloadFailure = shell.executeCommand("fixture-failure", 30000)
+            assertEquals("offload handler status: ${offloadFailure.first}", 7, offloadFailure.second)
+            assertTrue(offloadFailure.first.contains("OFFLOAD_ERROR_FIXTURE"))
             val registers = shell.executeCommand("/tmp/fork_regs", 30000)
             assertEquals("fork register check: ${registers.first}", 0, registers.second)
             val failure = shell.executeCommand("false", 30000)
