@@ -77,6 +77,7 @@ fun ComputerScreen(
     val mcpAllowLanByServer by viewModel.mcpAllowLanByServer.collectAsState()
     val mcpLastLog by viewModel.mcpLastLog.collectAsState()
     val statusNotice by viewModel.statusNotice.collectAsState()
+    val runtimeNotice by viewModel.runtimeNotice.collectAsState()
     val sceneFrames = rememberAnimFrameCount("scene_computador") ?: 0
 
     var expression by remember { mutableStateOf("") }
@@ -209,6 +210,14 @@ fun ComputerScreen(
                             item {
                                 GabiFeaturedSurface(borderColor = GabiTokens.TealAccent.copy(alpha = 0.45f), cornerRadius = 14.dp) {
                                     Text(statusNotice.orEmpty(), color = GabiTokens.TextPrimary, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+
+                        if (runtimeNotice != null) {
+                            item {
+                                GabiFeaturedSurface(borderColor = GabiTokens.TealAccent.copy(alpha = 0.3f), cornerRadius = 14.dp) {
+                                    Text(runtimeNotice.orEmpty(), color = GabiTokens.TextSecondary, style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }

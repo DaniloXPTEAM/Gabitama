@@ -16,6 +16,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.novoagentehb.app.isolationfixture.IsolatedProbeService
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeService
+import com.novoagentehb.app.computer.runtime.IsolatedRuntimeHealth
 import com.novoagentehb.app.app.NovoAgenteApplication
 import com.novoagentehb.app.app.IsolatedUid
 import org.junit.Assert.*
@@ -34,6 +35,9 @@ class IsolatedProbeAndroidTest {
         val application = context.applicationContext as NovoAgenteApplication
         assertNotNull(application.taskOrchestrator)
         assertNotNull(application.hbCharacterController)
+        assertTrue("runtime health check failed", kotlinx.coroutines.runBlocking {
+            IsolatedRuntimeHealth(context).isStartedAndIsolated()
+        })
         val runtimeReady = CountDownLatch(1)
         val runtimeBinder = AtomicReference<IBinder>()
         val runtimeConnection = object : ServiceConnection {

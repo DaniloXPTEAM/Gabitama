@@ -11,6 +11,7 @@ import com.novoagentehb.app.agent.skills.McpRemoteTool
 import com.novoagentehb.app.agent.skills.SkillAndMcpRegistry
 import com.novoagentehb.app.agent.tools.CapabilityRegistry
 import com.novoagentehb.app.data.local.SkillRecordEntity
+import com.novoagentehb.app.computer.runtime.IsolatedRuntimeHealth
 import com.novoagentehb.app.gabi.HBCharacterController
 import com.novoagentehb.app.gabi.HBState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +28,8 @@ class ComputerViewModel @Inject constructor(
     private val skillRegistry: SkillAndMcpRegistry,
     private val capabilityRegistry: CapabilityRegistry,
     private val orchestrator: TaskOrchestrator,
-    private val hbController: HBCharacterController
+    private val hbController: HBCharacterController,
+    private val isolatedRuntimeHealth: IsolatedRuntimeHealth
 ) : ViewModel() {
 
     val skills: StateFlow<List<SkillRecordEntity>> = skillRegistry.observeAll()
@@ -48,6 +50,8 @@ class ComputerViewModel @Inject constructor(
 
     private val _statusNotice = MutableStateFlow<String?>(null)
     val statusNotice: StateFlow<String?> = _statusNotice.asStateFlow()
+    private val _runtimeNotice = MutableStateFlow<String?>(null)
+    val runtimeNotice: StateFlow<String?> = _runtimeNotice.asStateFlow()
 
     val capabilityCount: Int get() = capabilityRegistry.capabilities.size
     val capabilitiesByTier: Map<RuntimeSupportTier, Int> get() = capabilityRegistry.countByTier()
@@ -165,9 +169,17 @@ class ComputerViewModel @Inject constructor(
     fun runDiagnosticsCommand() {
         orchestrator.submitUserMessage("/diagnostico")
         _statusNotice.value = "Comando /diagnostico enviado para a fila do orquestrador."
+        viewModelScope.launch {
+            _runtimeNotice.value = if (isolatedRuntimeHealth.isStartedAndIsolated()) {
+                "Serviço isolado iniciado. O shell original ainda não está disponível."
+            } else {
+                "Serviço isolado indisponível. O shell original ainda não está disponível."
+            }
+        }
     }
 
     fun clearNotice() {
+        _runtimeNotice.value = null
         _statusNotice.value = null
     }
 }
