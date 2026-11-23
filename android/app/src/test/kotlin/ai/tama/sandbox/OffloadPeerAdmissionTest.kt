@@ -20,6 +20,8 @@ class OffloadPeerAdmissionTest {
             assertTrue(admitted.allowed)
             assertEquals("session-a", admitted.sessionId)
             assertFalse(OffloadPeerPolicy.resolve(true, null, "session-a", "android-open", emptyList()).allowed)
+            assertFalse(OffloadPeerPolicy.resolve(true, null, null, "android-open", emptyList()).allowed)
+            assertFalse(OffloadPeerPolicy.resolve(true, null, null, "nanomuse-media", listOf("nanomuse-media", "status")).allowed)
             assertFalse(OffloadPeerPolicy.resolve(true, null, null, "nanomuse-media", listOf("nanomuse-media", "image")).allowed)
             OffloadPeerBindings.release(91033, lease)
             assertFalse(OffloadPeerPolicy.resolve(true, lease, null, "android-open", emptyList()).allowed)

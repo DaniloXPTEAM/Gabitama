@@ -32,6 +32,13 @@ class OriginalShellRuntimeAndroidTest {
         }
         assertTrue(root.isInstalled)
         assertTrue(PRootKernel.isBooted)
+        // A process not registered as a PRoot peer must be disconnected before
+        // the server parses any protocol bytes or dispatches a handler.
+        android.net.LocalSocket().use { untrusted ->
+            untrusted.connect(android.net.LocalSocketAddress(NativeOffloadServer.socketName))
+            untrusted.soTimeout = 5000
+            assertEquals("unregistered offload socket should close", -1, untrusted.inputStream.read())
+        }
         assertNull(PRootKernel.resolveHostPath("/../../outside"))
         assertNull(PRootKernel.resolveSessionHostPath("../outside", "/var/minis/workspace/file", context))
         val escape = java.io.File(root.rootfsDir, "tmp/fixture-escape")

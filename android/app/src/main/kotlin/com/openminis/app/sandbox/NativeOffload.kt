@@ -231,6 +231,14 @@ object NativeOffloadServer {
             val peer = if (nmParallel) try {
                 ai.tama.sandbox.OffloadPeerBindings.capture(client.peerCredentials.pid)
             } catch (_: Exception) { null } else null
+            // The abstract socket is reachable by other processes. Do not parse
+            // their payloads or create reply files unless the host registered
+            // this exact live PRoot peer. Unmanaged PTY offload remains disabled
+            // until PTY launch can bind its peer without a startup race.
+            if (nmParallel && peer == null) {
+                try { client.close() } catch (_: Exception) {}
+                continue
+            }
             thread(name = "native-offload-worker", isDaemon = true) {
                 try {
                     handleClient(client, peer)
