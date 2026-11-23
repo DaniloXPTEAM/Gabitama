@@ -118,4 +118,4 @@ tempo, isolar o shell dos dados privados da Gabi. As opções viáveis são:
 3. **Executar o PRoot no processo do app (desenho original).** Rejeitado: expõe dados privados
    da Gabi ao shell.
 
-Recomendação: opção 1 como experimento de viabilidade em branch separada, após aprovação.
+Recomendação: opção 1 como experimento de viabilidade no branch atual, somente após aprovação do proprietário.
