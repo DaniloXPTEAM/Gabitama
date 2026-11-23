@@ -44,7 +44,7 @@ class OriginalShellRuntimeAndroidTest {
         try {
             terminal.start("fixture-terminal")
             withTimeout(30000) { while (!terminal.isRunning) { if (terminal.state.value == TerminalSession.State.STOPPED) error("PTY stopped during boot"); delay(50) } }
-            terminal.sendText("printf 'PTY_FIXTURE_OK\\n'\n")
+            terminal.sendText("printf '%s%s\\n' PTY_FIXTURE _OK\n")
             withTimeout(30000) { while (!seen.get().contains("PTY_FIXTURE_OK")) delay(50) }
         } finally {
             terminal.stop()
