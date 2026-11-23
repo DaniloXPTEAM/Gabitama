@@ -286,6 +286,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         AndroidTestHarness.waitUntilText(compose, "Computador & Skills")
         compose.onNode(hasText("Diagnóstico") and hasClickAction()).performClick()
         AndroidTestHarness.waitUntilText(compose, "Comando /diagnostico enviado para a fila do orquestrador.")
+        AndroidTestHarness.waitUntilText(compose, "Serviço isolado iniciado. O shell original ainda não está disponível.")
 
         // Settings: alterna provedor, abre diagnóstico local e restaura Gemini
         AndroidTestHarness.clickBottomTab(compose, "Ajustes")
