@@ -153,3 +153,11 @@ a fixture executou um binário nativo fixo, sem entradas ou efeitos, empacotado
 apenas no APK descartável da CI. Ele retornou zero sob o UID isolado nas APIs 26,
 29 e 34. Na API 34, `/system/bin/true` separado retornou `IOException:EACCES`.
 Estes resultados não demonstram PRoot, ptrace, execução de Alpine ou segurança.
+
+[45235425663](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45235425663)
+executou, no UID isolado das APIs 26, 29 e 34, um binário fixo descartável que
+cria um filho e verifica `PTRACE_TRACEME`, parada, `PTRACE_SYSCALL` e retomada;
+o resultado foi zero nas três APIs. Não é prova de que PRoot/Alpine funcionem:
+o rootfs ainda não é acessível e outros caminhos, ABI ARM, políticas e casos de
+segurança não foram testados. A sonda do PRoot somente com `--version` ainda é
+uma fixture de CI e não habilita execução de comandos no produto.
