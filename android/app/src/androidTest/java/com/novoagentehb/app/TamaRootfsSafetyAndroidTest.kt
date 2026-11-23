@@ -10,6 +10,8 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 /** Synthetic tar entries only; these tests never install or reset a real rootfs. */
 @RunWith(AndroidJUnit4::class)
@@ -68,4 +70,23 @@ class TamaRootfsSafetyAndroidTest {
             assertFalse(File(parent.parentFile, "outside.txt").exists())
         } finally { parent.deleteRecursively() }
     }
+    @Test fun gzipChecksumMustBeValidEvenAfterTarEndMarker() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val parent = Files.createTempDirectory(context.cacheDir.toPath(), "rootfs-gzip-").toFile()
+        try {
+            val gz = ByteArrayOutputStream().apply {
+                GZIPOutputStream(this).use { it.write(tar(Triple("file", '0', "payload"))) }
+            }.toByteArray()
+            val validDir = File(parent, "valid").apply { mkdirs() }
+            RootfsManager.getInstance(context).extractTar(GZIPInputStream(ByteArrayInputStream(gz)), validDir)
+            assertEquals("payload", File(validDir, "file").readText())
+            gz[gz.size - 8] = (gz[gz.size - 8].toInt() xor 0x01).toByte()
+            val corruptDir = File(parent, "corrupt").apply { mkdirs() }
+            try {
+                RootfsManager.getInstance(context).extractTar(GZIPInputStream(ByteArrayInputStream(gz)), corruptDir)
+                fail("Corrupted gzip checksum was accepted")
+            } catch (_: java.util.zip.ZipException) { }
+        } finally { parent.deleteRecursively() }
+    }
+
 }

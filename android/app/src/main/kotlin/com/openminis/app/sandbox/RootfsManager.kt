@@ -45,8 +45,9 @@ class RootfsManager private constructor(private val context: Context) {
     private val archFile: File get() = File(rootfsDir, ".arch")
 
     val isInstalled: Boolean
-        get() = rootfsDir.exists() && archFile.exists() &&
-                archFile.readText().trim() == ARCH
+        get() = java.nio.file.Files.isDirectory(rootfsDir.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) &&
+                java.nio.file.Files.isRegularFile(archFile.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) &&
+                runCatching { archFile.readText().trim() == ARCH }.getOrDefault(false)
 
     /**
      * Observable install progress. UI layers (OnboardingScreen,
