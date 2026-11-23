@@ -74,11 +74,13 @@ O servidor de offload agora recusa, antes de ler o protocolo, conexões sem peer
 PRoot registrado pelo host. A sessão PTY original ainda não registra seu peer;
 por isso seu offload está indisponível por segurança, sem afetar o código de UI
 existente, que ainda não usa este runtime. Foram adicionados limites de workers,
-leitura e tamanho acumulado da requisição; o timeout de leitura não é prazo
-absoluto para toda a requisição, e os limites não constituem isolamento. A
-fixture em [45222729352](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45222729352)
-exercitou rejeição de peer, 16 conexões simultâneas, limite acumulado e timeout
-de leitura. Isso não comprova um prazo absoluto nem isolamento geral.
+leitura e tamanho acumulado da requisição; esses limites não constituem
+isolamento. [45222729352](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45222729352)
+exercitou rejeição de peer, 16 conexões simultâneas, limite acumulado e timeout.
+[45233631814](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45233631814)
+validou na fixture x86 um prazo absoluto para entrada lenta e a rejeição de uma
+saída de handler excessiva. Isso não limita a memória já alocada pelo handler
+nem o tempo de execução dele, e não comprova isolamento geral.
 
 A gravação de respostas de offload no `/tmp` compartilhado foi alterada para
 nome aleatório e criação exclusiva com `O_NOFOLLOW`; o teste de symlink em AVD passou em
@@ -144,3 +146,10 @@ A fixture ARM64 compilou em [45231495275](https://github.com/DaniloXPTEAM/Gabita
 com Alpine fixado e a adaptação experimental de status do offload aplicada apenas
 na cópia de build. O workflow não publica nem executa o APK de teste; o resultado
 não é validação ARM ou solução das obrigações de distribuição.
+
+
+Em [45234107903](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45234107903),
+a fixture executou um binário nativo fixo, sem entradas ou efeitos, empacotado
+apenas no APK descartável da CI. Ele retornou zero sob o UID isolado nas APIs 26,
+29 e 34. Na API 34, `/system/bin/true` separado retornou `IOException:EACCES`.
+Estes resultados não demonstram PRoot, ptrace, execução de Alpine ou segurança.
