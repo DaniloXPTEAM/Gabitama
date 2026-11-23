@@ -40,6 +40,7 @@ class IsolatedProbeService : Service() {
             }
             reply.data.putString("fixedExec", runFixed("/system/bin/true"))
             reply.data.putString("fixedNativeExec", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-exec.so").absolutePath))
+            reply.data.putString("fixedPtrace", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-ptrace.so").absolutePath))
         }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")
