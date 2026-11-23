@@ -266,7 +266,7 @@ object NativeOffloadServer {
     }
 
     private fun handleClient(client: LocalSocket, peer: ai.tama.sandbox.OffloadPeerLease?) {
-        val input = DataInputStream(client.inputStream)
+        val input = DataInputStream(OffloadDeadlineInputStream(client.inputStream, { client.soTimeout = it }))
         val output = DataOutputStream(client.outputStream)
 
         val magic = input.readLEInt()
