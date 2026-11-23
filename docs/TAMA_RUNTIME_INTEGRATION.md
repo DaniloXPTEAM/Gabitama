@@ -175,3 +175,13 @@ invocação foi corrigida e precisa ser testada novamente; a falha anterior não
 comprova uma limitação do PRoot. O teste não usa Alpine e não comprova que um
 comando arbitrário seja seguro. O código de
 produção não expõe essa fixture ao usuário ou ao agente.
+
+
+Na fixture corrigida [45242024683](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45242024683),
+o PRoot x86 experimental executou com saída zero um executável nativo fixo,
+sem entradas, sob UID isolado nas APIs 26, 29 e 34. A fixture usa a raiz `/` do
+AVD e somente um processo de teste; não é Alpine nem um shell operacional. A
+transferência de um diretório por Binder retornou `DeadObjectException`; a
+sonda alternativa de socket Unix foi recusada com `EACCES` antes de enviar o
+FD nas três APIs. Esses resultados não identificam uma solução de rootfs seguro,
+nem provam proteção contra todos os ataques ou disponibilidade ARM.
