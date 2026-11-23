@@ -68,7 +68,11 @@ class IsolatedProbeAndroidTest {
                     data.putParcelable("directoryFd", directoryFd)
                     replyTo = reply
                 }
-                service.get().send(request)
+                try { service.get().send(request) }
+                catch (failure: Exception) {
+                    Log.e("TamaIsolationFixture", "directoryTransferFailure=${failure.javaClass.name}")
+                    throw failure
+                }
             } finally { readPipe.close(); directoryFd.close() }
             assertTrue("isolated service did not respond", answered.await(15, TimeUnit.SECONDS))
             val data = result.get()
