@@ -34,10 +34,21 @@ jobs:
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
+          assert '<application\n' in s
+          s=s.replace('<application\n', '<application android:extractNativeLibs="true"\n', 1)
           service='<service android:name=".isolationfixture.IsolatedProbeService" android:exported="false" android:isolatedProcess="true" />'
           assert s.count('</application>') == 1
           open(p,'w').write(s.replace('</application>', service + '\n    </application>'))
           PY
+      - name: Compilar executável fixo descartável
+        run: |
+          python3 - <<'PYTHON'
+          import os, subprocess
+          cmd=os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager')
+          subprocess.run([cmd, '--install', 'ndk;27.2.12479018'], input='y\n'*100, text=True, check=True)
+          PYTHON
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang" -fPIE -pie -O2 scripts/android/isolation-fixture/fixture-exec.c -o android/app/src/main/jniLibs/x86_64/libfixture-exec.so
       - name: Construir APKs descartáveis
         working-directory: android
         run: |

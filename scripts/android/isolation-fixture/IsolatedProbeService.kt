@@ -22,15 +22,14 @@ class IsolatedProbeService : Service() {
         reply.data.putBoolean("ownDataDirWritable", runCatching { filesDir.canWrite() }.getOrDefault(false))
         reply.data.putBoolean("internetPermission", checkSelfPermission(android.Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED)
         if (request.data.getBoolean("probeFixedExec")) {
-            // One fixed OS binary, no parameters or user-supplied commands.
-            val execution = runCatching {
-                val child = ProcessBuilder("/system/bin/true").redirectErrorStream(true).start()
+            // Two fixed, parameter-free binaries. No user-supplied commands.
+            fun runFixed(path: String): String = runCatching {
+                val child = ProcessBuilder(path).redirectErrorStream(true).start()
                 try {
                     if (child.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) "exit:" + child.exitValue()
                     else "timeout"
                 } finally { if (child.isAlive) child.destroyForcibly() }
-            }
-            reply.data.putString("fixedExec", execution.getOrElse { failure ->
+            }.getOrElse { failure ->
                 val reason = when {
                     failure.message?.contains("error=13") == true -> "EACCES"
                     failure.message?.contains("error=1,") == true -> "EPERM"
@@ -38,7 +37,9 @@ class IsolatedProbeService : Service() {
                     else -> "other"
                 }
                 failure.javaClass.simpleName + ":" + reason
-            })
+            }
+            reply.data.putString("fixedExec", runFixed("/system/bin/true"))
+            reply.data.putString("fixedNativeExec", runFixed(File(applicationInfo.nativeLibraryDir, "libfixture-exec.so").absolutePath))
         }
         @Suppress("DEPRECATION")
         val pipe = request.data.getParcelable<ParcelFileDescriptor>("readPipe")
