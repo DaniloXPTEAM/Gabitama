@@ -9,6 +9,8 @@ on:
       - scripts/android/reproduce-landscape-api34.sh
       - .github/workflows/test-real-alpine.yml
       - scripts/android/alpine-fixture/**
+      - .github/workflows/test-original-shell.yml
+      - scripts/android/shell-fixture/**
 jobs:
   build-debug:
     name: JVM e APKs compartilhados
