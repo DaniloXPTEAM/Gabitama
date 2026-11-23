@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
@@ -82,6 +83,10 @@ object NativeOffloadServer {
     @Volatile private var boundName: String = SOCKET_NAME
     val socketName: String get() = boundName
 
+    // Limit stalled or oversized protocol requests even from registered peers.
+    private val workerSlots = Semaphore(16)
+    private const val REQUEST_BYTES_LIMIT = 4 * 1024 * 1024
+    private const val READ_TIMEOUT_MS = 10_000
     private val handlers = ConcurrentHashMap<String, NativeOffloadHandler>()
     private val counter = AtomicLong(0)
     private var serverSocket: LocalServerSocket? = null
@@ -235,7 +240,12 @@ object NativeOffloadServer {
             // their payloads or create reply files unless the host registered
             // this exact live PRoot peer. Unmanaged PTY offload remains disabled
             // until PTY launch can bind its peer without a startup race.
-            if (nmParallel && peer == null) {
+            if ((nmParallel && peer == null) || !workerSlots.tryAcquire()) {
+                try { client.close() } catch (_: Exception) {}
+                continue
+            }
+            try { client.soTimeout = READ_TIMEOUT_MS } catch (_: Exception) {
+                workerSlots.release()
                 try { client.close() } catch (_: Exception) {}
                 continue
             }
@@ -248,6 +258,7 @@ object NativeOffloadServer {
                     else Log.w(TAG, "worker error: ${e.message}", e)
                 } finally {
                     try { client.close() } catch (_: Exception) {}
+                    workerSlots.release()
                 }
             }
         }
@@ -268,21 +279,22 @@ object NativeOffloadServer {
             return
         }
 
+        val budget = OffloadRequestBudget(REQUEST_BYTES_LIMIT)
         val pid = input.readLEInt()
         val argc = input.readLEInt()
         if (argc < 0 || argc > 256) throw IllegalStateException("bad argc=$argc")
         val argv = ArrayList<String>(argc)
-        repeat(argc) { argv.add(input.readLEString()) }
+        repeat(argc) { argv.add(input.readLEString(budget)) }
 
         val envc = input.readLEInt()
         if (envc < 0 || envc > 4096) throw IllegalStateException("bad envc=$envc")
         val env = LinkedHashMap<String, String>(envc)
         repeat(envc) {
-            val s = input.readLEString()
+            val s = input.readLEString(budget)
             val eq = s.indexOf('=')
             if (eq >= 0) env[s.substring(0, eq)] = s.substring(eq + 1) else env[s] = ""
         }
-        val cwd = input.readLEString()
+        val cwd = input.readLEString(budget)
 
         val name = argv.firstOrNull().orEmpty().substringAfterLast('/')
         // nanoMuse: do not log shell arguments or private paths in the parallel app.
@@ -357,9 +369,10 @@ object NativeOffloadServer {
         return ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).int
     }
 
-    private fun DataInputStream.readLEString(): String {
+    private fun DataInputStream.readLEString(budget: OffloadRequestBudget): String {
         val len = readLEInt()
         if (len < 0 || len > 1 shl 20) throw IllegalStateException("bad string len $len")
+        budget.consume(len)
         if (len == 0) return ""
         val buf = ByteArray(len)
         readFully(buf)
