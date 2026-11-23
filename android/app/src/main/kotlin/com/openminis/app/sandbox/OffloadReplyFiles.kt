@@ -19,13 +19,6 @@ internal object OffloadReplyFiles {
         val flags = OsConstants.O_WRONLY or OsConstants.O_CREAT or OsConstants.O_EXCL or
             OsConstants.O_NOFOLLOW or OsConstants.O_CLOEXEC
         val fd = Os.open(file.absolutePath, flags, 0x180) // 0600
-        try {
-            FileOutputStream(fd).use { it.write(output.toByteArray(Charsets.UTF_8)) }
-        } catch (error: Throwable) {
-            // The stream normally closes the descriptor; handle failure while constructing it too.
-            try { Os.close(fd) } catch (_: Exception) {}
-            try { file.delete() } catch (_: Exception) {}
-            throw error
-        }
+        FileOutputStream(fd).use { it.write(output.toByteArray(Charsets.UTF_8)) }
     }
 }

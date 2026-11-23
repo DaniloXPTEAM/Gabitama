@@ -78,10 +78,11 @@ leitura e tamanho acumulado da requisição; o timeout de leitura não é prazo
 absoluto para toda a requisição, e os limites não constituem isolamento. A
 verificação ponta a ponta dessas últimas mudanças permanece pendente em CI.
 
-A gravação de respostas de offload no `/tmp` compartilhado ainda usa nome
-previsível e `writeText`, seguindo o upstream. Um convidado que possa modificar
-essa árvore pode tentar trocar o destino por um symlink: é uma pendência de
-segurança, não uma interface apropriada para entrada não confiável. Além disso,
+A gravação de respostas de offload no `/tmp` compartilhado foi alterada para
+nome aleatório e criação exclusiva com `O_NOFOLLOW`; o teste de symlink em AVD
+ainda está pendente. Isso protege apenas a abertura do componente final: um
+convidado com o mesmo UID ainda pode alterar a árvore ou substituir a resposta.
+Não é uma interface apropriada para entrada não confiável. Além disso,
 a rejeição de peers e os limites de protocolo não resolvem corridas no filesystem,
 revogação de operações já iniciadas nem esgotamento por pedidos lentos de peers
 admitidos. A ativação segue bloqueada até revisar e testar esses casos com uma
