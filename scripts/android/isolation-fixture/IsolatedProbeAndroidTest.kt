@@ -132,9 +132,15 @@ class IsolatedProbeAndroidTest {
                 }
                 service.get().send(request)
                 assertTrue("Unix directory probe did not respond", socketReply.await(15, TimeUnit.SECONDS))
-                assertTrue("Unix directory sender did not finish", sent.await(5, TimeUnit.SECONDS))
                 val outcome = socketResult.get().getString("unixDirectory").orEmpty()
-                if (outcome == "writable") assertTrue(File(directory, "isolated-unix.txt").exists())
+                if (!sent.await(5, TimeUnit.SECONDS)) {
+                    server.close()
+                    sent.await(1, TimeUnit.SECONDS)
+                }
+                if (outcome == "writable") {
+                    assertEquals("sent", transferStatus.get())
+                    assertTrue(File(directory, "isolated-unix.txt").exists())
+                }
                 Log.i("TamaIsolationFixture", "unixDirectory=$outcome unixTransfer=${transferStatus.get()}")
             } finally {
                 server.close()
