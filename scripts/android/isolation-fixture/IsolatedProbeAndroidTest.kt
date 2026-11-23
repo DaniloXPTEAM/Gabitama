@@ -38,6 +38,15 @@ class IsolatedProbeAndroidTest {
         assertTrue("runtime health check failed", kotlinx.coroutines.runBlocking {
             IsolatedRuntimeHealth(context).isStartedAndIsolated()
         })
+        val failedUnbinds = java.util.concurrent.atomic.AtomicInteger()
+        val refusingContext = object : android.content.ContextWrapper(context) {
+            override fun bindService(service: Intent, connection: ServiceConnection, flags: Int): Boolean = false
+            override fun unbindService(connection: ServiceConnection) { failedUnbinds.incrementAndGet() }
+        }
+        assertFalse("failed binding reported healthy", kotlinx.coroutines.runBlocking {
+            IsolatedRuntimeHealth(refusingContext).isStartedAndIsolated()
+        })
+        assertEquals("unbound a service that was never bound", 0, failedUnbinds.get())
         val runtimeReady = CountDownLatch(1)
         val runtimeBinder = AtomicReference<IBinder>()
         val runtimeConnection = object : ServiceConnection {
