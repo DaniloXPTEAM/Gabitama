@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.SessionDirectories
+import com.openminis.app.sandbox.RootfsSize
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -111,6 +112,21 @@ class TamaRootfsSafetyAndroidTest {
             Files.createSymbolicLink(File(victim, "attachments").toPath(), outside.toPath())
             try { SessionDirectories.ensure(files, "victim"); fail("Child symlink accepted") }
             catch (_: IllegalArgumentException) { }
+        } finally { parent.deleteRecursively() }
+    }
+
+    @Test fun rootfsSizeDoesNotFollowExternalOrRecursiveLinks() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val parent = Files.createTempDirectory(context.cacheDir.toPath(), "rootfs-size-").toFile()
+        try {
+            val root = File(parent, "root").apply { mkdir() }
+            val outside = File(parent, "outside").apply { mkdir() }
+            File(root, "payload").writeText("12345")
+            File(outside, "secret").writeText("outside-data")
+            Files.createSymbolicLink(File(root, "external").toPath(), outside.toPath())
+            Files.createSymbolicLink(File(root, "loop").toPath(), root.toPath())
+            assertEquals(5L, RootfsSize.measure(root))
+            assertEquals(0L, RootfsSize.measure(File(root, "external")))
         } finally { parent.deleteRecursively() }
     }
 
