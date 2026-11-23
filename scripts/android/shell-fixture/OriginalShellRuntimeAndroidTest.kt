@@ -90,6 +90,12 @@ class OriginalShellRuntimeAndroidTest {
                 stalled.outputStream.le(0x46464F4E)
                 assertEquals("stalled socket not timed out", -1, stalled.inputStream.read())
             }
+            connect().use { slow ->
+                // Bytes arrive within each socket timeout, but the whole request
+                // must still expire at the absolute 15 second deadline.
+                repeat(3) { slow.outputStream.write(0x4e); delay(5700) }
+                assertEquals("slow request outlived absolute deadline", -1, slow.inputStream.read())
+            }
             withTimeout(10_000) { while (NativeOffloadServer.availableWorkerSlotsForTest() != 16) delay(25) }
         } finally {
             held.forEach { runCatching { it.close() } }
