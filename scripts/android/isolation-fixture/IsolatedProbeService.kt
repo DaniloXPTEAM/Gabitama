@@ -59,6 +59,7 @@ class IsolatedProbeService : Service() {
                             output.contains("getcwd", ignoreCase = true) -> "getcwd"
                             output.contains("execve(", ignoreCase = true) -> "execve"
                             output.contains("fork()", ignoreCase = true) -> "fork"
+                            output.isBlank() -> "no-output"
                             else -> "other"
                         }
                         "exit:" + child.exitValue() + if (child.exitValue() != 0) ":" + reason else ""
