@@ -50,6 +50,14 @@ android {
         jvmTarget = "17"
     }
 
+    // Original Tama/OpenMinis PTY bridge. It does not by itself provide PRoot or a sandbox.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true

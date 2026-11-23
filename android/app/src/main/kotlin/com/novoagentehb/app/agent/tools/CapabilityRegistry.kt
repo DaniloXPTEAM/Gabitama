@@ -336,7 +336,7 @@ class CapabilityRegistry @Inject constructor() {
     )
 
     val unimplementedCapabilities: List<Pair<String, String>> = listOf(
-        "linux_proot_shell" to "NOT_IMPLEMENTED — Shell Linux / PRoot omitido intencionalmente (sem binários Termux/GPL).",
+        "linux_proot_shell" to "NOT_IMPLEMENTED — Ponte PTY original integrada, mas PRoot, rootfs, sessão e ferramentas ainda não estão conectados.",
         "generic_screen_operator" to "NOT_IMPLEMENTED — Operador genérico multi-app ausente; apenas WhatsApp via Acessibilidade é suportado."
     )
 

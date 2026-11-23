@@ -11,9 +11,13 @@ de implementação; a escolha e publicação da licença definitiva cabe exclusi
 ao proprietário (Danilo), após conclusão da auditoria jurídica/IP em
 docs/LICENSE_PROVENANCE.md.
 
-DECLARAÇÃO DE NÃO-HERANÇA:
-- Este projeto NÃO deriva de nanoMuse, OpenMinis, tama-v2 ou tamaaiv2 e NÃO
-  incorpora código ou assets sob GNU GPL / AGPL / LGPL copiados daquelas bases.
+ATUALIZAÇÃO — INTEGRAÇÃO ORIGINAL DO TAMA:
+- O projeto incorpora agora PtyBridge.kt e pty_bridge.c do Tama V2/nanoMuse,
+  com proveniência e avisos preservados em android/app/src/main/assets/licenses/tama-runtime/.
+  Portanto, a anterior declaração geral de não-herança e ausência de GPL não é válida.
+- A distribuição de componentes cobertos pela GPL deve cumprir os termos aplicáveis,
+  inclusive avisos e disponibilização da fonte correspondente. A licença do conjunto
+  e as demais condições de distribuição ainda precisam de revisão antes de publicar.
 - Atribuições de bibliotecas de terceiros efetivamente declaradas em Gradle
   (exclusivamente Apache-2.0 / MIT) constam em THIRD_PARTY_NOTICES.md.
 - Os assets visuais da personagem Gabi e do Quarto da Gabi presentes em

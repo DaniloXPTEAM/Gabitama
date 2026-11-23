@@ -1,3 +1,5 @@
+> **Atualização após R1.0:** a tabela histórica abaixo não descreve mais o estado atual. O PTY original do Tama V2/nanoMuse foi incorporado com código-fonte e avisos GPL preservados. A antiga afirmação de zero arquivos GPL ou ausência de referências ao upstream ficou superada. Veja `docs/TAMA_RUNTIME_INTEGRATION.md`; licença e obrigações do conjunto devem ser verificadas antes de distribuição.
+
 # AUDITORIA DE LICENÇAS E PROVENIÊNCIA — LICENSE_PROVENANCE.md (R1.0)
 
 Data da auditoria: 2026-11-21  
