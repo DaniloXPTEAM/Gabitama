@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'status=$?; echo "::error title=Isolation harness::Failure at line $LINENO (status $status)"' ERR
 [ "${CI:-}" = true ]
 [[ "$(adb get-serialno)" =~ ^emulator-[0-9]+$ ]]
 uid=$(id -u)
