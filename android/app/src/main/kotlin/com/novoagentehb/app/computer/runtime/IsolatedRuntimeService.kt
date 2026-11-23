@@ -72,6 +72,14 @@ class IsolatedRuntimeService : Service() {
                     reply.writeString(detail)
                     true
                 }
+                TRANSACTION_STORAGE_PROBE -> {
+                    data.enforceInterface(DESCRIPTOR)
+                    if (reply == null) return false
+                    val detail = storageProbe()
+                    reply.writeNoException()
+                    reply.writeString(detail)
+                    true
+                }
                 else -> super.onTransact(code, data, reply, flags)
             }
         }
@@ -145,6 +153,37 @@ class IsolatedRuntimeService : Service() {
         }
     }
 
+    /**
+     * Evidence only: reports whether the isolated UID can traverse, read or write its own
+     * storage roots, and whether a fixed 1 MiB write/read/delete cycle succeeds in cacheDir.
+     * Executes nothing supplied by callers.
+     */
+    private fun storageProbe(): String {
+        val lines = mutableListOf("uid=${Process.myUid()}")
+        val roots = listOf(
+            "filesDir" to filesDir,
+            "cacheDir" to cacheDir,
+            "codeCacheDir" to codeCacheDir,
+            "noBackupFilesDir" to noBackupFilesDir,
+            "dataLocalTmp" to File("/data/local/tmp"),
+        )
+        for ((name, dir) in roots) {
+            lines += "$name exists=${dir.exists()} traverse=${dir.canExecute()} read=${dir.canRead()} write=${dir.canWrite()}"
+        }
+        lines += try {
+            val probeDir = File(cacheDir, "storage-probe").apply { mkdirs() }
+            val probeFile = File(probeDir, "block.bin")
+            probeFile.outputStream().use { out -> repeat(MAX_STORAGE_PROBE_MIB) { out.write(ByteArray(1024 * 1024)) } }
+            val size = probeFile.length()
+            probeFile.delete()
+            probeDir.delete()
+            "cacheWrite=ok bytes=$size"
+        } catch (failure: Exception) {
+            "cacheWrite=${failure.javaClass.simpleName}:${(failure.message ?: "").take(160)}"
+        }
+        return lines.joinToString("\n")
+    }
+
     private fun prootRootProbe(rootPath: String): String {
         val proot = File(applicationInfo.nativeLibraryDir, "libproot.so")
         if (!proot.canExecute()) return "absent"
@@ -168,6 +207,8 @@ class IsolatedRuntimeService : Service() {
         internal const val TRANSACTION_STATUS = IBinder.FIRST_CALL_TRANSACTION + 1
         internal const val TRANSACTION_PROBE_REGULAR_FILE = IBinder.FIRST_CALL_TRANSACTION + 2
         internal const val TRANSACTION_DIAGNOSTIC_DIRECTORY = IBinder.FIRST_CALL_TRANSACTION + 3
+        internal const val TRANSACTION_STORAGE_PROBE = IBinder.FIRST_CALL_TRANSACTION + 4
+        internal const val MAX_STORAGE_PROBE_MIB = 1
 
         internal const val STATE_NO_EXECUTION = "no-execution"
         internal const val DIAGNOSTIC_FILE = "isolated-diagnostic.txt"

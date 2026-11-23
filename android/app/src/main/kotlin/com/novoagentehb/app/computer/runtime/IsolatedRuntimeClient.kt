@@ -85,6 +85,11 @@ class IsolatedRuntimeClient @Inject constructor(@ApplicationContext private val 
         }
     }
 
+    /** Evidence-only storage visibility report from the isolated worker. */
+    suspend fun storageDiagnostic(): String = withService { binder ->
+        call(binder, IsolatedRuntimeService.TRANSACTION_STORAGE_PROBE, {}) { reply -> reply.readString().orEmpty() }
+    }
+
     /** Releases the shared binding. The next call binds a new worker instance. */
     suspend fun close() {
         lock.withLock {
