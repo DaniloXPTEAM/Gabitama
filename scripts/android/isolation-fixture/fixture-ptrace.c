@@ -20,10 +20,11 @@ static int wait_child(pid_t child, int *status) {
 int main(void) {
     signal(SIGALRM, deadline);
     alarm(4);
+    pid_t expected_parent = getpid();
     pid_t child = fork();
     if (child < 0) return 10;
     if (child == 0) {
-        if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0) _exit(11);
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != expected_parent) _exit(11);
         if (ptrace(PTRACE_TRACEME, 0, 0, 0) != 0) _exit(12);
         raise(SIGSTOP);
         (void)getpid();
