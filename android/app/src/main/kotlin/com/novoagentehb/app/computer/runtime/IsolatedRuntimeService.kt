@@ -26,7 +26,7 @@ class IsolatedRuntimeService : Service() {
         internal const val DESCRIPTOR = "com.novoagentehb.app.computer.runtime.IsolatedRuntimeService"
         internal const val TRANSACTION_IDENTITY = IBinder.FIRST_CALL_TRANSACTION
 
-        /** Read the worker UID, not a claim supplied by a guest process. */
+        /** Startup diagnostic only; a compromised worker could forge its reply. */
         internal fun endpointUid(binder: IBinder): Int {
             val request = Parcel.obtain()
             val reply = Parcel.obtain()
