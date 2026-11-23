@@ -32,7 +32,7 @@ jobs:
           echo "ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea  $name" | sha256sum -c -
           sha256sum "$name"
           echo "::notice title=Alpine fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)"
-          cp "$name" "$GITHUB_WORKSPACE/android/app/src/androidTest/assets/alpine-3.21.3.tar.gz"
+          cp "$name" "$GITHUB_WORKSPACE/android/app/src/androidTest/assets/alpine-fixture.bin"
           cp "$GITHUB_WORKSPACE/scripts/android/alpine-fixture/RealAlpineRootfsAndroidTest.kt" "$GITHUB_WORKSPACE/android/app/src/androidTest/java/com/novoagentehb/app/"
       - name: Compilar APKs somente para teste
         working-directory: android

@@ -18,7 +18,7 @@ class RealAlpineRootfsAndroidTest {
         val context = instrumentation.targetContext
         val root = Files.createTempDirectory(context.cacheDir.toPath(), "alpine-fixture-").toFile()
         try {
-            instrumentation.context.assets.open("alpine-3.21.3.tar.gz").use { asset ->
+            instrumentation.context.assets.open("alpine-fixture.bin").use { asset ->
                 GZIPInputStream(asset).use { RootfsManager.getInstance(context).extractTar(it, root) }
             }
             assertTrue(File(root, "bin/busybox").isFile)
