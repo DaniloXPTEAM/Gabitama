@@ -108,7 +108,8 @@ class IsolatedProbeAndroidTest {
                         val wrote = directoryResult.get().getBoolean("directoryWrite")
                         assertEquals("directory FD outcome mismatch", wrote, File(directory, "isolated-fixture.txt").exists())
                         val error = directoryResult.get().getString("directoryError").orEmpty()
-                        Log.i("TamaIsolationFixture", "directoryFdWritable=$wrote directoryError=$error")
+                        val present = directoryResult.get().getBoolean("directoryPresent")
+                        Log.i("TamaIsolationFixture", "directoryFdPresent=$present directoryFdWritable=$wrote directoryError=$error")
                     } else Log.i("TamaIsolationFixture", "directoryTransfer=no-reply")
                 } catch (failure: android.os.RemoteException) {
                     Log.i("TamaIsolationFixture", "directoryTransfer=${failure.javaClass.name}")

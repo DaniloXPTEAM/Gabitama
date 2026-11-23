@@ -46,6 +46,7 @@ class IsolatedProbeService : Service() {
             failure.javaClass.simpleName + ":" + reason
         }.orEmpty()
         directory?.close()
+        reply.data.putBoolean("directoryPresent", directory != null)
         reply.data.putBoolean("directoryWrite", directoryOutcome.getOrDefault(false))
         reply.data.putString("directoryError", directoryError)
         request.replyTo.send(reply)
