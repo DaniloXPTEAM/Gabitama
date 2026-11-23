@@ -258,10 +258,15 @@ class SafetyPolicyAndMockIsolationAndroidTest {
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             actualAuthorization = request.header("Authorization").orEmpty()
+            if (request.method == "GET") {
+                okhttp3.Response.Builder().request(request).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("OK")
+                    .body(okhttp3.ResponseBody.create(null, """{"data":[{"id":"discovered-model"}]}""")).build()
+            } else {
             val buffer = okio.Buffer(); request.body!!.writeTo(buffer)
             actualModel = com.google.gson.JsonParser.parseString(buffer.readUtf8()).asJsonObject.get("model").asString
             okhttp3.Response.Builder().request(request).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("OK")
                 .body(okhttp3.ResponseBody.create(null, """{"choices":[{"message":{"content":"resposta simulada"}}]}""")).build()
+            }
         }.build()
         try {
             repo.add(profile, "synthetic-custom-key")
@@ -270,13 +275,18 @@ class SafetyPolicyAndMockIsolationAndroidTest {
             assertEquals(profile, reopened.active())
             assertEquals("synthetic-custom-key", reopened.key(profile.id))
             assertFalse(prefs.customProvidersJson.first().contains("synthetic-custom-key"))
-            val router = com.novoagentehb.app.agent.models.ModelRouter(client, prefs, vault, reopened, com.novoagentehb.app.data.providers.ProviderNetwork(client))
+            val network = com.novoagentehb.app.data.providers.ProviderNetwork(client)
+            assertEquals(listOf("discovered-model"), network.discover(profile, reopened.key(profile.id)))
+            assertEquals("Bearer synthetic-custom-key", actualAuthorization)
+            val router = com.novoagentehb.app.agent.models.ModelRouter(client, prefs, vault, reopened, network)
             val result = router.generateTurn(com.novoagentehb.app.agent.models.ModelRole.CHAT, "system", listOf(com.novoagentehb.app.agent.models.ModelChatMessage("user", "oi")), emptyList())
             assertTrue(result is com.novoagentehb.app.agent.models.ModelTurnResult.TextReply)
             assertEquals("chosen-chat", actualModel)
             assertEquals("Bearer synthetic-custom-key", actualAuthorization)
             assertEquals(profile.id, (result as com.novoagentehb.app.agent.models.ModelTurnResult.TextReply).providerId)
             assertEquals("chosen-chat", result.modelId)
+            router.generateTurn(com.novoagentehb.app.agent.models.ModelRole.VISION, "system", listOf(com.novoagentehb.app.agent.models.ModelChatMessage("user", "oi")), emptyList())
+            assertEquals("chosen-vision", actualModel)
             repo.update(profile.copy(chatModel = "new-model"), "")
             assertEquals("__needs_selection__", prefs.activeCustomProviderId.first())
         } finally {

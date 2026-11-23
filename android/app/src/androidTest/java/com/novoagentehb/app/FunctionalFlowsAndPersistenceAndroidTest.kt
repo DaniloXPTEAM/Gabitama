@@ -268,9 +268,20 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         // Settings: alterna provedor, abre diagnóstico local e restaura Gemini
         AndroidTestHarness.clickBottomTab(compose, "Ajustes")
         AndroidTestHarness.waitUntilText(compose, "Ajustes · Gemini & Voz")
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Adicionar, importar e gerenciar"))
+        compose.onNode(hasText("Adicionar, importar e gerenciar")).performClick()
+        AndroidTestHarness.waitUntilText(compose, "Gerenciar provedores")
+        compose.onNode(hasText("Importar JSON de arquivo")).assertIsDisplayed()
+        compose.onNode(hasText("Fechar") and hasClickAction()).performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Groq"))
         compose.onNode(hasText("Groq")).performClick()
-        AndroidTestHarness.waitUntilText(compose, "Provedor ativo: Groq", substring = true)
+        compose.waitUntil(15_000) {
+            try {
+                compose.onNode(hasScrollAction()).performScrollToNode(hasText("Provedor ativo: Groq", substring = true))
+                true
+            } catch (_: AssertionError) { false }
+        }
+        compose.onNode(hasText("Provedor ativo: Groq", substring = true)).assertIsDisplayed()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Google Gemini"))
         compose.onNode(hasText("Google Gemini")).performClick()
         AndroidTestHarness.waitUntilText(compose, "✓ Google Gemini")
