@@ -7,12 +7,19 @@ import com.openminis.app.sandbox.ExecutionCoordinator
 import com.openminis.app.sandbox.PRootKernel
 import com.openminis.app.sandbox.PersistentShell
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.TerminalSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 /** Internal ARM-only fixture. No user/agent input, network or arbitrary scripts. */
 @RunWith(AndroidJUnit4::class)
@@ -42,6 +49,25 @@ class Arm64OriginalShellAndroidTest {
             assertEquals(result.output, 0, result.exitCode)
             assertTrue(result.output.contains("ARM_COORDINATOR_OK"))
         } finally { ExecutionCoordinator.sessionDidTerminate("fixture-arm64-coordinator") }
+        val terminal = TerminalSession(context)
+        val output = AtomicReference("")
+        val collector = launch(Dispatchers.IO) {
+            terminal.outputBytes.collect { bytes -> output.updateAndGet { it + String(bytes, Charsets.UTF_8) } }
+        }
+        try {
+            terminal.start("fixture-arm64-terminal")
+            withTimeout(30_000) {
+                while (!terminal.isRunning) {
+                    if (terminal.state.value == TerminalSession.State.STOPPED) error("ARM PTY stopped during startup")
+                    delay(50)
+                }
+            }
+            terminal.sendText("printf '%s%s\\n' ARM_PTY _OK\n")
+            withTimeout(30_000) { while (!output.get().contains("ARM_PTY_OK")) delay(50) }
+        } finally {
+            terminal.stop()
+            collector.cancelAndJoin()
+        }
         val timeout = PersistentShell(context, "fixture-arm64-timeout", emptyMap())
         val late = File(root.rootfsDir, "tmp/arm-fixture-late")
         try {
