@@ -99,7 +99,7 @@ class IsolatedProbeAndroidTest {
             val directoryFd = ParcelFileDescriptor.open(directory, ParcelFileDescriptor.MODE_READ_ONLY)
             try {
                 val request = Message.obtain().apply {
-                    data.putParcelable("directoryFd", directoryFd)
+                    this.data.putParcelable("directoryFd", directoryFd)
                     replyTo = directoryMessenger
                 }
                 try {
