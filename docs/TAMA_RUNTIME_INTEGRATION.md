@@ -169,6 +169,9 @@ Alpine ou comandos, e não habilita execução no produto.
 foi além de `--version`: a fixture x86 invocou o PRoot original experimental
 sob UID isolado para executar apenas um binário nativo fixo e sem entrada, com
 limite de tempo e limpeza do grupo de processos. O PRoot retornou código 1 nas
-APIs 26, 29 e 34. A causa exata ainda está em investigação; o teste não usa
-Alpine e não comprova que um comando arbitrário seja seguro. O código de
+APIs 26, 29 e 34. A classificação posterior identificou opção desconhecida:
+a fixture havia inserido `--`, que o parser do PRoot original não aceita. A
+invocação foi corrigida e precisa ser testada novamente; a falha anterior não
+comprova uma limitação do PRoot. O teste não usa Alpine e não comprova que um
+comando arbitrário seja seguro. O código de
 produção não expõe essa fixture ao usuário ou ao agente.
