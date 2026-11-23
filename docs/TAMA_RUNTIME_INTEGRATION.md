@@ -38,3 +38,28 @@ iniciada descoberta automática de mirrors. O código portado não é registrado
 interface nem como ferramenta do agente. PRoot e rootfs ainda não são incluídos
 no APK de produção, e o isolamento de execução de entrada arbitrária, controles
 de permissão e testes arm64 permanecem obrigatórios antes da ativação.
+
+## Evidências de execução e bloqueio de isolamento
+
+Em [45204514747](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45204514747),
+uma fixture descartável no AVD API 34 x86_64 iniciou o shell original com Alpine
+3.21.3 e PRoot experimental, executou processo externo e verificou registradores
+após fork, persistência, erro, timeout, cancelamento e stop da sessão PTY. O
+PRoot da fixture tem backports experimentais específicos de x86; não são o
+binário de produção nem prova para ARM. O término usa SIGQUIT tratado pelo
+PRoot para matar os tracees conhecidos antes do fallback forçado; o teste não
+comprova eliminação de todos os descendentes em todas as corridas ou falhas.
+
+A tentativa de iniciar um `isolatedProcess` usando a Application existente falhou
+em [45207454876](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45207454876):
+a inicialização Hilt atingiu `SecureKeyVault` e o serviço Keystore não estava
+disponível naquele processo isolado. Em uma fixture descartável que troca a
+Application por `android.app.Application`, [45208717977](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45208717977)
+verificou UID diferente, impossibilidade de ler um arquivo privado fixo do app,
+permissão INTERNET não concedida e diretório privado do app não gravável. Esta
+sonda não executa shell, não prova que PRoot funcione sob UID isolado e não é
+uma arquitetura pronta para produção. Antes de ativar execução arbitrária é
+necessário resolver inicialização sem acesso a credenciais, provisionamento e
+limpeza de rootfs próprio, IPC autenticado e limitado, quotas, disponibilidade
+nativa e testes adversariais. Não compartilhar os diretórios privados do app
+com o processo executor apenas para contornar essa falha.
