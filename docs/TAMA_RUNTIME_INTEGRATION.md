@@ -76,14 +76,49 @@ por isso seu offload está indisponível por segurança, sem afetar o código de
 existente, que ainda não usa este runtime. Foram adicionados limites de workers,
 leitura e tamanho acumulado da requisição; o timeout de leitura não é prazo
 absoluto para toda a requisição, e os limites não constituem isolamento. A
-verificação ponta a ponta dessas últimas mudanças permanece pendente em CI.
+fixture em [45222729352](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45222729352)
+exercitou rejeição de peer, 16 conexões simultâneas, limite acumulado e timeout
+de leitura. Isso não comprova um prazo absoluto nem isolamento geral.
 
 A gravação de respostas de offload no `/tmp` compartilhado foi alterada para
-nome aleatório e criação exclusiva com `O_NOFOLLOW`; o teste de symlink em AVD
-ainda está pendente. Isso protege apenas a abertura do componente final: um
+nome aleatório e criação exclusiva com `O_NOFOLLOW`; o teste de symlink em AVD passou em
+[45212341786](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45212341786). Isso protege apenas a abertura do componente final: um
 convidado com o mesmo UID ainda pode alterar a árvore ou substituir a resposta.
 Não é uma interface apropriada para entrada não confiável. Além disso,
 a rejeição de peers e os limites de protocolo não resolvem corridas no filesystem,
 revogação de operações já iniciadas nem esgotamento por pedidos lentos de peers
 admitidos. A ativação segue bloqueada até revisar e testar esses casos com uma
 fronteira de UID apropriada.
+
+## Incremento Hilt e estados reais do coordenador
+
+A Application agora injeta os dois componentes via `dagger.Lazy`, mantendo a
+inicialização explícita e imediata no processo normal, mas não instancia a Gabi,
+o orquestrador ou o cofre no UID isolado. O serviço de produção não exportado é
+somente um endpoint de ciclo de vida e identidade diagnóstica, sem qualquer
+interface de comandos. [45222655478](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45222655478)
+validou o bind no AVD API 34 com a Application Hilt real, além de confirmar a
+inicialização da Gabi e do orquestrador no processo principal. A identidade
+retornada pelo serviço não é autenticação contra um processo comprometido.
+
+[45224335875](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45224335875)
+validou na fixture x86 o `ExecutionCoordinator` original sobre PRoot e shell
+persistente: criação, estado persistente, erro e encerramento. Isso não conecta
+o coordenador à UI, não valida ARM nem justifica executar comandos não confiáveis.
+A tentativa exploratória de passar um FD de diretório produziu
+`DeadObjectException` em AVD; ainda não está estabelecido se a causa foi a
+transferência, morte do serviço ou outro limite Binder. Um pipe de dados fixos
+foi transferido, mas não é um filesystem executável.
+
+O PRoot upstream recebe `exit_code` do offload, mas o código reescreve o comando
+como `/bin/cat` e não devolve esse código ao shell. A fixture x86 aplica uma
+adaptação experimental em cópia descartável, usando argumentos separados sem
+interpolação de entrada, e [45225217490](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45225217490)
+passou com um handler fixo de retorno 7. Essa correção não está aplicada ao
+PRoot de produção e precisa de revisão de compatibilidade, segurança e ARM.
+
+A preparação de um teste ARM64 fixo está em `scripts/android/arm64-shell-fixture/`;
+o workflow só prepara e compila uma fixture descartável, sem publicá-la nem
+executá-la. Os loaders vendorizados permanecem sem comprovação de fontes exatas;
+nenhum resultado de preparação constitui validação física ou autorização para
+distribuição.

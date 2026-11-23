@@ -4,6 +4,7 @@ on:
   push:
     branches: [arena/a142d5dd-gabitama]
     paths-ignore:
+      - docs/**
       - .github/workflows/recover-tested-apk.yml
       - .github/workflows/reproduce-landscape-api34.yml
       - scripts/android/reproduce-landscape-api34.sh

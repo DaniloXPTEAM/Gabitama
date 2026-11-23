@@ -15,3 +15,9 @@ coverage. It is not used for the arm64 build, not packaged in production, and no
 claimed safe or equivalent to the complete upstream fix. In particular, the old
 fork lacks later upstream fixes for unusual fork event ordering. Its test result
 cannot validate physical ARM devices or app-level isolation.
+
+The fixture also applies `adapt-offload-status.py` to its disposable copy:
+the original extension receives an offload exit code but rewrites the command
+to `cat` without returning it. The experimental adaptation uses a fixed shell
+script with separate argv for output path and status; the fixture checks exit 7.
+This is not applied to production and needs ARM and adversarial review.
