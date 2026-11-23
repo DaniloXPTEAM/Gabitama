@@ -2,7 +2,7 @@ name: Build Android Debug APK (GabiTama)
 on:
   workflow_dispatch:
   push:
-    branches: [arena/a142d5dd-gabitama]
+    branches: [arena/a142d5dd-gabitama, arena/1dba9faf-gabitama]
     paths-ignore:
       - docs/**
       - .github/workflows/recover-tested-apk.yml
