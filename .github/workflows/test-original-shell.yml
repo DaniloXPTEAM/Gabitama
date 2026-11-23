@@ -39,7 +39,10 @@ jobs:
           name=alpine-minirootfs-3.21.3-x86_64.tar.gz
           base=https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64
           mkdir -p /tmp/alpine-shell android/app/src/main/assets android/app/src/androidTest/assets
-          musl-gcc -static -O2 scripts/android/shell-fixture/fork_regs.c -o android/app/src/androidTest/assets/fork_regs.bin
+          musl-gcc -static -O2 -idirafter /usr/include -idirafter /usr/include/x86_64-linux-gnu scripts/android/shell-fixture/fork_regs.c -o android/app/src/androidTest/assets/fork_regs.bin 2>/tmp/fork-compile.log || {
+            sed -n '1,15p' /tmp/fork-compile.log | sed 's/^/::error title=Fork fixture compile::/'
+            exit 1
+          }
           curl -fsSL --retry 3 "$base/$name" -o "/tmp/alpine-shell/$name"
           curl -fsSL --retry 3 "$base/$name.sha256" -o /tmp/alpine-shell/SHA256SUMS
           (cd /tmp/alpine-shell && sha256sum -c SHA256SUMS && echo "1a694899e406ce55d32334c47ac0b2efb6c06d7e878102d1840892ad44cd5239  $name" | sha256sum -c - && echo "::notice title=Alpine x86_64 fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)")
