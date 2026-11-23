@@ -26,6 +26,11 @@ jobs:
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
+          # Isolated processes cannot initialize the production Hilt/Keystore application.
+          # Use a plain Application for this boundary-only disposable fixture.
+          original='android:name=".app.NovoAgenteApplication"'
+          assert s.count(original) == 1
+          s=s.replace(original, 'android:name="android.app.Application"')
           service='<service android:name=".isolationfixture.IsolatedProbeService" android:exported="false" android:isolatedProcess="true" />'
           assert s.count('</application>') == 1
           open(p,'w').write(s.replace('</application>', service + '\n    </application>'))
