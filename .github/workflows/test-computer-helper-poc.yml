@@ -36,14 +36,7 @@ jobs:
           set -o pipefail
           chmod +x gradlew
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :computer-helper:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/helper-build.log || {
-            python3 - <<'PY'
-            import re
-            lines = open('/tmp/helper-build.log').read().splitlines()
-            for i, line in enumerate(lines):
-                if re.match(r'^(e: |error: |\* What went wrong:|Execution failed for task)', line):
-                    for value in lines[i:i+2]:
-                        print('::error title=Helper PoC build::' + value.replace('%', '%25')[:800])
-            PY
+            python3 ../scripts/android/computer-helper-poc/summarize-build.py /tmp/helper-build.log
             exit 1
           }
       - name: Habilitar KVM

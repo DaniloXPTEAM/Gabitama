@@ -53,7 +53,7 @@ class ComputerHelperClient(
     fun isInstalled(): Boolean = try {
         context.packageManager.getPackageInfo(helperPackage, 0)
         true
-    } catch (_: PackageManager.NameNotFoundException) {
+    } catch (ignored: PackageManager.NameNotFoundException) {
         false
     }
 
@@ -100,7 +100,7 @@ class ComputerHelperClient(
     private suspend fun attempt(code: Int, write: (Parcel) -> Unit): Reply {
         val binder = bind() ?: return Reply(HelperContract.CODE_DENIED)
         val future = CompletableFuture<Reply>()
-        val job = callers.submit {
+        val job = callers.submit(Runnable {
             val data = Parcel.obtain()
             val reply = Parcel.obtain()
             try {
@@ -108,7 +108,7 @@ class ComputerHelperClient(
                 write(data)
                 val ok = binder.transact(code, data, reply, 0)
                 future.complete(if (ok) parse(reply) else Reply(HelperContract.CODE_IO))
-            } catch (_: DeadObjectException) {
+            } catch (ignored: DeadObjectException) {
                 future.complete(Reply(CODE_DEAD))
             } catch (failure: Exception) {
                 Log.w(TAG, "helper call failed: ${failure.javaClass.simpleName}")
@@ -117,8 +117,8 @@ class ComputerHelperClient(
                 data.recycle()
                 reply.recycle()
             }
-        }
-        val deadline = deadlines.schedule({
+        })
+        val deadline = deadlines.schedule(Runnable {
             if (future.complete(Reply(HelperContract.CODE_TIMEOUT))) {
                 // The transaction may still be blocked; drop the binding so the next call starts fresh.
                 job.cancel(true)
@@ -167,7 +167,7 @@ class ComputerHelperClient(
         val intent = Intent(HelperContract.ACTION_BIND).setPackage(helperPackage)
         val bound = try {
             context.bindService(intent, callback, Context.BIND_AUTO_CREATE)
-        } catch (_: SecurityException) {
+        } catch (ignored: SecurityException) {
             false
         }
         if (!bound) return null
