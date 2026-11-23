@@ -113,8 +113,8 @@ class IsolatedProbeService : Service() {
             // Fixture-only Unix FD transfer; no arbitrary paths or commands.
             val transfer = runCatching {
                 android.net.LocalSocket().use { socket ->
-                    socket.soTimeout = 5000
                     socket.connect(android.net.LocalSocketAddress(socketName))
+                    socket.soTimeout = 5000
                     check(socket.inputStream.read() == 1)
                     val descriptors = socket.ancillaryFileDescriptors.orEmpty()
                     check(descriptors.size == 1)
