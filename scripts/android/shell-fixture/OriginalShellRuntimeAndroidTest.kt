@@ -36,6 +36,31 @@ class OriginalShellRuntimeAndroidTest {
         } finally {
             shell.stop()
         }
+        // Verify a timed-out command cannot mutate the guest later. This uses fixed,
+        // synthetic files in a disposable AVD, never user-provided shell text.
+        val timeoutShell = PersistentShell(context, "fixture-timeout", emptyMap())
+        val late = java.io.File(root.rootfsDir, "tmp/fixture-after-timeout")
+        val timed = timeoutShell.executeCommand("touch /tmp/fixture-started; sleep 4; touch /tmp/fixture-after-timeout", 2000)
+        assertEquals(124, timed.second)
+        assertTrue(java.io.File(root.rootfsDir, "tmp/fixture-started").exists())
+        delay(5000)
+        assertFalse("timed-out process continued writing", late.exists())
+        assertFalse(timeoutShell.isAlive)
+
+        val cancelledShell = PersistentShell(context, "fixture-cancel", emptyMap())
+        val started = java.io.File(root.rootfsDir, "tmp/fixture-cancel-started")
+        val afterCancel = java.io.File(root.rootfsDir, "tmp/fixture-after-cancel")
+        val job = launch(Dispatchers.IO) {
+            cancelledShell.executeCommand("touch /tmp/fixture-cancel-started; sleep 4; touch /tmp/fixture-after-cancel", 30000)
+        }
+        try {
+            withTimeout(15000) { while (!started.exists()) delay(50) }
+            job.cancelAndJoin()
+            delay(5000)
+            assertFalse("cancelled process continued writing", afterCancel.exists())
+            assertFalse(cancelledShell.isAlive)
+        } finally { job.cancel(); cancelledShell.stop() }
+
         val terminal = TerminalSession(context)
         val seen = AtomicReference("")
         val collector = launch(Dispatchers.IO) {

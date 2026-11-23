@@ -39,7 +39,7 @@ jobs:
           mkdir -p /tmp/alpine-shell android/app/src/main/assets
           curl -fsSL --retry 3 "$base/$name" -o "/tmp/alpine-shell/$name"
           curl -fsSL --retry 3 "$base/$name.sha256" -o /tmp/alpine-shell/SHA256SUMS
-          (cd /tmp/alpine-shell && sha256sum -c SHA256SUMS && echo "::notice title=Alpine x86_64 fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)")
+          (cd /tmp/alpine-shell && sha256sum -c SHA256SUMS && echo "1a694899e406ce55d32334c47ac0b2efb6c06d7e878102d1840892ad44cd5239  $name" | sha256sum -c - && echo "::notice title=Alpine x86_64 fixture SHA256::$(sha256sum "$name" | cut -d' ' -f1)")
           cp "/tmp/alpine-shell/$name" android/app/src/main/assets/alpine-minirootfs.tar.gz
           cp scripts/android/shell-fixture/OriginalShellRuntimeAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
           # Test-only ABI adaptation. Production remains arm64, and no generated binaries are committed.

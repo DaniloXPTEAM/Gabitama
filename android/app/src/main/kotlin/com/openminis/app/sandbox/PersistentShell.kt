@@ -572,8 +572,11 @@ class PersistentShell(
                     pendingCallback.set(cb)
 
                     cont.invokeOnCancellation {
-                        // nanoMuse: a timed-out command cannot clear a newer command's callback.
-                        pendingCallback.compareAndSet(cb, null)
+                        // A timed-out/cancelled command must not keep running or leak output
+                        // into a subsequent request. Revoke the peer and stop this shell.
+                        // The callback identity ensures an older cancellation cannot stop a
+                        // newer command. The coordinator recreates the shell on next use.
+                        if (pendingCallback.compareAndSet(cb, null)) stop()
                     }
 
                     try {
@@ -589,7 +592,7 @@ class PersistentShell(
             }
 
             if (result == null) {
-                // Timeout cancels its own callback above, but does not kill the shell.
+                // Cancellation above invalidates this shell before returning timeout.
                 Pair("[Command timed out after ${timeout / 1000}s]", 124)
             } else {
                 result
