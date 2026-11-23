@@ -29,4 +29,16 @@ jobs:
         run: scripts/android/arm64-shell-fixture/prepare-ci.sh
       - name: Compilar teste ARM sem distribuição
         working-directory: android
-        run: bash ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          bash ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee /tmp/arm-fixture-build.log || {
+            python3 - <<'PY'
+          import re
+          lines=open('/tmp/arm-fixture-build.log').read().splitlines()
+          for i, line in enumerate(lines):
+              if re.match(r'^(e: |error: |\* What went wrong:|Execution failed for task)', line):
+                  for value in lines[i:i+2]:
+                      print('::error title=ARM fixture build::' + value.replace('%','%25')[:800])
+          PY
+            exit 1
+          }
