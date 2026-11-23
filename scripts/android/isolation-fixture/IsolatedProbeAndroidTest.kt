@@ -46,6 +46,14 @@ class IsolatedProbeAndroidTest {
             val workerUid = IsolatedRuntimeService.endpointUid(runtimeBinder.get())
             assertNotEquals("production service shares host UID", Process.myUid(), workerUid)
             assertTrue("production service UID is not isolated", IsolatedUid.isIsolated(workerUid))
+            val request = android.os.Parcel.obtain()
+            val response = android.os.Parcel.obtain()
+            try {
+                request.writeInterfaceToken(IsolatedRuntimeService.DESCRIPTOR)
+                assertFalse("unexpected execution or other IPC is exposed", runtimeBinder.get().transact(
+                    IsolatedRuntimeService.TRANSACTION_IDENTITY + 1, request, response, 0,
+                ))
+            } finally { request.recycle(); response.recycle() }
         }
         finally { context.unbindService(runtimeConnection) }
         val file = File.createTempFile("isolated-probe-", ".txt", context.cacheDir).apply { writeText("fixture") }
