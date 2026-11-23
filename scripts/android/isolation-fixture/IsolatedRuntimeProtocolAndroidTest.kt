@@ -42,7 +42,7 @@ class IsolatedRuntimeProtocolAndroidTest {
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
     @Test
-    fun productionWorkerVerifiesOnlyGrantedRegularFiles() = runBlocking {
+    fun productionWorkerVerifiesOnlyGrantedRegularFiles() = runBlocking<Unit> {
         val root = newRoot()
         val links = mutableListOf<File>()
         try {
@@ -89,7 +89,7 @@ class IsolatedRuntimeProtocolAndroidTest {
     }
 
     @Test
-    fun concurrentCallsStayBoundedAndWorkerSurvivesCancelAndReconnect() = runBlocking {
+    fun concurrentCallsStayBoundedAndWorkerSurvivesCancelAndReconnect() = runBlocking<Unit> {
         val root = newRoot()
         try {
             File(root, "probe.txt").writeBytes(ByteArray(60_000) { 7 })

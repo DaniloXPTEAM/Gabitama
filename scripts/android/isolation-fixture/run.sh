@@ -33,7 +33,7 @@ if os.environ['ISOLATION_INSTRUMENT_STATUS'] != '0' or not re.search(r'OK \(4 te
    line = re.sub(r'/data/[^ :]*', '<app-path>', line)
    print('::error title=Isolated process crash::'+line[:400].replace('%','%25'))
  for line in s.splitlines():
-  if re.match(r'^\s*(?:java\.|android\.|junit\.|at com\.novoagentehb\.app\.IsolatedProbe)',line):
+  if re.match(r'^\s*(?:java\.|android\.|junit\.|kotlin\.|Caused by|at com\.novoagentehb\.app\.)',line):
    print('::error title=Isolation diagnostic::'+line.strip()[:400].replace('%','%25'))
  raise SystemExit(1)
 PY
