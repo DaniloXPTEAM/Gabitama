@@ -9,7 +9,8 @@ sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT
 trap 'sudo iptables -D OUTPUT -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT; sudo ip6tables -D OUTPUT -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT' EXIT
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk || { echo '::error title=Isolation setup::Target APK installation failed'; exit 1; }
 adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk || { echo '::error title=Isolation setup::Test APK installation failed'; exit 1; }
-adb logcat -c
+# API 26 can deny clearing log buffers; the AVD is fresh and output is filtered.
+adb logcat -c || echo '::warning title=Isolation fixture::Could not clear emulator log buffer; using filtered logs.'
 if adb shell am instrument -w -r -e class com.novoagentehb.app.IsolatedProbeAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/tama-isolation.txt 2>&1; then
   export ISOLATION_INSTRUMENT_STATUS=0
 else
