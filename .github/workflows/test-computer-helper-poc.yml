@@ -30,6 +30,13 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Instalar NDK exigido pelo Gradle antes da configuração
+        run: |
+          python3 - <<'PYNDK'
+          import os, subprocess
+          cmd = os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager')
+          subprocess.run([cmd, '--install', 'ndk;27.0.12077973'], input='y\n' * 100, text=True, check=True)
+          PYNDK
       - name: Construir APKs descartáveis (app, teste e auxiliar)
         working-directory: android
         run: |
