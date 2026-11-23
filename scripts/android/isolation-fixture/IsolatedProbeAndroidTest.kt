@@ -15,6 +15,8 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.novoagentehb.app.isolationfixture.IsolatedProbeService
+import com.novoagentehb.app.computer.runtime.IsolatedRuntimeService
+import com.novoagentehb.app.app.NovoAgenteApplication
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +29,18 @@ import java.util.concurrent.atomic.AtomicReference
 class IsolatedProbeAndroidTest {
     @Test fun isolatedAndroidUidCannotReadAppPrivateDataOrUseInternetPermission() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // Main process retains its real Hilt application and initialized Gabi graph.
+        val application = context.applicationContext as NovoAgenteApplication
+        assertNotNull(application.taskOrchestrator)
+        assertNotNull(application.hbCharacterController)
+        val runtimeReady = CountDownLatch(1)
+        val runtimeConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) { runtimeReady.countDown() }
+            override fun onServiceDisconnected(name: ComponentName?) = Unit
+        }
+        assertTrue(context.bindService(Intent(context, IsolatedRuntimeService::class.java), runtimeConnection, Context.BIND_AUTO_CREATE))
+        try { assertTrue("production isolated runtime failed to start", runtimeReady.await(30, TimeUnit.SECONDS)) }
+        finally { context.unbindService(runtimeConnection) }
         val file = File.createTempFile("isolated-probe-", ".txt", context.cacheDir).apply { writeText("fixture") }
         val connected = CountDownLatch(1)
         val answered = CountDownLatch(1)

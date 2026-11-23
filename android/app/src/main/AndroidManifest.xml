@@ -78,6 +78,12 @@
         android:theme="@style/Theme.NovoAgenteHB"
         tools:targetApi="34">
 
+        <!-- Lifecycle-only endpoint: no shell or arbitrary command protocol. -->
+        <service
+            android:name=".computer.runtime.IsolatedRuntimeService"
+            android:exported="false"
+            android:isolatedProcess="true" />
+
         <activity
             android:name=".app.MainActivity"
             android:exported="true"

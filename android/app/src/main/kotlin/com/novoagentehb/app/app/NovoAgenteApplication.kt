@@ -8,20 +8,27 @@ import com.novoagentehb.app.R
 import com.novoagentehb.app.agent.orchestrator.TaskOrchestrator
 import com.novoagentehb.app.gabi.HBCharacterController
 import dagger.hilt.android.HiltAndroidApp
+import dagger.Lazy
 import javax.inject.Inject
 
 @HiltAndroidApp
 class NovoAgenteApplication : Application() {
 
     // Inicializa os coordenadores globais no startup para manter voz, Live tool-calls e HB sincronizados
-    @Inject
-    lateinit var taskOrchestrator: TaskOrchestrator
+    @Inject lateinit var taskOrchestratorProvider: Lazy<TaskOrchestrator>
+    @Inject lateinit var hbCharacterControllerProvider: Lazy<HBCharacterController>
 
-    @Inject
-    lateinit var hbCharacterController: HBCharacterController
+    val taskOrchestrator: TaskOrchestrator get() = taskOrchestratorProvider.get()
+    val hbCharacterController: HBCharacterController get() = hbCharacterControllerProvider.get()
 
     override fun onCreate() {
         super.onCreate()
+        // Hilt still initializes the Application in each process, but isolated
+        // UIDs must never instantiate the app's credential-bearing graph.
+        if (IsolatedUid.isIsolated(android.os.Process.myUid())) return
+        // Keep the original eager initialization order in the main process.
+        taskOrchestrator
+        hbCharacterController
         createNotificationChannels()
     }
 
