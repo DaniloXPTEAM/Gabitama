@@ -213,3 +213,9 @@ Limites explícitos: a corrida entre validação e abertura fica mitigada pela v
 provisionado, nenhuma execução foi habilitada, ARM64 não foi testado e o broker não está ligado a
 nenhuma tela ou serviço de produção. Isto não comprova isolamento completo nem segurança contra
 processos concorrentes com o mesmo UID.
+
+Resultado real deste incremento (branch `arena/1dba9faf-gabitama`):
+- [45270713716](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45270713716) sobre `20b7c47`: fixture isolado SUCCESS nas APIs 26, 29 e 34 (`OK (2 tests)`).
+- [45270770365](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45270770365) sobre `c38f7a5`: JVM (incluindo `RootfsGrantPolicyTest`), build de APKs e testes compartilhados SUCCESS nas APIs 26, 29 e 34.
+Estes resultados validam a concessão mediada de um arquivo regular. Não validam ARM64, Alpine, PRoot,
+provisionamento do rootfs, concorrência entre processos, morte do serviço nem cancelamento do broker.
