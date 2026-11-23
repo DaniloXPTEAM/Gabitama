@@ -33,6 +33,7 @@ class OriginalShellRuntimeAndroidTest {
             NativeOffloadResult(0, "OFFLOAD_FIXTURE_OK\n")
         }
         NativeOffloadServer.register("fixture-failure") { NativeOffloadResult(7, "OFFLOAD_ERROR_FIXTURE\n") }
+        NativeOffloadServer.register("fixture-large") { NativeOffloadResult(0, "x".repeat(1_048_577)) }
         coroutineScope {
             List(4) { async(Dispatchers.IO) { PRootKernel.boot(context) } }.awaitAll()
         }
@@ -129,6 +130,9 @@ class OriginalShellRuntimeAndroidTest {
             val offloadFailure = shell.executeCommand("fixture-failure", 30000)
             assertEquals("offload handler status: ${offloadFailure.first}", 7, offloadFailure.second)
             assertTrue(offloadFailure.first.contains("OFFLOAD_ERROR_FIXTURE"))
+            val oversizedReply = shell.executeCommand("fixture-large", 30000)
+            assertEquals("oversized handler result: ${oversizedReply.first}", 2, oversizedReply.second)
+            assertTrue(oversizedReply.first.contains("output exceeds reply limit"))
             val registers = shell.executeCommand("/tmp/fork_regs", 30000)
             assertEquals("fork register check: ${registers.first}", 0, registers.second)
             val failure = shell.executeCommand("false", 30000)

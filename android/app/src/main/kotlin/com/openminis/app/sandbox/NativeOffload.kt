@@ -308,7 +308,7 @@ object NativeOffloadServer {
         val guestSession = env["MINIS_CHAT_SESSION_ID"]?.takeIf { it.isNotEmpty() }
         val decision = ai.tama.sandbox.OffloadPeerPolicy.resolve(nmParallel, peer, guestSession, name, argv)
         val sessionId = decision.sessionId
-        val result = if (!decision.allowed) {
+        val handlerResult = if (!decision.allowed) {
             NativeOffloadResult(exitCode = 2, output = decision.refusal ?: "native_offload: request refused\n")
         } else if (!ai.tama.net.NativeOffloadSession.valid(nmParallel, sessionId)) {
             NativeOffloadResult(exitCode = 2, output = "native_offload: invalid chat session\n")
@@ -333,6 +333,9 @@ object NativeOffloadServer {
                 NativeOffloadResult(exitCode = 1, output = ai.tama.net.NativeOffloadPrivacy.failureOutput(nmParallel, e.message))
             }
         }
+        // A handler can already have allocated its output; this caps what the
+        // server persists and returns, not all memory used inside the handler.
+        val result = OffloadOutputPolicy.bound(handlerResult)
         val elapsedMs = (System.nanoTime() - t0) / 1_000_000
 
         val tmpDir = rootfsTmpDir ?: throw IllegalStateException("server not started")
