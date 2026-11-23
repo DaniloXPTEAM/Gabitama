@@ -44,6 +44,8 @@ jobs:
           cp scripts/android/shell-fixture/OriginalShellRuntimeAndroidTest.kt android/app/src/androidTest/java/com/novoagentehb/app/
           # Test-only ABI adaptation. Production remains arm64, and no generated binaries are committed.
           sed -i 's/private const val ARCH = "aarch64"/private const val ARCH = "x86_64"/' android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
+          # Disposable, fixed commands only: expose proot stderr for this fixture diagnosis.
+          sed -i 's/if (!nmParallel) Log.d("PRootStderr", line)/Log.d("PRootStderr", line)/' android/app/src/main/kotlin/com/openminis/app/sandbox/PersistentShell.kt
           sed -i 's/<application$/<application android:extractNativeLibs="true"/' android/app/src/main/AndroidManifest.xml
       - name: Construir APKs descartáveis para o teste fixo
         working-directory: android
