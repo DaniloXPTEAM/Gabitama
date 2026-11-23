@@ -47,6 +47,8 @@ class AppPreferences @Inject constructor(
 ) {
     private val ds = context.appDataStore
 
+    val geminiImageModel: Flow<String> = ds.data.map { it[KEY_GEMINI_IMAGE_MODEL] ?: "" }
+    suspend fun setGeminiImageModel(model: String) = ds.edit { it[KEY_GEMINI_IMAGE_MODEL] = model }
     val customProvidersJson: Flow<String> = ds.data.map { it[KEY_CUSTOM_PROVIDERS] ?: "[]" }
     val activeCustomProviderId: Flow<String> = ds.data.map { it[KEY_ACTIVE_CUSTOM_PROVIDER] ?: "" }
     suspend fun saveCustomProvidersJson(json: String) = ds.edit { it[KEY_CUSTOM_PROVIDERS] = json }
@@ -136,6 +138,7 @@ class AppPreferences @Inject constructor(
         private fun providerModelKey(provider: ProviderId, role: String) =
             stringPreferencesKey("provider_model_${provider.id}_$role")
 
+        private val KEY_GEMINI_IMAGE_MODEL = stringPreferencesKey("gemini_image_model_v1")
         private val KEY_CUSTOM_PROVIDERS = stringPreferencesKey("custom_providers_v1")
         private val KEY_ACTIVE_CUSTOM_PROVIDER = stringPreferencesKey("active_custom_provider_v1")
         private val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")

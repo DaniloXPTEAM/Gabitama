@@ -432,7 +432,7 @@ class TaskOrchestrator @Inject constructor(
                 }
 
                 val receipt = executeCapabilityWithPolicies(
-                    request = ToolExecutionRequest(
+                    rawRequest = ToolExecutionRequest(
                         taskId = pending.taskId,
                         idempotencyKey = pending.idempotencyKey,
                         capabilityName = pending.capabilityName,
@@ -517,6 +517,17 @@ class TaskOrchestrator @Inject constructor(
             publishTurnState { it.copy(status = TaskStatus.IDLE, activeTaskDescription = "") }
             hbController.notifyTaskOutcome(true, false, taskId, "Diagnóstico gerado")
             onAssistantReply?.invoke("Relatório de diagnóstico local gerado na tela.")
+            return
+        }
+
+        val imagePrompt = com.novoagentehb.app.agent.media.ImageRequestIntent.parse(text)
+        if (imagePrompt != null) {
+            val receipt = executeCapabilityWithPolicies(ToolExecutionRequest(taskId, "$taskId:generate_image", "generate_image", mapOf("prompt" to imagePrompt), goalId))
+            if (receipt.status != TaskStatus.AWAITING_CONFIRMATION) {
+                saveAssistantMessage(receipt.summary, taskId)
+                publishTurnState { it.copy(status = TaskStatus.IDLE, activeTaskDescription = "", lastReceipt = receipt) }
+                onAssistantReply?.invoke(receipt.summary)
+            }
             return
         }
 
@@ -621,10 +632,21 @@ class TaskOrchestrator @Inject constructor(
     }
 
     suspend fun executeCapabilityWithPolicies(
-        request: ToolExecutionRequest,
+        rawRequest: ToolExecutionRequest,
         providerUsed: String? = null,
         liveCallId: String? = null
     ): ExecutionReceipt {
+        val configuredImageModel = if (rawRequest.capabilityName == "generate_image") prefs.geminiImageModel.first() else ""
+        if (rawRequest.capabilityName == "generate_image" && (configuredImageModel.isBlank() ||
+                (rawRequest.userConfirmed && rawRequest.args["model"] != configuredImageModel))) {
+            val receipt = ExecutionReceipt(rawRequest.taskId, rawRequest.idempotencyKey, rawRequest.capabilityName,
+                RiskLevel.PAID_API_CALL, TaskStatus.FAILED,
+                "Rota de imagem não configurada ou alterada. Configure ou reautorize o modelo em Ajustes; nenhuma imagem foi solicitada.",
+                false, errorCode = "IMAGE_ROUTE_UNAVAILABLE")
+            persistReceipt(receipt, rawRequest.goalId)
+            return receipt
+        }
+        val request = if (rawRequest.capabilityName == "generate_image") rawRequest.copy(args = rawRequest.args + ("model" to configuredImageModel)) else rawRequest
         val descriptor = registry.find(request.capabilityName)
             ?: return ExecutionReceipt(
                 taskId = request.taskId,

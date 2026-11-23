@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.novoagentehb.app.data.providers.CustomProvider
@@ -24,6 +25,8 @@ fun ProviderManagerDialog(viewModel: SettingsViewModel, onClose: () -> Unit) {
     val activeId by viewModel.activeCustomId.collectAsState()
     val notice by viewModel.customNotice.collectAsState()
     val models by viewModel.customModels.collectAsState()
+    val imageModel by viewModel.geminiImageModel.collectAsState()
+    var imageInput by remember(imageModel) { mutableStateOf(imageModel) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<String?>(null) }
@@ -62,9 +65,13 @@ fun ProviderManagerDialog(viewModel: SettingsViewModel, onClose: () -> Unit) {
         }
     }
     AlertDialog(onDismissRequest = onClose, title = { Text("Gerenciar provedores") }, text = {
-        Column(Modifier.fillMaxWidth().heightIn(max = 600.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 600.dp).testTag("provider_manager_scroll").verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Provedores personalizados: API OpenAI compatível (chat e /models). Listagem não comprova preço, visão, ferramentas ou disponibilidade.", style = MaterialTheme.typography.bodySmall)
             notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Text("Imagens Gemini · rota por texto", style = MaterialTheme.typography.titleSmall)
+            Text("Configure uma vez um modelo Gemini que sua conta suporta para imagens; nenhuma compatibilidade ou preço é presumido. Cada geração exige confirmação. Edição com referência ainda não está disponível.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(imageInput, { imageInput = it }, label = { Text("Modelo Gemini de imagem (vazio desativa)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedButton(onClick = { viewModel.saveGeminiImageModel(imageInput) }) { Text("Salvar rota de imagem") }
             providers.forEach { p ->
                 HorizontalDivider()
                 Text("${p.name}${if (p.id == activeId) " · ATIVO" else ""}\n${p.baseUrl}\nChat: ${p.chatModel}", style = MaterialTheme.typography.bodySmall)

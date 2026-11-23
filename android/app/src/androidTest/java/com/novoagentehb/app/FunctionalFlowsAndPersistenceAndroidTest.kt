@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.novoagentehb.app.app.MainActivity
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -56,6 +57,27 @@ class FunctionalFlowsAndPersistenceAndroidTest {
 
         compose.onNode(hasContentDescription("Limpar conversa") and hasClickAction()).performClick()
         AndroidTestHarness.waitUntilText(compose, "Pronta para conversar")
+    }
+
+    @Test
+    fun chatRecognizesImageRequestAndRequiresConsent(): Unit {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = com.novoagentehb.app.data.prefs.AppPreferences(context)
+        val oldModel = kotlinx.coroutines.runBlocking { prefs.geminiImageModel.first() }
+        try {
+            kotlinx.coroutines.runBlocking { prefs.setGeminiImageModel("test-image-model") }
+            AndroidTestHarness.ensureOnHomeScreen(compose)
+            AndroidTestHarness.clickBottomTab(compose, "Gabi")
+            AndroidTestHarness.waitUntilText(compose, "Chat com a Gabi")
+            compose.onNode(hasSetTextAction()).performClick()
+            compose.onNode(hasSetTextAction()).performTextInput("Gabi, crie uma imagem de uma maçã.")
+            AndroidTestHarness.dismissImeIfVisible(compose)
+            compose.onNode(hasContentDescription("Enviar") and hasClickAction()).performClick()
+            AndroidTestHarness.waitUntilText(compose, "Enviar ao Gemini para gerar uma imagem?", substring = true)
+            compose.onNode(hasText("test-image-model", substring = true)).assertIsDisplayed()
+            compose.onNode(hasText("Cancelar") and hasClickAction()).performClick()
+            AndroidTestHarness.waitUntilText(compose, "Tudo bem, cancelei a ação generate_image.")
+        } finally { kotlinx.coroutines.runBlocking { prefs.setGeminiImageModel(oldModel) } }
     }
 
     @Test
@@ -271,7 +293,7 @@ class FunctionalFlowsAndPersistenceAndroidTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Adicionar, importar e gerenciar"))
         compose.onNode(hasText("Adicionar, importar e gerenciar")).performClick()
         AndroidTestHarness.waitUntilText(compose, "Gerenciar provedores")
-        compose.onNode(hasText("Importar JSON de arquivo")).assertIsDisplayed()
+        compose.onNode(hasText("Importar JSON de arquivo")).performScrollTo().assertIsDisplayed()
         compose.onNode(hasText("Fechar") and hasClickAction()).performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Groq"))
         compose.onNode(hasText("Groq")).performClick()

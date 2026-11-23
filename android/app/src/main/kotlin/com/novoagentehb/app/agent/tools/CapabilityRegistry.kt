@@ -292,11 +292,10 @@ class CapabilityRegistry @Inject constructor() {
         ),
         ToolDescriptor(
             name = "generate_image",
-            description = "Gera uma imagem por texto usando Gemini, com modelo informado explicitamente e confirmação de custo. Não suporta referência nem edição nesta versão.",
+            description = "Gera uma imagem por texto com a rota Gemini de imagem configurada pela pessoa, após confirmação de custo. Não suporta referência nem edição.",
             riskLevel = RiskLevel.PAID_API_CALL,
             params = listOf(
-                ToolParamSpec("prompt", "Descrição da imagem", required = true),
-                ToolParamSpec("model", "Identificador de modelo Gemini com geração de imagem escolhido pela pessoa", required = true)
+                ToolParamSpec("prompt", "Descrição da imagem", required = true)
             ),
             runtimeTier = RuntimeSupportTier.HTTP_BYOK_OR_PUBLIC,
             expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,

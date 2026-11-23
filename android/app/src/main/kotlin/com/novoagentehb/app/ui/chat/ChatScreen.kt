@@ -295,6 +295,7 @@ fun ChatScreen(
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = GabiTokens.TextPrimary
                                         )
+                                        if (!isUser) WorkspaceImagePreview(msg.content)
                                         if (!isUser && !msg.providerUsed.isNullOrBlank()) {
                                             Spacer(Modifier.height(4.dp))
                                             Text(

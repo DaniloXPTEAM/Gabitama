@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -457,6 +458,7 @@ fun ConfirmActionBar(
     ) {
         Text(
             text = prompt,
+            modifier = Modifier.heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
             color = GabiTokens.TextPrimary,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium

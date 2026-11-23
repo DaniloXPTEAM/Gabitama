@@ -38,6 +38,18 @@ class SettingsViewModel @Inject constructor(
     private val providerNetwork: ProviderNetwork
 ) : ViewModel() {
 
+    val geminiImageModel = prefs.geminiImageModel.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    fun saveGeminiImageModel(value: String) {
+        val model = value.trim()
+        if (model.isNotEmpty() && !Regex("[A-Za-z0-9._-]{1,100}").matches(model)) {
+            _customNotice.value = "Identificador de imagem Gemini inválido."
+            return
+        }
+        viewModelScope.launch {
+            prefs.setGeminiImageModel(model)
+            _customNotice.value = if (model.isEmpty()) "Rota de imagem Gemini desativada." else "Rota Gemini salva; confirme compatibilidade e custo. Cada imagem exige autorização."
+        }
+    }
     val customProviderList = customProviders.providers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val activeCustomId = customProviders.activeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     private val _customModels = MutableStateFlow<List<String>>(emptyList())
