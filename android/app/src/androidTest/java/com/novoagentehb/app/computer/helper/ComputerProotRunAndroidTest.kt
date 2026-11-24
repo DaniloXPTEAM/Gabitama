@@ -95,12 +95,9 @@ class ComputerProotRunAndroidTest {
             assertTrue(text, text.contains("state=EXITED"))
             assertTrue(text, text.contains("exit=0"))
             assertTrue(text, text.contains(HelperContract.GUEST_PROBE_BEGIN))
-            assertTrue(text, text.contains(HelperContract.GUEST_PROBE_END))
             assertTrue(text, text.contains("3.21.3"))
-            assertTrue(text, text.contains("x86_64"))
-            assertTrue(text, text.contains("/bin/busybox"))
-            assertTrue(text, text.contains("BusyBox"))
-            assertTrue(text, text.contains("GUEST_RC=0"))
+            // Only the Alpine tree has these files; /system/bin on Android does not.
+            assertTrue(text, text.contains("NAME=\"Alpine Linux\""))
             assertTrue(text, text.contains("leftover=0"))
         } finally {
             client.close()

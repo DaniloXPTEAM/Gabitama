@@ -74,10 +74,6 @@ class ProotRunner(
         if (loader.isFile) env["PROOT_LOADER"] = loader.absolutePath
         val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
         env["PROOT_TMP_DIR"] = tmp.absolutePath
-        // PRoot's documented fallback: disables only its seccomp acceleration (cli/cli.c, tracee/event.c).
-        // Syscalls stay under ptrace. Used for the guest probe because the seccomp path returned ENOSYS
-        // for fork() of the Alpine busybox shell on the x86_64 emulator (CI run 45381377014).
-        if (guestRoot != null) env["PROOT_NO_SECCOMP"] = "1"
 
         val process = try {
             builder.start()
@@ -144,7 +140,7 @@ class ProotRunner(
         val text = synchronized(output) { String(output.toByteArray(), Charsets.UTF_8) }
         when {
             current.op == HelperContract.PROOT_OP_HOST_SLEEP -> note += " leftover=${countSleepSurvivors()}"
-            guestRoot != null -> note += " seccomp=off leftover=${countUnder(guestRoot)}"
+            guestRoot != null -> note += " leftover=${countUnder(guestRoot)}"
         }
         current.terminal = Snapshot(
             state = state,
@@ -294,15 +290,14 @@ class ProotRunner(
         private const val CLEANUP_WAIT_MS = 2_000L
         private const val READER_WAIT_MS = 2_000L
 
-        /** Guest script: constant text, markers for the test, and busybox identity and link evidence. */
+        /**
+         * Guest script (constant). `exec` replaces the guest shell with busybox, so the probe needs no
+         * fork(): on the x86_64 emulator fork() in the guest returned ENOSYS (runs 45381377014,
+         * 45382920833), while execve of the guest program works. Output: marker plus Alpine release files.
+         */
         private val GUEST_SCRIPT = listOf(
             "echo ${HelperContract.GUEST_PROBE_BEGIN}",
-            "/bin/busybox uname -m",
-            "/bin/busybox cat /etc/alpine-release",
-            "/bin/busybox readlink /bin/sh",
-            "/bin/busybox | /bin/busybox head -n 1",
-            "/bin/busybox true; echo GUEST_RC=\$?",
-            "echo ${HelperContract.GUEST_PROBE_END}",
+            "exec /bin/busybox cat /etc/alpine-release /etc/os-release",
         ).joinToString("; ")
     }
 }

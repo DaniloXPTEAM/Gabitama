@@ -46,7 +46,6 @@ object HelperContract {
     const val ROOTFS_X86_DIR = "alpine-rootfs-x86_64-test"
     /** Marker strings written by the fixed guest probe; the test asserts them. */
     const val GUEST_PROBE_BEGIN = "GABITAMA_GUEST_BEGIN"
-    const val GUEST_PROBE_END = "GABITAMA_GUEST_END"
 
     // Fixed Alpine rootfs provisioning (experimental, debug/test builds only). No arguments accepted.
     const val ALPINE_VERSION = "3.21.3"
