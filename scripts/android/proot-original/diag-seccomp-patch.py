@@ -26,11 +26,22 @@ def patch(rel, pairs):
     path.write_text(text, encoding='utf-8')
 
 
+def status_probe(label):
+    return ('\tif (getenv("PROOT_DIAG_BPF") != NULL) {\n'
+            '\t\tFILE *gabitama_status = fopen("/proc/self/status", "r");\n'
+            '\t\tchar gabitama_line[256];\n'
+            '\t\twhile (gabitama_status != NULL && fgets(gabitama_line, sizeof(gabitama_line), gabitama_status) != NULL)\n'
+            '\t\t\tif (strncmp(gabitama_line, "Seccomp", 7) == 0)\n'
+            '\t\t\t\tfprintf(stderr, "GABITAMA_SECCOMP_STATUS ' + label + ' %s", gabitama_line);\n'
+            '\t\tif (gabitama_status != NULL)\n'
+            '\t\t\tfclose(gabitama_status);\n'
+            '\t}\n')
+
+
 patch('syscall/seccomp.c', [
     ('#include <assert.h>        /* assert(3), */\n',
      '#include <assert.h>        /* assert(3), */\n#include <stdio.h>         /* fprintf(3) (diagnostic only) */\n'
-     '#include <stdlib.h>        /* getenv(3) (diagnostic only) */\n'
-     ),
+     '#include <stdlib.h>        /* getenv(3) (diagnostic only) */\n'),
     ('\tstatus = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program);\n',
      '\tif (getenv("PROOT_DIAG_BPF") != NULL) {\n'
      '\t\tfor (size_t di = 0; di < program.len; di++)\n'
@@ -38,16 +49,9 @@ patch('syscall/seccomp.c', [
      '\t\t\t\t(unsigned) program.filter[di].code, (unsigned) program.filter[di].jt,\n'
      '\t\t\t\t(unsigned) program.filter[di].jf, (unsigned) program.filter[di].k);\n'
      '\t}\n'
+     + status_probe('before') +
      '\tstatus = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program);\n'
-     '\tif (getenv("PROOT_DIAG_BPF") != NULL) {\n'
-     '\t\tFILE *gabitama_status = fopen("/proc/self/status", "r");\n'
-     '\t\tchar gabitama_line[256];\n'
-     '\t\twhile (gabitama_status != NULL && fgets(gabitama_line, sizeof(gabitama_line), gabitama_status) != NULL)\n'
-     '\t\t\tif (strncmp(gabitama_line, "Seccomp", 7) == 0)\n'
-     '\t\t\t\tfprintf(stderr, "GABITAMA_SECCOMP_STATUS %s", gabitama_line);\n'
-     '\t\tif (gabitama_status != NULL)\n'
-     '\t\t\tfclose(gabitama_status);\n'
-     '\t}\n'),
+     + status_probe('after')),
 ])
 
 patch('tracee/event.c', [

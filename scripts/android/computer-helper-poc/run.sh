@@ -44,6 +44,16 @@ if [ -s "$TRACE" ]; then
   grep -E 'GABITAMA_BPF [0-9]+ code=0x(6|15) ' "$TRACE" | head -200 > /tmp/poc-artifacts/bpf-ret-jeq-lines.txt || true
   grep -E 'SIGSYS|seccomp|GABITAMA_FORK|ENOSYS|clone|vfork|fork' "$TRACE" | head -20 | cut -c1-240 > /tmp/poc-artifacts/fork-trace-summary.txt || true
   head -3 /tmp/poc-artifacts/fork-trace-summary.txt | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=fork trace::$l"; done
+# Android's own seccomp policy for app processes (system text file, not app data). Kept as an artefact and
+# summarised: it shows whether a filter outside PRoot already traps fork.
+adb shell 'ls /system/etc/seccomp_policy 2>/dev/null; echo ---' > /tmp/poc-artifacts/android-seccomp-policy-list.txt 2>/dev/null || true
+adb shell 'cat /system/etc/seccomp_policy/app_seccomp.policy 2>/dev/null' > /tmp/poc-artifacts/android-app-seccomp.policy.txt 2>/dev/null || true
+if [ -s /tmp/poc-artifacts/android-app-seccomp.policy.txt ]; then
+  grep -E '^(fork|vfork|clone|clone3|open|openat|stat|newfstatat|execve|wait4|prctl)[: ]' /tmp/poc-artifacts/android-app-seccomp.policy.txt | head -12 | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=android app seccomp::$l"; done
+  echo "::notice title=android app seccomp::lines=$(wc -l < /tmp/poc-artifacts/android-app-seccomp.policy.txt)"
+else
+  echo '::notice title=android app seccomp::policy file absent on this image'
+fi
   if [ "${PROOT_DIAG_BPF:-0}" = "1" ] && [ "${BPF_COUNT:-0}" -eq 0 ]; then
     echo '::error title=fork trace::BPF dump absent in a diagnostic build (PROOT_DIAG_BPF=1 not reached PRoot)'
     BPF_STATUS=1

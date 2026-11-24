@@ -15,7 +15,7 @@ from pathlib import Path
 ARCH_X86_64 = 0xC000003E
 LINE = re.compile(r'GABITAMA_BPF (\d+) code=0x([0-9a-f]+) jt=(\d+) jf=(\d+) k=0x([0-9a-f]+)')
 SIGSYS = re.compile(r'GABITAMA_SIGSYS code=(-?\d+) syscall=(-?\d+) arch=0x([0-9a-f]+)')
-SECCOMP_STATUS = re.compile(r'GABITAMA_SECCOMP_STATUS (Seccomp.*)')
+SECCOMP_STATUS = re.compile(r'GABITAMA_SECCOMP_STATUS (before|after) (Seccomp.*)')
 SYSCALLS = {0: 'read', 1: 'write', 2: 'open', 4: 'stat', 56: 'clone', 57: 'fork', 58: 'vfork',
             59: 'execve', 61: 'wait4', 157: 'prctl', 257: 'openat', 262: 'newfstatat', 435: 'clone3'}
 ACTIONS = {0x7FFF0000: 'ALLOW', 0x7FF00000: 'TRACE', 0x00030000: 'TRAP', 0x00050000: 'ERRNO',
@@ -132,10 +132,10 @@ def main():
         print('verdict: sigsys none in trace')
     statuses = []
     for m in SECCOMP_STATUS.finditer(text):
-        line = m.group(1).strip()
+        line = f'{m.group(1)} {m.group(2).strip()}'
         if line not in statuses:
             statuses.append(line)
-    for line in statuses[:6]:
+    for line in statuses[:8]:
         print(f'verdict: proc {line}')
     if not statuses:
         print('verdict: proc status lines absent (diagnostic copy older than the status probe)')
