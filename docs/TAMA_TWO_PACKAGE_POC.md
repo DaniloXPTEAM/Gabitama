@@ -90,3 +90,33 @@ Registro de falhas que levaram a correções (não ocultadas):
 - `45293751255`: API 34 exigia errno específico (corrigido em `e912d37`, com a propriedade "não legível").
 
 Build JVM e APKs do mesmo commit: ver run `45294872548` (`Build Android Debug APK`).
+
+## 7. Computador original (PRootKernel, PersistentShell, TerminalSession, ExecutionCoordinator, ShellExecutor, RootfsManager, PtyBridge)
+
+Estado: **presentes no repositório** em `android/app/src/main/kotlin/com/openminis/app/sandbox/`
+(cópia do Tama V2), **não integrados** ao auxiliar nem à UI. Nenhuma nova versão simplificada foi
+criada. A integração depende das etapas abaixo, nesta ordem:
+
+1. Provisionar a árvore Alpine **dentro do pacote auxiliar**. Hoje o `RootfsManager` original espera
+   `alpine-minirootfs.tar.gz` e `proot-aarch64` em `assets/`, e nenhum dos dois existe no repositório.
+   O `RootfsManager.extractTar` original já valida traversal e links (`TamaRootfsSafetyAndroidTest`) e
+   deve ser reutilizado no auxiliar, não reescrito.
+2. Trocar `filesDir` por `filesDir` do auxiliar em `RootfsManager` e `PRootKernel`. Hoje ambos
+   assumem o processo do app.
+3. Expor a execução pelo contrato do auxiliar com operação **fixa** (ex.: "rodar o bootstrap"),
+   nunca comando arbitrário. Antes, validar sem shell a extração e o `proot --version` no auxiliar.
+4. Manter `PersistentShell` e `TerminalSession` desabilitados até cumprir: isolamento de rede,
+   limites de CPU/memória/armazenamento de execução, cancelamento/morte verificados e teste ARM64.
+
+## 8. Licenciamento e proveniência (não há conformidade declarada)
+
+- `android/deps/proot/COPYING` (PRoot): GPL-2.0. Distribuir binário exige fornecer fonte
+  correspondente e os avisos.
+- `android/deps/talloc/COPYING.LESSER` (talloc): LGPL-3.0. Linkagem estática exige atender à LGPL.
+- Loaders Termux e `proot-aarch64`: **proveniência não comprovada no repositório**. Não copiar sem
+  origem verificada.
+- Alpine minirootfs: licença e checksums não verificados neste ambiente (CDN não permitido).
+- `THIRD_PARTY_NOTICES.md` afirma "nenhum componente GPL/LGPL". Essa afirmação está **desatualizada**
+  diante de `third_party/tama-runtime` e de `PtyBridge` do Tama V2 e precisa de revisão do proprietário
+  antes de qualquer distribuição.
+- Não há evidência de ARM64 real neste ciclo. A prova atual roda em emulador x86_64.
