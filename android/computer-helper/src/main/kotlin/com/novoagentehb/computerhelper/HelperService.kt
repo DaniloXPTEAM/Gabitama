@@ -72,8 +72,10 @@ class HelperService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        // Reject at bind time as well: unauthorized callers never receive a binder.
-        return if (authorizeCaller().code == HelperContract.CODE_OK) binder else null
+        // Inside onBind, Binder.getCallingUid() is the system server, not the client, so the caller
+        // cannot be authorized here. Bind is gated by the service's android:permission (enforced by the
+        // system), and every transaction below re-checks the real calling UID before doing anything.
+        return binder
     }
 
     private fun authorizeCaller(): HelperPolicy.Decision {
