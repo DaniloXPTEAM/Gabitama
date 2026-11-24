@@ -188,8 +188,8 @@ class GeminiLiveLifecycleAndroidTest {
         assertTrue(awaitState(LiveSessionState.BLOCKED))
         assertNotNull(coordinator.status.value.liveConnectionError)
         waitMs(500)
-        assertEquals(0, server.requestCount)
-        assertEquals(0, connections.get())
+        // connections counts enqueued responses (set above), so the socket check is the server-side request count.
+        assertEquals("no WebSocket upgrade reached the server", 0, server.requestCount)
     }
 
     @Ignore("diagnóstico: isolar missingKey antes de reativar")

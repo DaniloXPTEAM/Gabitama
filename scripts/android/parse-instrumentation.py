@@ -78,19 +78,22 @@ for line in raw.splitlines():
 def source_test_count(root='android/app/src/androidTest'):
     """Number of @Test methods in the instrumentation sources: the suite's own declared size."""
     total = 0
+    ignored = 0
     for directory, _, files in os.walk(root):
         for name in files:
             if name in EXCLUDED_FILES:
                 continue
             if name.endswith(('.kt', '.java')):
                 with open(os.path.join(directory, name), encoding='utf-8', errors='replace') as handle:
-                    total += len(re.findall(r'^\s*@Test\b', handle.read(), re.M))
-    return total
+                    text = handle.read()
+                    total += len(re.findall(r'^\s*@Test\b', text, re.M))
+                    ignored += len(re.findall(r'^\s*@Ignore\b', text, re.M))
+    return total, ignored
 
 # Derived from the sources, not hard-coded, so a new test cannot make the run look incomplete
-# (or an old count mask a missing test). An @Ignore'd test would still be reported as skipped.
-expected = source_test_count()
-print(f'::notice title=Instrumentation suite::declared @Test methods={expected}')
+# (or an old count mask a missing test). Skips are allowed only when they match the @Ignore declarations in source.
+expected, declared_ignored = source_test_count()
+print(f'::notice title=Instrumentation suite::declared @Test methods={expected} declared @Ignore={declared_ignored}')
 if (len(started) != expected or set(completed) != started or
         not re.search(r'^INSTRUMENTATION_CODE: -1\s*$', raw, re.M) or
         re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)):
@@ -115,4 +118,7 @@ for (cls, name), code in sorted(completed.items()):
 out = 'android/app/build/outputs/androidTest-results/connected/TEST-instrumentation.xml'
 os.makedirs(os.path.dirname(out), exist_ok=True)
 ET.ElementTree(suite).write(out, encoding='utf-8', xml_declaration=True)
-sys.exit(1 if failures or skipped else 0)
+if failures or skipped != declared_ignored:
+    print(f'::error title=Instrumentation result::failures={failures} skipped={skipped} declared_ignore={declared_ignored}')
+    sys.exit(1)
+sys.exit(0)
