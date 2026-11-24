@@ -24,7 +24,9 @@ object HelperContract {
 
     // Fixed Alpine rootfs provisioning (experimental, debug/test builds only). No arguments accepted.
     const val ALPINE_VERSION = "3.21.3"
-    const val ALPINE_ASSET = "alpine-minirootfs-3.21.3-aarch64.tar.gz"
+    // Asset name without a compressed-file extension: the Android build stored "*.tar.gz" as "*.tar".
+    // The bytes are still the official .tar.gz, and ALPINE_SHA256 is checked over those exact bytes.
+    const val ALPINE_ASSET = "alpine-minirootfs-aarch64.bin"
     const val ALPINE_SHA256 = "ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea"
     const val ROOTFS_DIR = "alpine-rootfs"
     const val ROOTFS_MAX_ENTRIES = 20_000
