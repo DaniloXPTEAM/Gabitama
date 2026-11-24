@@ -1,3 +1,9 @@
+// PENDENTE — NÃO COMPILADO, NÃO É EVIDÊNCIA.
+// Motivo: nas runs 45479711232 e 45481765040 (commits d5689de e eeb73e1), as APIs 26/29/34 abortaram o
+// processo de instrumentação após 11 testes; nenhum XML foi gerado e os outros 27 testes não rodaram.
+// Causa não identificada: os logs do job são inacessíveis pelo sandbox (blob bloqueado).
+// Para reativar: mover de volta para android/app/src/androidtest/java/com/novoagentehb/app/ e diagnosticar
+// o crash (logcat -b crash) em ambiente com acesso aos logs.
 package com.novoagentehb.app
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
