@@ -67,6 +67,9 @@ class RootfsProvisioner(
     /** Private rootfs directory of this variant (guest root for PRoot). */
     fun rootDir(): File = root
 
+    /** ELF arch the variant is verified against (e.g. "x86_64"). */
+    fun arch(): String = variant.arch
+
     /** True only when the on-disk tree verifies against the marker and pinned digest. */
     fun isInstalled(): Boolean = validInstall() != null
 

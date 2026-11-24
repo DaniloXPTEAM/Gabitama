@@ -258,16 +258,16 @@ class PersistentShell(
         processBuilder.redirectErrorStream(!debugOffload)
 
         val env = processBuilder.environment()
-        env["PROOT_TMP_DIR"] = PRootKernel.getProotTmpDir(context).absolutePath
-        if (PRootKernel.nativeLibDir.isNotEmpty()) {
-            env["LD_LIBRARY_PATH"] = PRootKernel.nativeLibDir
-        }
-        if (PRootKernel.prootLoaderPath.isNotEmpty()) {
-            env["PROOT_LOADER"] = PRootKernel.prootLoaderPath
-        }
-        if (PRootKernel.prootLoader32Path.isNotEmpty()) {
-            env["PROOT_LOADER_32"] = PRootKernel.prootLoader32Path
-        }
+        // Shared PRoot block (PATH is not set on this path)
+        env.putAll(
+            PRootEnvironment.processEnv(
+                path = null,
+                tmpDir = PRootKernel.getProotTmpDir(context).absolutePath,
+                nativeLibDir = PRootKernel.nativeLibDir,
+                loader = PRootKernel.prootLoaderPath,
+                loader32 = PRootKernel.prootLoader32Path,
+            ),
+        )
         env["TERM"] = "dumb"
         env["PS1"] = ""  // Suppress prompt to avoid polluting output
         // Timezone: customEnvironment["TZ"] is seeded at PRootKernel.boot(),

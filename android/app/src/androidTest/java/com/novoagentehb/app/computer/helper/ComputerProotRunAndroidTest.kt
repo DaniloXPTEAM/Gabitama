@@ -103,6 +103,11 @@ class ComputerProotRunAndroidTest {
             assertTrue(text, text.contains("GABITAMA_ENV_LD="))
             assertTrue(text, Regex("GABITAMA_ENV_LD=\\S*computerhelper").containsMatchIn(text))
             assertTrue(text, text.contains("leftover=0"))
+            // Components that took part in building this command, reported by the helper's contract:
+            // the spec (PRootRuntimeSpec), argv from ProotCommandLine, env from PRootEnvironment,
+            // and a rootfs state that comes from RootfsProvisioner (INSTALLED, arch x86_64, fixed execution).
+            assertTrue(text, text.contains("components=PRootRuntimeSpec>ProotCommandLine>PRootEnvironment"))
+            assertTrue(text, text.contains("rootfs=INSTALLED arch=x86_64 execution=FIXED_OPERATIONS_ONLY"))
         } finally {
             client.close()
         }

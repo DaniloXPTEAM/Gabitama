@@ -157,6 +157,12 @@
       "declared_license": "Apache-2.0 (declared direct coordinate)"
     },
     {
+      "alias": "okhttp-mockwebserver",
+      "coordinate": "com.squareup.okhttp3:mockwebserver",
+      "version": "4.12.0",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
       "alias": "room-runtime",
       "coordinate": "androidx.room:room-runtime",
       "version": "2.6.1",
@@ -226,6 +232,12 @@
       "alias": "androidx-documentfile",
       "coordinate": "androidx.documentfile:documentfile",
       "version": "1.0.1",
+      "declared_license": "Apache-2.0 (declared direct coordinate)"
+    },
+    {
+      "alias": "kotlinx-serialization-json",
+      "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      "version": "BOM-managed",
       "declared_license": "Apache-2.0 (declared direct coordinate)"
     }
   ]

@@ -108,18 +108,17 @@ object ShellExecutor {
         val processBuilder = ProcessBuilder(prootCommand)
         processBuilder.redirectErrorStream(true)
 
-        // Set required environment for PRoot
+        // Set required environment for PRoot (shared block; PATH is not set on this path)
         val env = processBuilder.environment()
-        env["PROOT_TMP_DIR"] = PRootKernel.getProotTmpDir(context).absolutePath
-        if (PRootKernel.nativeLibDir.isNotEmpty()) {
-            env["LD_LIBRARY_PATH"] = PRootKernel.nativeLibDir
-        }
-        if (PRootKernel.prootLoaderPath.isNotEmpty()) {
-            env["PROOT_LOADER"] = PRootKernel.prootLoaderPath
-        }
-        if (PRootKernel.prootLoader32Path.isNotEmpty()) {
-            env["PROOT_LOADER_32"] = PRootKernel.prootLoader32Path
-        }
+        env.putAll(
+            PRootEnvironment.processEnv(
+                path = null,
+                tmpDir = PRootKernel.getProotTmpDir(context).absolutePath,
+                nativeLibDir = PRootKernel.nativeLibDir,
+                loader = PRootKernel.prootLoaderPath,
+                loader32 = PRootKernel.prootLoader32Path,
+            ),
+        )
 
         // Apply custom environment from PRootKernel
         for ((key, value) in PRootKernel.customEnvironment) {

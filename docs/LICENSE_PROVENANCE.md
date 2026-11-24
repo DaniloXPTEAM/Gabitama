@@ -11,8 +11,8 @@ Escopo: `novo-agente-hb/` (`com.novoagentehb.app`, identificador interno provis�
 
 | Tema | Estado atual (verificado nesta data) | Evidência |
 | --- | --- | --- |
-| Referências a nanoMuse no código | **Presentes.** 34 arquivos com "nanomuse" fora de `.git`. Textos visíveis (`res/`, `AndroidManifest.xml`) não citam nanoMuse. | `grep -ri nanomuse` (ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`) |
-| Namespace `io.github.nanomuse` | Três classes: `hub/HubClient.kt` (sem uso fora do pacote), `sandbox/FeedSandboxScope.kt` (usada pelo Feed da Gabi via `PRootKernel` e `ExecutionCoordinator`), `sandbox/OffloadSocketName.kt` (usada por `NativeOffload`). | imports e chamadas |
+| Referências a nanoMuse no código | **Presentes.** 33 arquivos com "nanomuse" fora de `.git` (24/11/2026; matriz em `docs/NANOMUSE_REFERENCE_MATRIX.md`). Textos visíveis (`res/`, `AndroidManifest.xml`) não citam nanoMuse. | `grep -ri nanomuse` (ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`) |
+| Namespace `io.github.nanomuse` | Duas classes em uso (24/11/2026; `hub/HubClient.kt` removido por não ter instanciação): `sandbox/FeedSandboxScope.kt` (usada pelo Feed da Gabi via `PRootKernel` e `ExecutionCoordinator`), `sandbox/OffloadSocketName.kt` (usada por `NativeOffload`). | imports e chamadas |
 | Código GPL | **Há código de origem nanoMuse/Tama V2 sob GPL.** O PTY (`PtyBridge.kt`, `pty_bridge.c`) está registrado em `LICENSE_PENDING_OWNER.txt` com GPL preservado. | `LICENSE_PENDING_OWNER.txt`; `android/app/src/main/assets/licenses/tama-runtime/LICENSE-nanoMuse.txt` (texto integral da GPLv3) |
 | PRoot | GPL-2.0, vendorizado em `third_party/tama-runtime/android/deps/proot`. | `THIRD_PARTY_NOTICES.md` |
 | Conformidade comercial | **Não declarada.** Pendente do proprietário. | `LICENSE_PENDING_OWNER.txt` |

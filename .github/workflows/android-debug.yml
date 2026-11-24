@@ -79,6 +79,14 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: scripts/android/isolated-ime-tests.sh
+      - name: Guardar logs do teste IME (texto, artefato privado de CI, 7 dias)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ime-isolated-logs-${{ github.run_id }}
+          path: /tmp/*.log
+          if-no-files-found: ignore
+          retention-days: 7
   android-emulator:
     name: Android API ${{ matrix.api }} — binário compartilhado
     needs: [build-debug, ime-isolated]

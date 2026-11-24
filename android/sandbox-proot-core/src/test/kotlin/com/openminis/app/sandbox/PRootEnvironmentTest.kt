@@ -29,4 +29,10 @@ class PRootEnvironmentTest {
             env,
         )
     }
+
+    /** The three original paths (ShellExecutor, TerminalSession, PersistentShell) do not set PATH. */
+    @Test fun pathIsOmittedWhenCallerPassesNull() {
+        val env = PRootEnvironment.processEnv(path = null, tmpDir = "/t", nativeLibDir = "", loader = "", loader32 = "")
+        assertEquals(linkedMapOf("PROOT_TMP_DIR" to "/t"), env)
+    }
 }

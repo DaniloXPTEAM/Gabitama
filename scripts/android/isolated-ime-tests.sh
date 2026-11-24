@@ -19,7 +19,7 @@ cmp candidate/app-debug-androidTest.apk /tmp/com.novoagentehb.app.debug.test.apk
 failed=0
 for test in chatImeInputDiagnosticsPersistsAcrossRestartAndClears goalsRemindersMemoryAndLibraryPersistRealMutations; do
   adb shell am instrument -w -r -e class "com.novoagentehb.app.FunctionalFlowsAndPersistenceAndroidTest#$test" com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > "/tmp/$test.log" 2>&1 || failed=1
-  TEST_NAME="$test" python3 -c 'import os; name=os.environ["TEST_NAME"]; s=open("/tmp/"+name+".log").read(); ok="OK (1 test)" in s and "FAILURES!!!" not in s; print(("::notice" if ok else "::error")+" title=Isolated API 34::"+name+" "+("PASS" if ok else "FAIL")+" root_focus_exception="+str("RootViewWithoutFocusException" in s)); raise SystemExit(0 if ok else 1)' || failed=1
+  python3 scripts/android/ime-failure-classify.py "$test" "/tmp/$test.log" || failed=1
 done
 # Only the test harness' fixed boolean/insets log is exposed; no user text.
 adb logcat -d -s GabiTestEvidence:I '*:S' | grep -E 'ime_(before|after) visible=' | sed -E 's/.*(ime_(before|after) visible=(true|false|null) windowFocus=(true|false)).*/::notice title=IME state::\1/' || true

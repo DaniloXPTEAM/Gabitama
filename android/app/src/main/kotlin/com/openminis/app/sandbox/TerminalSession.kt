@@ -150,13 +150,16 @@ class TerminalSession(private val context: Context) {
 
                 // Environment in KEY=VALUE form
                 val envMap = LinkedHashMap<String, String>()
-                envMap["PROOT_TMP_DIR"] = PRootKernel.getProotTmpDir(context).absolutePath
-                if (PRootKernel.nativeLibDir.isNotEmpty())
-                    envMap["LD_LIBRARY_PATH"] = PRootKernel.nativeLibDir
-                if (PRootKernel.prootLoaderPath.isNotEmpty())
-                    envMap["PROOT_LOADER"] = PRootKernel.prootLoaderPath
-                if (PRootKernel.prootLoader32Path.isNotEmpty())
-                    envMap["PROOT_LOADER_32"] = PRootKernel.prootLoader32Path
+                // Shared PRoot block (PATH is not set on this path)
+                envMap.putAll(
+                    PRootEnvironment.processEnv(
+                        path = null,
+                        tmpDir = PRootKernel.getProotTmpDir(context).absolutePath,
+                        nativeLibDir = PRootKernel.nativeLibDir,
+                        loader = PRootKernel.prootLoaderPath,
+                        loader32 = PRootKernel.prootLoader32Path,
+                    ),
+                )
                 envMap["TERM"] = "xterm-256color"
                 envMap["LANG"] = "C.UTF-8"
                 envMap["LC_ALL"] = "C.UTF-8"

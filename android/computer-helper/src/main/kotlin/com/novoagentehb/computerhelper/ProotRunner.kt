@@ -5,8 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.system.Os
 import android.system.OsConstants
 import com.novoagentehb.computerhelper.contract.HelperContract
-import com.openminis.app.sandbox.PRootEnvironment
-import com.openminis.app.sandbox.ProotCommandLine
+import com.openminis.app.sandbox.PRootRuntimeSpec
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -51,6 +50,7 @@ class ProotRunner(
         @Volatile var process: Process? = null
         @Volatile var cancelRequested: Boolean = false
         @Volatile var terminal: Snapshot? = null
+        @Volatile var components: String = ""
     }
 
     private val lock = Any()
@@ -65,7 +65,9 @@ class ProotRunner(
         if (guestOp && !alpineX86.isInstalled()) {
             return Pair(HelperContract.CODE_NOT_INSTALLED, plain(State.FAILED, op, "rootfs-absent"))
         }
-        val argv = argvFor(op, binary.absolutePath, guestRoot)
+        // The shared contract is the only source of argv and environment for guest operations.
+        val spec = runtimeSpec(binary, guestRoot)
+        val argv = argvFor(op, binary.absolutePath, spec)
             ?: return Pair(HelperContract.CODE_BAD_REQUEST, plain(State.FAILED, op, "bad-op"))
         if (!binary.isFile || !binary.canExecute()) {
             return Pair(HelperContract.CODE_NOT_INSTALLED, plain(State.FAILED, op, "binary-missing"))
@@ -73,18 +75,7 @@ class ProotRunner(
         val builder = ProcessBuilder(argv).redirectErrorStream(true)
         val env = builder.environment()
         env.clear()
-        // Environment built by the shared PRootEnvironment (original Tama V2 variable block).
-        val nativeLibDir = context.applicationInfo.nativeLibraryDir
-        val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
-        env.putAll(
-            PRootEnvironment.processEnv(
-                path = if (guestRoot != null) GUEST_PATH else "/system/bin",
-                tmpDir = tmp.absolutePath,
-                nativeLibDir = nativeLibDir,
-                loader = File(nativeLibDir, LOADER).takeIf { it.isFile }?.absolutePath,
-                loader32 = null,
-            ),
-        )
+        env.putAll(spec.prootEnvironment(if (guestRoot != null) GUEST_PATH else "/system/bin"))
         val traceFile = File(context.cacheDir, TRACE_FILE)
         if (op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE) {
             // Diagnostic: verbose PRoot output goes to a private file, never into the reply.
@@ -101,6 +92,7 @@ class ProotRunner(
             return Pair(HelperContract.CODE_IO, plain(State.FAILED, op, "spawn-failed"))
         }
         val current = Run(op)
+        if (guestRoot != null) current.components = spec.components()
         current.process = process
         current.pid = pidOf(process)
         run = current
@@ -166,6 +158,7 @@ class ProotRunner(
             current.op == HelperContract.PROOT_OP_HOST_SLEEP -> note += " leftover=${countSleepSurvivors()}"
             guestRoot != null -> note += " leftover=${countUnder(guestRoot)}"
         }
+        if (current.components.isNotEmpty()) note += " ${current.components}"
         current.terminal = Snapshot(
             state = state,
             op = current.op,
@@ -188,33 +181,35 @@ class ProotRunner(
 
     private fun plain(state: State, op: Int, note: String) = Snapshot(state, op, -1, 0, note, "")
 
-    private fun argvFor(op: Int, binary: String, guestRoot: File?): List<String>? = when (op) {
+    /**
+     * Contract filled from the real state of this helper: the rootfs status comes from RootfsProvisioner,
+     * the paths from the app's native library directory and the helper's private cache. No Gabi path.
+     */
+    private fun runtimeSpec(binary: File, guestRoot: File?): PRootRuntimeSpec {
+        val nativeLibDir = context.applicationInfo.nativeLibraryDir
+        val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
+        val loader = File(nativeLibDir, LOADER)
+        return PRootRuntimeSpec(
+            rootfsDir = guestRoot?.canonicalPath,
+            rootfsInstalled = guestRoot != null && alpineX86.isInstalled(),
+            rootfsArch = alpineX86.arch(),
+            prootBinary = binary.absolutePath,
+            nativeLibDir = nativeLibDir,
+            loaderPath = if (loader.isFile) loader.absolutePath else "",
+            loader32Path = "",
+            tmpDir = tmp.absolutePath,
+            execution = PRootRuntimeSpec.Execution.FIXED_OPERATIONS_ONLY,
+        )
+    }
+
+    private fun argvFor(op: Int, binary: String, spec: PRootRuntimeSpec): List<String>? = when (op) {
         HelperContract.PROOT_OP_VERSION -> listOf(binary, "--version")
         // Fixed host-root sleep: used only to exercise timeout and cancellation of a live tracee.
         HelperContract.PROOT_OP_HOST_SLEEP -> listOf(binary, "--kill-on-exit", "-r", "/", SLEEP_BIN, "60")
-        // Fixed guest program inside the Alpine x86_64 test rootfs. Absolute paths only; no caller input.
-        // Built by the shared ProotCommandLine (original Tama V2 PRoot configuration): no second argv builder.
-        // Only the lifecycle flag --kill-on-exit is added here, because this runner owns the process.
-        HelperContract.PROOT_OP_ALPINE_X86_PROBE -> guestRoot?.let {
-            ProotCommandLine.build(
-                prootBinary = binary,
-                rootfsDir = it.canonicalPath,
-                bindMounts = emptyMap(),
-                offloadSpec = null,
-                shellCommand = GUEST_SCRIPT,
-                leadingOptions = listOf("--kill-on-exit"),
-            )
-        }
-        HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE -> guestRoot?.let {
-            ProotCommandLine.build(
-                prootBinary = binary,
-                rootfsDir = it.canonicalPath,
-                bindMounts = emptyMap(),
-                offloadSpec = null,
-                shellCommand = FORK_SCRIPT,
-                leadingOptions = listOf("--kill-on-exit"),
-            )
-        }
+        // Fixed guest programs inside the Alpine x86_64 test rootfs. Only the contract builds the command;
+        // --kill-on-exit is the lifecycle flag this runner owns.
+        HelperContract.PROOT_OP_ALPINE_X86_PROBE -> spec.commandFor(GUEST_SCRIPT, listOf("--kill-on-exit"))
+        HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE -> spec.commandFor(FORK_SCRIPT, listOf("--kill-on-exit"))
         else -> null
     }
 
