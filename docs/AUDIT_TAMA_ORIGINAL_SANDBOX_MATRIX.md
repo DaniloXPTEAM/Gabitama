@@ -19,7 +19,7 @@ import ou comentário). `Uso atual` = quem chama o componente no código fonte.
 | `ExecutionCoordinator.kt` (389 linhas) | Importa `io.github.nanomuse.sandbox.FeedSandboxScope` e `EnvVarRepository` (dados do app); 25 ocorrências de nanoMuse. | Nenhum chamador fora de `sandbox/` (não alcançado pela UI). | Não declarada por arquivo. | **Não integrar** agora. Coordenação de execução só depois de validação do shell. | `grep` de referências |
 | `ShellExecutor.kt` (217 linhas) | 5 ocorrências de nanoMuse; usa `SeccompFallbackPolicy` (desativado no app paralelo, conforme comentário). | `ExecutionCoordinator`, teste `SeccompFallbackPolicyTest`. | Não declarada por arquivo. | **Manter desabilitado** (execução arbitrária). | Comentário em `SeccompFallbackPolicy.kt` |
 | `PtyBridge.kt` (66 linhas) | Sem cabeçalho próprio. Registrado em `LICENSE_PENDING_OWNER.txt` como incorporação do PTY do Tama V2/nanoMuse, com `pty_bridge.c`. | `TerminalSession` e `TamaOriginalPtyAndroidTest`. | GPL declarado no aviso do próprio `LICENSE_PENDING_OWNER.txt`; **não relicenciar**. | **Manter** com avisos. Não tratar como MIT. Desabilitado até validação. | `LICENSE_PENDING_OWNER.txt`; `androidTest/.../TamaOriginalPtyAndroidTest.kt` |
-| `NativeOffload.kt` (395 linhas) | Importa `com.novoagentehb.app.BuildConfig` e `io.github.nanomuse.sandbox.OffloadSocketName`; 17 ocorrências de nanoMuse. | **Nenhuma referência fora do próprio arquivo.** Código morto no fluxo atual. | Não declarada por arquivo. | **Não integrar.** Candidato a limpeza futura, somente após prova de ausência de uso (não por namespace). | `grep` (0 referências externas) |
+| `NativeOffload.kt` (395 linhas) | Objeto `NativeOffloadServer`. Importa `BuildConfig` e `OffloadSocketName` (nanoMuse); 17 ocorrências de nanoMuse. | **Dependência ativa entre componentes originais.** `PRootKernel.boot` chama `NativeOffloadServer.start(rootfsDir)`; `PRootKernel` e `PersistentShell` leem `registeredHandlers`/`socketName` para montar `--native-offload`; `TerminalSession` faz o mesmo. Não é alcançado pela UI atual (nenhum uso fora de `sandbox/`). | Não declarada por arquivo. | **Integrar por etapas** (ver §4). Não apagar. Remoção só com prova de que nenhum caminho o alcança. | `grep` de `NativeOffloadServer` em `PRootKernel.kt`, `PersistentShell.kt`, `TerminalSession.kt` |
 
 ## 2. Componentes de apoio no mesmo pacote
 
@@ -30,13 +30,30 @@ import ou comentário). `Uso atual` = quem chama o componente no código fonte.
 | `TerminalSanitizer.kt` | `ExecutionCoordinator`, `ShellExecutor`, teste unitário. | — |
 | `OffloadDeadlineInputStream.kt`, `OffloadOutputPolicy.kt`, `OffloadReplyFiles.kt`, `OffloadRequestBudget.kt`, `RootfsSize.kt`, `SessionDirectories.kt` | Apoio de offload/rootfs; testes unitários para parte deles. | Dependem de `NativeOffload`, que não é usado. |
 
-## 3. Divergências documentais encontradas
+## 3. Classificação em quatro categorias (corrigida em 24/11/2026)
+
+A versão anterior desta matriz marcava `NativeOffload` como "sem referências". Isso estava errado: o componente é usado pelo `PRootKernel` original. A classificação correta separa:
+
+| Categoria | Componentes |
+| --- | --- |
+| **a. Dependência entre componentes originais** | `NativeOffload` (← `PRootKernel`, `PersistentShell`, `TerminalSession`); `SeccompFallbackPolicy` (← `ShellExecutor`, `PersistentShell`, `TerminalSession`); `TerminalSanitizer` (← `ExecutionCoordinator`, `ShellExecutor`); `RootfsManager` (← `PRootKernel`, `PersistentShell`, `TerminalSession`) |
+| **b. Alcançado pela interface atual** | Nenhum componente do pacote é chamado diretamente pela UI. O caminho alcançado é `ComputerViewModel` → `ComputerHelperClient` → auxiliar, que não usa essas classes. |
+| **c. Código não integrado ao fluxo de produção** | `PRootKernel` (`boot` e `buildProotCommand`, após esta etapa ligados ao auxiliar via `ProotCommandLine`), `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `NativeOffload` |
+| **d. Comprovadamente desnecessário** | Nenhum. `ShellTimeoutPolicy.kt` não tem referências externas, mas não há prova de desuso (não foi removido). |
+
+## 3a. Atualização desta etapa
+
+- `PRootKernel.buildProotCommand` agora delega a `ProotCommandLine` (módulo `android/sandbox-proot-core`), que contém o corpo original do método sem dependências da Gabi. O app mantém os logs e o guard `isBooted`.
+- O auxiliar usa o mesmo `ProotCommandLine` nas operações de probe e de diagnóstico de fork. Não existe segundo construtor de argv.
+- `PersistentShell` e `TerminalSession` ainda montam o próprio argv de offload (linhas ~242 e ~461). Esse código duplicado é original e fica para a fase de integração de cada um, quando for consolidado em `ProotCommandLine`.
+
+## 4. Divergências documentais encontradas
 
 1. `docs/LICENSE_PROVENANCE.md` afirma "0 ocorrências" de `nanoMuse` / `OpenMinis` / `tama-v2`. A varredura desta etapa encontrou 34 arquivos com "nanomuse" fora de `.git`. A auditoria anterior está desatualizada e não deve ser citada como prova.
 2. `LICENSE_PENDING_OWNER.txt` registra a incorporação do PTY do Tama V2/nanoMuse com GPL preservado. Isso contradiz qualquer declaração de "0 código GPL" no documento antigo.
 3. Nenhum componente acima tem SPDX ou cabeçalho de licença próprio. A origem de cada um é inferida de imports e comentários, não de procedência formal.
 
-## 4. Decisões desta etapa
+## 5. Decisões desta etapa
 
 - Nenhum arquivo foi alterado. Esta matriz é o único artefato.
 - Acesso a dados da Gabi (`FileMentionIndex`, `MountedFoldersStore`, `EnvVarRepository`) não entra no caminho do auxiliar.

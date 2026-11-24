@@ -21,12 +21,28 @@ Status: **Android x86_64 comprovado em CI (emulador); Android ARM64 NÃO comprov
 | Run | Commit | Resultado |
 |---|---|---|
 | `45381377014` | `9542114` | p04 falhou: `/bin/sh: can't fork: Function not implemented` (exit 2) após o `echo` inicial. |
-| `45382920833` | `f27bfae` | Mesma falha com `PROOT_NO_SECCOMP=1` (fallback documentado do PRoot). Emulador x86_64 nas APIs 26, 29 e 34. |
+| `45382920833` | `f27bfae` | Mesma falha com `PROOT_NO_SECCOMP=1`. Emulador x86_64 nas APIs 26, 29 e 34. |
 | `45384389673` | `816b35a` | Sucesso: guest usa `exec` (sem `fork`) e lê `/etc/alpine-release` e `/etc/os-release`. |
+| `45385840869` | `4271db0` | Build APK falhou só no job API 26 (`chatImeInputDiagnosticsPersistsAcrossRestartAndClears`). |
+| `—` | `f2dd770` | Commit sem alteração de código; o job API 26 passou nessa reexecução. |
+| `45388725054` | `1ee1ad4` | Build APK **success** em JVM, IME e APIs 26, 29 e 34. A falha de IME não permanece no último build aprovado. |
 
-Hipótese descartada: o filtro seccomp do PRoot. `PROOT_NO_SECCOMP=1` desliga só a aceleração, e o `fork` continuou
-com ENOSYS. O PRoot não tem tratamento de `clone` que explique o erro. A causa do ENOSYS no `fork` do guest
-permanece **não diagnosticada**; o teste evita `fork`. Nenhum binário do PRoot foi alterado.
+Hipótese testada e não suficiente: `PROOT_NO_SECCOMP=1` (`f27bfae`) não removeu o `ENOSYS`. Isso mostra que a flag,
+sozinha, não corrige o problema. **Não exclui** os caminhos de `SYSCALL_AVOIDER` do próprio PRoot (ver abaixo).
+O teste `exec` (`816b35a`) contorna `fork` e não diagnostica a causa.
+
+### Mapa de caminhos do PRoot que produzem `-ENOSYS` (leitura do código vendorizado, 24/11/2026)
+
+- `syscall/sysnum.c`: `detranslate_sysnum` devolve `SYSCALL_AVOIDER` quando a syscall não está na tabela do ABI.
+- `arch.h`: `SYSCALL_AVOIDER` é `-2` em x86_64 (`-1` em ARM64). O kernel responde `-ENOSYS` a esse número.
+- `syscall/enter.c`: `execveat` com fd não-`AT_FDCWD` devolve `-ENOSYS` explicitamente.
+- `tracee/seccomp.c`: `ftruncate` com `SYSCALL_AVOIDER` devolve `-ENOSYS`.
+- `tracee/event.c:658`: o caminho `seccomp_after_ptrace_enter` depende de `PROOT_ASSUME_NEW_SECCOMP` e da ordem das paradas.
+- `tracee/tracee.c:400`: `clone` e `clone3` são lidos para flags de filho; `clone` e `clone3` estão em `sysnums-x86_64.h` (56 e 435).
+
+Nenhum desses caminhos trata `fork`/`vfork` do guest diretamente. A causa **não está diagnosticada**. A operação
+`PROOT_OP_ALPINE_X86_FORK_TRACE` (diagnóstico `p05`) registra o log verboso do PRoot e devolve um resumo filtrado
+(`trace lines=… sigsys=…`, linhas de `clone`, `fork`, `vfork`, `seccomp` e `SIGSYS`).
 
 ## Limites conhecidos (não resolvidos)
 
@@ -46,10 +62,17 @@ execução/concluído/erro). O botão "Diagnóstico" executa a operação fixa d
 está instalado** (build de CI). Não há entrada de comando.
 Testes JVM: `HelperStatusMapperTest`.
 
-## Pendências
+## Pendências (atualizado em 24/11/2026)
 
-1. Diagnosticar e corrigir `fork()` no guest x86_64 (investigação no PRoot com ptrace/clone; teste dedicado).
-2. Adaptar `PRootKernel`, `RootfsManager`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `TerminalSession` e
-   `PersistentShell` ao auxiliar, mantendo execução arbitrária desabilitada.
-3. Execução ARM64 real (depende de infraestrutura com KVM ou dispositivo autorizado).
-4. Licenciamento (GPL/LGPL) para qualquer distribuição futura. Nada disto está publicado.
+Classificação: **x86_64 (CI emulador)** e **ARM64 (dispositivo/emulador ARM64)**.
+
+| # | Item | Classe | Estado |
+|---|---|---|---|
+| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Em investigação. Instrumentação `p05` (`FORK_TRACE`) adicionada; aguarda evidência de CI. |
+| 2 | Integração do `PRootKernel` original | x86_64 | Em andamento: construção de argv em `ProotCommandLine`, usada pelo app e pelo auxiliar. |
+| 3 | `RootfsManager`, `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `NativeOffload` | x86_64 | Pendente por etapa; ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`. |
+| 4 | Execução de Alpine **aarch64** em Android ARM64 | ARM64 | Não comprovada (sem KVM e sem emulador Linux aarch64 no runner). Não repetir sondagem sem condição nova. |
+| 5 | Licenciamento (GPL/LGPL) para qualquer distribuição | Ambas | Pendente do proprietário. Nada publicado. |
+
+Itens já confirmados, que **não** são pendências: build APK em `1ee1ad4` (APIs 26/29/34); proveniência e assinatura
+do Alpine x86_64 (`816b35a`); PoC p04 (`816b35a`, `1ee1ad4`).

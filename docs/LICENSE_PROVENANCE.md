@@ -5,7 +5,25 @@
 Data da auditoria: 2026-11-21  
 Escopo: `novo-agente-hb/` (`com.novoagentehb.app`, identificador interno provisório `NOVO_AGENTE_HB`)
 
-## 1. Resultado Global da Auditoria IP
+## 0. Estado atual (24/11/2026) — substitui as seções 1 e 2 abaixo
+
+**As tabelas das seções 1 e 2 são HISTÓRICAS (obsoletas).** Não as cite como conclusão atual.
+
+| Tema | Estado atual (verificado nesta data) | Evidência |
+| --- | --- | --- |
+| Referências a nanoMuse no código | **Presentes.** 34 arquivos com "nanomuse" fora de `.git`. Textos visíveis (`res/`, `AndroidManifest.xml`) não citam nanoMuse. | `grep -ri nanomuse` (ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`) |
+| Namespace `io.github.nanomuse` | Três classes: `hub/HubClient.kt` (sem uso fora do pacote), `sandbox/FeedSandboxScope.kt` (usada pelo Feed da Gabi via `PRootKernel` e `ExecutionCoordinator`), `sandbox/OffloadSocketName.kt` (usada por `NativeOffload`). | imports e chamadas |
+| Código GPL | **Há código de origem nanoMuse/Tama V2 sob GPL.** O PTY (`PtyBridge.kt`, `pty_bridge.c`) está registrado em `LICENSE_PENDING_OWNER.txt` com GPL preservado. | `LICENSE_PENDING_OWNER.txt`; `android/app/src/main/assets/licenses/tama-runtime/LICENSE-nanoMuse.txt` (texto integral da GPLv3) |
+| PRoot | GPL-2.0, vendorizado em `third_party/tama-runtime/android/deps/proot`. | `THIRD_PARTY_NOTICES.md` |
+| Conformidade comercial | **Não declarada.** Pendente do proprietário. | `LICENSE_PENDING_OWNER.txt` |
+
+Avisos legais que **não podem ser removidos** enquanto o código correspondente existir: `LICENSE-nanoMuse.txt`, `NOTICE.txt`, `THIRD_PARTY_NOTICES.md`, os cabeçalhos de licença do PRoot e o aviso do PTY. Renomear um namespace não altera a licença do código.
+
+Histórico: a versão original desta auditoria (2026-11-21) afirmava 0 referências a nanoMuse e 0 arquivos GPL. Essa afirmação foi superada pelo PTY incorporado e pelo código de offload e Feed com origem nanoMuse. Mantida apenas como registro.
+
+---
+
+## 1. Resultado Global da Auditoria IP (HISTÓRICO — 2026-11-21, OBSOLETO)
 
 | Critério | Resultado | Evidência concreta |
 | --- | --- | --- |
@@ -18,7 +36,7 @@ Escopo: `novo-agente-hb/` (`com.novoagentehb.app`, identificador interno provis�
 | Licença comercial/final do novo produto | **PENDENTE DO PROPRIETÁRIO** | Registrada em `LICENSE_PENDING_OWNER.txt`; nenhuma licença definitiva foi assumida ou publicada |
 | Direitos comerciais externos da arte visual Gabi | **REQUER REVISÃO FINAL DO DONO ANTES DE PUBLICAÇÃO PÚBLICA** | Os 1.324 ativos provêm de `DaniloXPTEAM/Jarvis-Projeto@voz-latencia` (veja `docs/HB_ASSET_MAP.md`), permanecendo o app privado até revisão final do proprietário |
 
-## 2. Limite Honesto da Varredura Offline (SBOM v2)
+## 2. Limite Honesto da Varredura Offline (SBOM v2) (HISTÓRICO)
 
 `evidence/SBOM.json` (`schema: novo_agente_hb_sbom_v2`) declara explicitamente:
 - `license_audit_scope = "DIRECT_TOML_DECLARED_ONLY"`
