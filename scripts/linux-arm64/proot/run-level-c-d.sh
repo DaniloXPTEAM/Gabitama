@@ -5,7 +5,7 @@
 #   D: a fixed diagnostic bootstrap inside that root (uname, release file, busybox applet).
 # Passing this does NOT prove the Android app, bionic, Termux loaders, a PTY or a persistent shell.
 set -euo pipefail
-PROOT_SRC="third_party/tama-runtime/android/deps/proot/src"
+PROOT_SRC="${PROOT_SRC:-third_party/tama-runtime/android/deps/proot/src}"
 PROOT="$PROOT_SRC/proot"
 LOADER="$PROOT_SRC/loader/loader"
 ROOTFS="${ROOTFS:?set ROOTFS to the extracted Alpine tree}"
@@ -19,7 +19,7 @@ echo "proot e_machine=$machine (aarch64) host=$(uname -m)"
 test "$(uname -m)" = "aarch64" || { echo "::error title=Level C::host is not aarch64"; exit 1; }
 
 echo "== Level C: run Alpine userland under PRoot"
-export PROOT_LOADER="$PWD/$LOADER"
+export PROOT_LOADER="$(cd "$(dirname "$LOADER")" && pwd)/$(basename "$LOADER")"
 out=$("$PROOT" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
 echo "$out"
 echo "$out" | grep -qx "aarch64" || { echo "::error title=Level C::uname did not report aarch64"; exit 1; }

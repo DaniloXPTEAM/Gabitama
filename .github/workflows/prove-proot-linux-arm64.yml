@@ -21,15 +21,31 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libtalloc-dev
-      - name: Compilar PRoot original (fonte preservada)
+      - name: Compilar PRoot original em cópia temporária (host Linux, não Android)
+        # The preserved source is copied, never modified. Two host-only deviations, both documented in
+        # docs/LICENSE_MATRIX_COMPUTER_RUNTIME.md §5 and docs/TAMA_TWO_PACKAGE_POC.md:
+        #  - HAS_LOADER_32BIT= : no 32-bit loader (the host has no -m32; this test runs only aarch64 guests);
+        #  - a compile-only linux/ashmem.h shim: the ashmem extension is Android-only and stays inert
+        #    unless --ashmem-memfd is passed, which this test never does.
         run: |
+          set -u
+          cp -a third_party/tama-runtime/android/deps/proot "$RUNNER_TEMP/proot-src"
+          mkdir -p "$RUNNER_TEMP/shim/linux"
+          cat > "$RUNNER_TEMP/shim/linux/ashmem.h" <<'SHIM'
+          #ifndef LINUX_ASHMEM_HOST_SHIM
+          #define LINUX_ASHMEM_HOST_SHIM
+          #include <sys/ioctl.h>
+          #define __ASHMEMIOC 0x77
+          #define ASHMEM_GET_SIZE _IO(__ASHMEMIOC, 4)
+          #define ASHMEM_SET_SIZE _IO(__ASHMEMIOC, 3)
+          #endif
+          SHIM
+          export CPPFLAGS="-I$RUNNER_TEMP/shim"
           set +e
-          make -C third_party/tama-runtime/android/deps/proot/src -j2 proot > "$RUNNER_TEMP/proot-build.log" 2>&1
+          make -C "$RUNNER_TEMP/proot-src/src" -j2 HAS_LOADER_32BIT= proot > "$RUNNER_TEMP/proot-build.log" 2>&1
           status=$?
           set -e
-          # Only the tail is published (diagnostic); the full log stays on the runner.
           if [ "$status" -ne 0 ]; then
-            # GitHub keeps only ~10 annotations per step: publish the error lines first, then the last lines.
             { grep -iE 'error|\*\*\*|undefined|no such|cannot|killed' "$RUNNER_TEMP/proot-build.log" | tail -n 8; echo '--- last lines ---'; tail -n 6 "$RUNNER_TEMP/proot-build.log"; } | cut -c1-300 | sed -e 's/%/%25/g' -e 's/^/::error title=PRoot build::/'
           fi
           exit $status
@@ -45,4 +61,5 @@ jobs:
       - name: Nível C e D
         env:
           ROOTFS: ${{ runner.temp }}/alpine-root
+          PROOT_SRC: ${{ runner.temp }}/proot-src/src
         run: bash scripts/linux-arm64/proot/run-level-c-d.sh
