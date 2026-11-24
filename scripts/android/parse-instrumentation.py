@@ -40,7 +40,20 @@ for line in raw.splitlines():
     elif last_key == 'stack' and not line.startswith('INSTRUMENTATION_'):
         status[last_key] += '\n' + line
 
-expected = int(os.environ.get('GABITAMA_EXPECTED_TESTS', '29'))
+def source_test_count(root='android/app/src/androidTest'):
+    """Number of @Test methods in the instrumentation sources: the suite's own declared size."""
+    total = 0
+    for directory, _, files in os.walk(root):
+        for name in files:
+            if name.endswith(('.kt', '.java')):
+                with open(os.path.join(directory, name), encoding='utf-8', errors='replace') as handle:
+                    total += len(re.findall(r'^\s*@Test\b', handle.read(), re.M))
+    return total
+
+# Derived from the sources, not hard-coded, so a new test cannot make the run look incomplete
+# (or an old count mask a missing test). An @Ignore'd test would still be reported as skipped.
+expected = source_test_count()
+print(f'::notice title=Instrumentation suite::declared @Test methods={expected}')
 if (len(started) != expected or set(completed) != started or
         not re.search(r'^INSTRUMENTATION_CODE: -1\s*$', raw, re.M) or
         re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)):
