@@ -14,6 +14,8 @@ from pathlib import Path
 
 ARCH_X86_64 = 0xC000003E
 LINE = re.compile(r'GABITAMA_BPF (\d+) code=0x([0-9a-f]+) jt=(\d+) jf=(\d+) k=0x([0-9a-f]+)')
+SIGSYS = re.compile(r'GABITAMA_SIGSYS code=(-?\d+) syscall=(-?\d+) arch=0x([0-9a-f]+)')
+SECCOMP_STATUS = re.compile(r'GABITAMA_SECCOMP_STATUS (Seccomp.*)')
 SYSCALLS = {0: 'read', 1: 'write', 2: 'open', 4: 'stat', 56: 'clone', 57: 'fork', 58: 'vfork',
             59: 'execve', 61: 'wait4', 157: 'prctl', 257: 'openat', 262: 'newfstatat', 435: 'clone3'}
 ACTIONS = {0x7FFF0000: 'ALLOW', 0x7FF00000: 'TRACE', 0x00030000: 'TRAP', 0x00050000: 'ERRNO',
@@ -104,6 +106,7 @@ def selftest():
     assert run(prog, 1, arch=0x40000003) == 'ALLOW'
     jmp = [(0x20, 0, 0, 4), (0x15, 1, 0, ARCH_X86_64), (0x06, 0, 0, 0x80000000), (0x06, 0, 0, 0x7FFF0000)]
     assert run(jmp, 9) == 'ALLOW' and run(jmp, 9, arch=1) == 'KILL_PROCESS'
+    assert ACTIONS[0x00030000] == 'TRAP' and action_of(0x00030000) == 'TRAP(0)'
     print('selftest ok')
 
 
@@ -119,6 +122,23 @@ def main():
     print(f'verdict: program_len={len(prog)} arch=x86_64')
     for nr, name in sorted(SYSCALLS.items()):
         print(f'verdict: {name}({nr})={run(prog, nr)}')
+    sigsys = {}
+    for m in SIGSYS.finditer(text):
+        key = (int(m.group(1)), int(m.group(2)), m.group(3))
+        sigsys[key] = sigsys.get(key, 0) + 1
+    for (code, nr, arch), n in sorted(sigsys.items()):
+        print(f'verdict: sigsys si_code={code} syscall={SYSCALLS.get(nr, nr)}({nr}) arch=0x{arch} count={n}')
+    if not sigsys:
+        print('verdict: sigsys none in trace')
+    statuses = []
+    for m in SECCOMP_STATUS.finditer(text):
+        line = m.group(1).strip()
+        if line not in statuses:
+            statuses.append(line)
+    for line in statuses[:6]:
+        print(f'verdict: proc {line}')
+    if not statuses:
+        print('verdict: proc status lines absent (diagnostic copy older than the status probe)')
     counts = {}
     for nr in range(0, 462):
         verdict = run(prog, nr).split('(')[0]
