@@ -136,8 +136,8 @@ for record in (apk_db or "").split("\n\n"):
     fields = dict(line.split(":", 1) for line in record.splitlines() if ":" in line)
     if "P" in fields:
         packages.append((fields["P"], fields.get("V", "?"), fields.get("L", "?")))
-for name, version, license_id in packages:
-    print(f"::notice title=Alpine package::{name} {version} license={license_id}")
+# One annotation for the whole inventory: per-package annotations exhaust the per-job annotation quota.
+print("::notice title=Alpine packages::" + "; ".join(f"{name} {version} license={license_id}" for name, version, license_id in packages))
 lines = [
     f"tarball: {tar_path.rsplit('/', 1)[-1]}",
     f"packages: {len(packages)}",

@@ -30,7 +30,7 @@ run_proot() {
   "$PROOT" "$@" >"$log" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "::group::PRoot output ($title, exit $rc)"; cat "$log"; echo "::endgroup::"
-    echo "::error title=$title::PRoot exited $rc: $(tail -n 3 "$log" | tr '\n' ' ' | cut -c1-400)"
+    echo "::error title=$title::PRoot exited $rc: $(tail -c 700 "$log" | tr '\n' ' ')"
     rm -f "$log"; exit 1
   fi
   cat "$log"; rm -f "$log"
