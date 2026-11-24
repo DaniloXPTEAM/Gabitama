@@ -4,6 +4,7 @@ import android.content.Context
 import android.system.Os
 import android.system.OsConstants
 import com.novoagentehb.computerhelper.contract.HelperContract
+import com.openminis.app.sandbox.ProotCommandLine
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -57,8 +58,9 @@ class ProotRunner(
     fun start(op: Int): Pair<Int, Snapshot> = synchronized(lock) {
         run?.takeIf { it.terminal == null }?.let { return Pair(HelperContract.CODE_BUSY, snapshotOf(it)) }
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY)
-        val guestRoot = if (op == HelperContract.PROOT_OP_ALPINE_X86_PROBE) alpineX86.rootDir() else null
-        if (op == HelperContract.PROOT_OP_ALPINE_X86_PROBE && !alpineX86.isInstalled()) {
+        val guestOp = op == HelperContract.PROOT_OP_ALPINE_X86_PROBE || op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE
+        val guestRoot = if (guestOp) alpineX86.rootDir() else null
+        if (guestOp && !alpineX86.isInstalled()) {
             return Pair(HelperContract.CODE_NOT_INSTALLED, plain(State.FAILED, op, "rootfs-absent"))
         }
         val argv = argvFor(op, binary.absolutePath, guestRoot)
@@ -74,6 +76,12 @@ class ProotRunner(
         if (loader.isFile) env["PROOT_LOADER"] = loader.absolutePath
         val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
         env["PROOT_TMP_DIR"] = tmp.absolutePath
+        val traceFile = File(context.cacheDir, TRACE_FILE)
+        if (op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE) {
+            // Diagnostic: verbose PRoot output goes to a private file, never into the reply.
+            env["PROOT_VERBOSE"] = HelperContract.PROOT_TRACE_VERBOSE
+            builder.redirectOutput(traceFile)
+        }
 
         val process = try {
             builder.start()
@@ -137,7 +145,11 @@ class ProotRunner(
         // Sweep before joining the reader: a surviving holder of stdout would keep the pipe open.
         if (guestRoot != null) sweepUnder(guestRoot)
         reader.join(READER_WAIT_MS)
-        val text = synchronized(output) { String(output.toByteArray(), Charsets.UTF_8) }
+        val text = if (current.op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE) {
+            traceSummary(File(context.cacheDir, TRACE_FILE))
+        } else {
+            synchronized(output) { String(output.toByteArray(), Charsets.UTF_8) }
+        }
         when {
             current.op == HelperContract.PROOT_OP_HOST_SLEEP -> note += " leftover=${countSleepSurvivors()}"
             guestRoot != null -> note += " leftover=${countUnder(guestRoot)}"
@@ -169,15 +181,64 @@ class ProotRunner(
         // Fixed host-root sleep: used only to exercise timeout and cancellation of a live tracee.
         HelperContract.PROOT_OP_HOST_SLEEP -> listOf(binary, "--kill-on-exit", "-r", "/", SLEEP_BIN, "60")
         // Fixed guest program inside the Alpine x86_64 test rootfs. Absolute paths only; no caller input.
+        // Built by the shared ProotCommandLine (original Tama V2 PRoot configuration): no second argv builder.
+        // Only the lifecycle flag --kill-on-exit is added here, because this runner owns the process.
         HelperContract.PROOT_OP_ALPINE_X86_PROBE -> guestRoot?.let {
-            listOf(binary, "--kill-on-exit", "-r", it.canonicalPath, "-w", "/", "/bin/sh", "-c", GUEST_SCRIPT)
+            ProotCommandLine.build(
+                prootBinary = binary,
+                rootfsDir = it.canonicalPath,
+                bindMounts = emptyMap(),
+                offloadSpec = null,
+                shellCommand = GUEST_SCRIPT,
+                leadingOptions = listOf("--kill-on-exit"),
+            )
+        }
+        HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE -> guestRoot?.let {
+            ProotCommandLine.build(
+                prootBinary = binary,
+                rootfsDir = it.canonicalPath,
+                bindMounts = emptyMap(),
+                offloadSpec = null,
+                shellCommand = FORK_SCRIPT,
+                leadingOptions = listOf("--kill-on-exit"),
+            )
         }
         else -> null
     }
 
+    /**
+     * Filtered view of the PRoot verbose log for the fork diagnostic. Keeps the markers, every
+     * SIGSYS / seccomp line and the syscall-register lines of clone, fork and vfork. The result is
+     * bounded by the reply limit; the full file stays in the helper's private cache.
+     */
+    private fun traceSummary(file: File): String {
+        if (!file.isFile) return "trace=absent"
+        var total = 0
+        var sigsys = 0
+        val keep = ArrayDeque<String>()
+        file.bufferedReader().useLines { lines ->
+            for (line in lines) {
+                total++
+                if (line.contains("SIGSYS")) sigsys++
+                val interesting = line.contains(HelperContract.GUEST_FORK_BEGIN) ||
+                    line.contains(HelperContract.GUEST_FORK_RC) ||
+                    line.contains("SIGSYS") || line.contains("seccomp") ||
+                    line.contains("clone") || line.contains("fork") || line.contains("vfork")
+                if (interesting) {
+                    keep.addLast(line.take(200))
+                    if (keep.size > TRACE_KEEP_LINES) keep.removeFirst()
+                }
+            }
+        }
+        val header = "trace lines=$total sigsys=$sigsys bytes=${file.length()}"
+        val body = keep.joinToString("\n")
+        return (header + "\n" + body).take(HelperContract.PROOT_MAX_OUTPUT_BYTES)
+    }
+
     private fun deadlineFor(op: Int): Long = when (op) {
         HelperContract.PROOT_OP_HOST_SLEEP -> HelperContract.PROOT_SLEEP_DEADLINE_MS
-        HelperContract.PROOT_OP_ALPINE_X86_PROBE -> HelperContract.PROOT_ALPINE_PROBE_DEADLINE_MS
+        HelperContract.PROOT_OP_ALPINE_X86_PROBE,
+        HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE -> HelperContract.PROOT_ALPINE_PROBE_DEADLINE_MS
         else -> HelperContract.PROOT_VERSION_DEADLINE_MS
     }
 
@@ -295,6 +356,16 @@ class ProotRunner(
          * fork(): on the x86_64 emulator fork() in the guest returned ENOSYS (runs 45381377014,
          * 45382920833), while execve of the guest program works. Output: marker plus Alpine release files.
          */
+        private const val TRACE_FILE = "proot-fork-trace.log"
+        private const val TRACE_KEEP_LINES = 60
+
+        /** Fork diagnostic: a shell that runs an external program (busybox fork path), then reports rc. */
+        private val FORK_SCRIPT = listOf(
+            "echo ${HelperContract.GUEST_FORK_BEGIN}",
+            "/bin/true",
+            "echo ${HelperContract.GUEST_FORK_RC}\$?",
+        ).joinToString("; ")
+
         private val GUEST_SCRIPT = listOf(
             "echo ${HelperContract.GUEST_PROBE_BEGIN}",
             "exec /bin/busybox cat /etc/alpine-release /etc/os-release",

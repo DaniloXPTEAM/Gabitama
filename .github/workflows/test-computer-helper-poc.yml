@@ -16,6 +16,8 @@ on:
       - third_party/tama-runtime/android/deps/**
       - android/rootfs-extractor/**
       - android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
+      - android/app/src/main/kotlin/com/openminis/app/sandbox/PRootKernel.kt
+      - android/sandbox-proot-core/**
       - scripts/android/alpine-provenance/**
       - .github/workflows/test-computer-helper-poc.yml
 permissions:

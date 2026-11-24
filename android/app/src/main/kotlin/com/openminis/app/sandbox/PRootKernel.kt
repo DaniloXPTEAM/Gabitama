@@ -610,62 +610,32 @@ object PRootKernel {
     fun buildProotCommand(shellCommand: String): List<String> {
         check(isBooted) { "PRootKernel.boot() must be called before building commands" }
 
-        val cmd = mutableListOf<String>()
+        // Native offload: route registered handler names to the host-side
+        // NativeOffloadServer over the abstract unix socket.
+        val handlers = NativeOffloadServer.registeredHandlers
+        val offloadSpec = if (handlers.isNotEmpty()) {
+            "${NativeOffloadServer.socketName}:${handlers.joinToString(",")}"
+        } else {
+            null
+        }
 
-        cmd.add(rootfsManager.prootBinary.absolutePath)
-
-        // Run as fake root (uid 0)
-        cmd.add("-0")
-
-        // T141: Translate hardlink() syscalls to symlink(). Android's /data
-        // (ext4/F2FS as mounted by zygote) refuses cross-directory hardlinks
-        // for app uids, so PRoot would otherwise pass link() straight through
-        // to the host kernel and the host kernel rejects with EPERM. Alpine's
-        // apk installs busybox-applet packages (binutils, gcc deps, etc.) by
-        // hardlinking ar/ld/nm/strip → busybox; without this flag every such
-        // install fails with "Permission denied". Symlinks are functionally
-        // equivalent for the apk consumer.
-        cmd.add("--link2symlink")
-
-        // Set rootfs
-        cmd.add("-r")
-        cmd.add(rootfsManager.rootfsDir.absolutePath)
-
-        // Bind essential pseudo-filesystems
-        cmd.add("-b")
-        cmd.add("/dev")
-        cmd.add("-b")
-        cmd.add("/proc")
-        cmd.add("-b")
-        cmd.add("/sys")
-
-        // Working directory
-        cmd.add("-w")
-        cmd.add("/root")
-
-        // User bind mounts
+        // The argv itself is built by the shared, Android-free ProotCommandLine (same code the
+        // computer helper uses). Only the Gabi-side logging stays here.
+        val cmd = ProotCommandLine.build(
+            prootBinary = rootfsManager.prootBinary.absolutePath,
+            rootfsDir = rootfsManager.rootfsDir.absolutePath,
+            bindMounts = bindMounts,
+            offloadSpec = offloadSpec,
+            shellCommand = shellCommand,
+        )
+        // Log external-folder binds specifically — these are the ones that
+        // read empty when the host view is filtered, and the proot child's
+        // own EACCES on readdir is otherwise invisible in the log file.
         for ((linuxPath, hostPath) in bindMounts) {
-            cmd.add("-b")
-            cmd.add("$hostPath:$linuxPath")
-            // Log external-folder binds specifically — these are the ones that
-            // read empty when the host view is filtered, and the proot child's
-            // own EACCES on readdir is otherwise invisible in the log file.
             if (linuxPath.startsWith(MOUNTS_LINUX_PREFIX)) {
                 Log.i(TAG, "proot bind mount: $hostPath -> $linuxPath")
             }
         }
-
-        // Native offload: route registered handler names to the host-side
-        // NativeOffloadServer over the abstract unix socket.
-        val handlers = NativeOffloadServer.registeredHandlers
-        if (handlers.isNotEmpty()) {
-            cmd.add("--native-offload=${NativeOffloadServer.socketName}:${handlers.joinToString(",")}")
-        }
-
-        // Shell command
-        cmd.add("/bin/sh")
-        cmd.add("-c")
-        cmd.add(shellCommand)
 
         Log.d(TAG, "proot cmd: ${cmd.take(cmd.size - 1).joinToString(" ")} <shellCommand ${shellCommand.length} bytes>")
         return cmd

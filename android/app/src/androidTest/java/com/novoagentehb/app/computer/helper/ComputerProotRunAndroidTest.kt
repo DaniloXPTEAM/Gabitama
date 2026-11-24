@@ -104,6 +104,28 @@ class ComputerProotRunAndroidTest {
         }
     }
 
+    /**
+     * Diagnostic (not a pass/fail proof of fork): the same Alpine x86_64 guest runs an external
+     * program from a shell, with PRoot verbose output kept by the helper. The test requires only a
+     * finished run and a trace summary; the summary is logged for the ENOSYS investigation.
+     */
+    @Test
+    fun p05_forkTraceSummaryIsProducedForEnosysInvestigation(): Unit = runBlocking<Unit> {
+        val client = ComputerHelperClient(instrumentation.targetContext)
+        try {
+            val provision = awaitProvision(client)
+            assertTrue(provision.text, provision.text.contains("state=INSTALLED"))
+            val start = client.prootStart(HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE)
+            assertEquals(HelperContract.CODE_OK, start.code)
+            val terminal = awaitTerminal(client)
+            log("p05 terminal=${terminal.text}")
+            assertTrue(terminal.text, terminal.text.contains("trace lines="))
+            assertTrue(terminal.text, terminal.text.contains("leftover=0"))
+        } finally {
+            client.close()
+        }
+    }
+
     private suspend fun awaitProvision(client: ComputerHelperClient): ComputerHelperClient.Reply {
         val first = client.testX86ProvisionStart()
         log("p04 provisionStart code=${first.code} text=${first.text}")

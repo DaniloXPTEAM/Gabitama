@@ -30,6 +30,14 @@ object HelperContract {
     const val PROOT_OP_HOST_SLEEP = 2
     /** Fixed guest program: /bin/sh of the Alpine x86_64 TEST rootfs. No caller-supplied argv. */
     const val PROOT_OP_ALPINE_X86_PROBE = 3
+    /**
+     * Diagnostic only (CI emulator): the same Alpine x86_64 guest runs `/bin/true` from a shell, which
+     * forks. PRoot verbose output goes to a private file; the reply carries only a filtered summary.
+     */
+    const val PROOT_OP_ALPINE_X86_FORK_TRACE = 4
+    const val GUEST_FORK_BEGIN = "GABITAMA_FORK_BEGIN"
+    const val GUEST_FORK_RC = "GABITAMA_FORK_RC="
+    const val PROOT_TRACE_VERBOSE = "4"
     const val PROOT_MAX_OUTPUT_BYTES = 4096
     const val PROOT_VERSION_DEADLINE_MS = 10_000L
     const val PROOT_SLEEP_DEADLINE_MS = 5_000L
