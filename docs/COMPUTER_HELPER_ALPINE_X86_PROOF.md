@@ -31,18 +31,37 @@ Hipótese testada e não suficiente: `PROOT_NO_SECCOMP=1` (`f27bfae`) não remov
 sozinha, não corrige o problema. **Não exclui** os caminhos de `SYSCALL_AVOIDER` do próprio PRoot (ver abaixo).
 O teste `exec` (`816b35a`) contorna `fork` e não diagnostica a causa.
 
-### Mapa de caminhos do PRoot que produzem `-ENOSYS` (leitura do código vendorizado, 24/11/2026)
+### Diagnóstico do `fork` (instrumentado, CI `45406137846`, APIs 29 e 34)
 
-- `syscall/sysnum.c`: `detranslate_sysnum` devolve `SYSCALL_AVOIDER` quando a syscall não está na tabela do ABI.
-- `arch.h`: `SYSCALL_AVOIDER` é `-2` em x86_64 (`-1` em ARM64). O kernel responde `-ENOSYS` a esse número.
-- `syscall/enter.c`: `execveat` com fd não-`AT_FDCWD` devolve `-ENOSYS` explicitamente.
-- `tracee/seccomp.c`: `ftruncate` com `SYSCALL_AVOIDER` devolve `-ENOSYS`.
-- `tracee/event.c:658`: o caminho `seccomp_after_ptrace_enter` depende de `PROOT_ASSUME_NEW_SECCOMP` e da ordem das paradas.
-- `tracee/tracee.c:400`: `clone` e `clone3` são lidos para flags de filho; `clone` e `clone3` estão em `sysnums-x86_64.h` (56 e 435).
+Operação `PROOT_OP_ALPINE_X86_FORK_TRACE` (`p05`): o mesmo guest Alpine x86_64 roda `/bin/true` a partir de `/bin/sh -c`,
+com `PROOT_VERBOSE=4` gravado em arquivo privado. O resumo do log, lido pelas anotações do job, mostra a sequência:
 
-Nenhum desses caminhos trata `fork`/`vfork` do guest diretamente. A causa **não está diagnosticada**. A operação
-`PROOT_OP_ALPINE_X86_FORK_TRACE` (diagnóstico `p05`) registra o log verboso do PRoot e devolve um resumo filtrado
-(`trace lines=… sigsys=…`, linhas de `clone`, `fork`, `vfork`, `seccomp` e `SIGSYS`).
+1. `proot info: ptrace acceleration (seccomp mode 2, new syscall order) enabled`
+2. `proot info: vpid 1: seccomp SIGSYS: fork(...) = 0x39`
+3. `proot info: Setting result after SIGSYS to 0xffffffffffffffda` (`-38`, ENOSYS)
+4. `/bin/sh: can't fork: Function not implemented`
+
+**Comprovado (código + log):**
+
+- O `fork` do guest chega ao PRoot como SIGSYS com `SYS_SECCOMP` (`tracee/event.c`, caso `SIGSYS`).
+- `tracee/seccomp.c`, `handle_seccomp_event_common`: o `switch` por syscall não tem `case` para `PR_fork`, `PR_vfork`
+  nem `PR_clone`. O `default:` faz `set_result_after_seccomp(tracee, -ENOSYS)`. Esse é o ENOSYS observado.
+- `syscall/seccomp.c` (`proot_sysnums`) não lista `fork`, `vfork` nem `clone`. Por desenho, syscalls não listadas
+  recebem `SECCOMP_RET_ALLOW`. Logo, o SIGSYS de `fork` **não** é explicado pela lista do PRoot.
+
+**Não comprovado:** por que o kernel do emulador x86_64 entrega SIGSYS para `fork` quando o filtro do PRoot não o trata.
+Hipótese a verificar (não testada): diferença entre o filtro instalado e o esperado para o ABI do guest, ou ação
+de filtro vinda de outro componente do sistema. Próximo passo: dump do BPF instalado (`/proc/<pid>/status` `Seccomp`,
+e leitura do programa) no mesmo emulador, sem alterar flags.
+
+**Correções avaliadas e NÃO aplicadas:**
+
+- Reiniciar `fork` com o mesmo número (`restart_syscall_after_seccomp`): risco de loop, porque a syscall volta a
+  cair no filtro que gerou o SIGSYS.
+- `PROOT_NO_SECCOMP=1` (`f27bfae`): já testado; não bastou.
+- Caminho `exec` (`816b35a`): contorna `fork`; não corrige nada.
+
+Nenhuma correção foi incorporada ao PRoot. `third_party/` não foi alterado.
 
 ## Limites conhecidos (não resolvidos)
 
@@ -68,7 +87,7 @@ Classificação: **x86_64 (CI emulador)** e **ARM64 (dispositivo/emulador ARM64)
 
 | # | Item | Classe | Estado |
 |---|---|---|---|
-| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Em investigação. Instrumentação `p05` (`FORK_TRACE`) adicionada; aguarda evidência de CI. |
+| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Localizado: SIGSYS `SYS_SECCOMP` em `fork` → `default: -ENOSYS` (`tracee/seccomp.c`). Falta explicar por que o filtro entrega SIGSYS (ver diagnóstico). |
 | 2 | Integração do `PRootKernel` original | x86_64 | Em andamento: construção de argv em `ProotCommandLine`, usada pelo app e pelo auxiliar. |
 | 3 | `RootfsManager`, `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `NativeOffload` | x86_64 | Pendente por etapa; ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`. |
 | 4 | Execução de Alpine **aarch64** em Android ARM64 | ARM64 | Não comprovada (sem KVM e sem emulador Linux aarch64 no runner). Não repetir sondagem sem condição nova. |
