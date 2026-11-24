@@ -64,6 +64,7 @@ fun SettingsScreen(
     val activeCustomId by viewModel.activeCustomId.collectAsState()
     val chatModel by viewModel.chatModel.collectAsState()
     val liveModel by viewModel.liveVoiceModel.collectAsState()
+    val liveModelIsLegacy by viewModel.liveModelIsLegacy.collectAsState()
     val screenModel by viewModel.screenOpModel.collectAsState()
     val visionModel by viewModel.visionModel.collectAsState()
     val discoveredLiveModels by viewModel.discoveredLiveModels.collectAsState()
@@ -279,6 +280,16 @@ fun SettingsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
                                 )
+                                if (liveModelIsLegacy) {
+                                    Text(
+                                        "O modelo Live salvo é o anterior (gemini-2.5-flash-native-audio). O padrão aprovado é gemini-3.8-live. Sua seleção não foi trocada automaticamente.",
+                                        color = GabiTokens.AmberAccent,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    OutlinedButton(onClick = { viewModel.applyDefaultLiveModel() }, shape = CircleShape) {
+                                        Text("Aplicar padrão gemini-3.8-live", color = GabiTokens.TealAccent)
+                                    }
+                                }
                                 Spacer(Modifier.height(8.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(

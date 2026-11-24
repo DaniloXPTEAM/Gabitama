@@ -20,7 +20,9 @@ class ChatModelDefaultsUnitTest {
     }
 
     @Test fun liveVoiceModelIsNotChangedByChatDefault() {
-        assertEquals("gemini-2.5-flash-native-audio-preview-09-2025", AppPreferences.DEFAULT_GEMINI_LIVE_MODEL)
+        assertEquals("gemini-3.8-live", AppPreferences.DEFAULT_GEMINI_LIVE_MODEL)
+        assertEquals("gemini-2.5-flash-native-audio-preview-09-2025", AppPreferences.LEGACY_GEMINI_LIVE_MODEL)
         assert(AppPreferences.DEFAULT_GEMINI_LIVE_MODEL != AppPreferences.DEFAULT_GEMINI_CHAT_MODEL)
+        assert(AppPreferences.DEFAULT_GEMINI_LIVE_MODEL != AppPreferences.LEGACY_GEMINI_LIVE_MODEL)
     }
 }

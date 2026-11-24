@@ -72,6 +72,21 @@ class AppPreferences @Inject constructor(
         it[KEY_LIVE_MODEL] ?: DEFAULT_GEMINI_LIVE_MODEL
     }
 
+    /** True only when the store holds the previous Live default explicitly; it may be a manual choice, so the user decides. */
+    val liveModelIsLegacy: Flow<Boolean> = ds.data.map { it[KEY_LIVE_MODEL] == LEGACY_GEMINI_LIVE_MODEL }
+
+    /** Applies the new Live default only if the stored value is still the legacy one. Returns true when changed. */
+    suspend fun applyDefaultLiveModelIfLegacy(): Boolean {
+        var changed = false
+        ds.edit {
+            if (it[KEY_LIVE_MODEL] == LEGACY_GEMINI_LIVE_MODEL) {
+                it[KEY_LIVE_MODEL] = DEFAULT_GEMINI_LIVE_MODEL
+                changed = true
+            }
+        }
+        return changed
+    }
+
     val voiceMode: Flow<VoiceModeId> = ds.data.map {
         runCatching { VoiceModeId.valueOf(it[KEY_VOICE_MODE] ?: VoiceModeId.GEMINI_LIVE.name) }
             .getOrDefault(VoiceModeId.GEMINI_LIVE)
@@ -140,8 +155,10 @@ class AppPreferences @Inject constructor(
     suspend fun setQuartoSelectedStageId(stageId: String) = ds.edit { it[KEY_QUARTO_STAGE_ID] = stageId }
 
     companion object {
-        // Padrão histórico; disponibilidade e compatibilidade reais devem ser verificadas na conta.
-        const val DEFAULT_GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
+        /** Live voice default (owner-approved 24/11/2026). Real API smoke passed (run 45443197031); device audio NOT tested. */
+        const val DEFAULT_GEMINI_LIVE_MODEL = "gemini-3.8-live"
+        /** Previous Live default. Only a stored value equal to this is offered for upgrade; it is never overwritten silently. */
+        const val LEGACY_GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
         /** Text chat model for new installs (owner-approved 24/11/2026). Not used for Live voice. */
         const val DEFAULT_GEMINI_CHAT_MODEL = "gemini-3.5-flash-lite"
 

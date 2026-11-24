@@ -42,4 +42,32 @@ class ChatModelPreservationAndroidTest {
             prefs.setModels(oldChat, oldScreen, oldVision, oldLive)
         }
     }
+
+    @Test
+    fun legacyLiveModelIsOfferedButNotOverwrittenUntilUserApplies() = runBlocking {
+        val prefs = AppPreferences(context)
+        val oldChat = prefs.chatModel.first()
+        val oldScreen = prefs.screenOpModel.first()
+        val oldVision = prefs.visionModel.first()
+        val oldLive = prefs.liveVoiceModel.first()
+        try {
+            // A stored legacy value is kept after reopen and is reported as legacy (not silently replaced).
+            prefs.setModels(oldChat, oldScreen, oldVision, AppPreferences.LEGACY_GEMINI_LIVE_MODEL)
+            val reopened = AppPreferences(context)
+            assertEquals(AppPreferences.LEGACY_GEMINI_LIVE_MODEL, reopened.liveVoiceModel.first())
+            assertEquals(true, reopened.liveModelIsLegacy.first())
+
+            // Explicit user action applies the approved default.
+            assertEquals(true, reopened.applyDefaultLiveModelIfLegacy())
+            assertEquals(AppPreferences.DEFAULT_GEMINI_LIVE_MODEL, AppPreferences(context).liveVoiceModel.first())
+            assertEquals(false, AppPreferences(context).liveModelIsLegacy.first())
+
+            // A custom (non-legacy) choice is never touched by the upgrade action.
+            prefs.setModels(oldChat, oldScreen, oldVision, "custom-live-choice")
+            assertEquals(false, prefs.applyDefaultLiveModelIfLegacy())
+            assertEquals("custom-live-choice", AppPreferences(context).liveVoiceModel.first())
+        } finally {
+            prefs.setModels(oldChat, oldScreen, oldVision, oldLive)
+        }
+    }
 }

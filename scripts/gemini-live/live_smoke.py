@@ -189,14 +189,15 @@ def live_session():
     finally:
         # (h) Stop: client closes the socket
         t_close = time.monotonic()
-        closed_ok = True
+        closed_ok = False
         try:
             ws.close(1000, "smoke_done")
+            closed_ok = True
         except Exception as err:  # noqa: BLE001
-            closed_ok = False
             log("stop_error", error=scrub(type(err).__name__))
         log("stop", socket_closed=closed_ok, ms=int((time.monotonic() - t_close) * 1000))
-    return ok
+    # Success needs the turn AND a clean socket close (a failed close is a failed smoke).
+    return ok and closed_ok
 
 
 def main():

@@ -110,6 +110,21 @@ class SettingsViewModel @Inject constructor(
     val liveVoiceModel: StateFlow<String> = prefs.liveVoiceModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_GEMINI_LIVE_MODEL)
 
+    val liveModelIsLegacy: StateFlow<Boolean> = prefs.liveModelIsLegacy
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Explicit user action: replaces only the stored legacy Live value with the approved default. */
+    fun applyDefaultLiveModel() {
+        viewModelScope.launch {
+            val changed = prefs.applyDefaultLiveModelIfLegacy()
+            _statusBanner.value = if (changed) {
+                "Modelo Live atualizado para ${AppPreferences.DEFAULT_GEMINI_LIVE_MODEL}. Áudio no aparelho ainda não foi testado."
+            } else {
+                "Nenhuma alteração: o modelo Live salvo não é o anterior."
+            }
+        }
+    }
+
     val voiceMode: StateFlow<VoiceModeId> = prefs.voiceMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VoiceModeId.GEMINI_LIVE)
 
