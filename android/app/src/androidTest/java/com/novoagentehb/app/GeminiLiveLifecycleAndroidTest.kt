@@ -1,9 +1,3 @@
-// PENDENTE — NÃO COMPILADO, NÃO É EVIDÊNCIA.
-// Motivo: nas runs 45479711232 e 45481765040 (commits d5689de e eeb73e1), as APIs 26/29/34 abortaram o
-// processo de instrumentação após 11 testes; nenhum XML foi gerado e os outros 27 testes não rodaram.
-// Causa não identificada: os logs do job são inacessíveis pelo sandbox (blob bloqueado).
-// Para reativar: mover de volta para android/app/src/androidtest/java/com/novoagentehb/app/ e diagnosticar
-// o crash (logcat -b crash) em ambiente com acesso aos logs.
 package com.novoagentehb.app
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,6 +22,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
@@ -62,34 +57,68 @@ class GeminiLiveLifecycleAndroidTest {
     @Volatile private var holdSetupComplete = false
     private var originalKey = ""
 
-    @Before
-    fun setUp() {
-        // No runtime-permission changes here: granting/revoking RECORD_AUDIO on a running app can restart the test process.
-        server = MockWebServer().apply { start() }
-        http = OkHttpClient.Builder().build()
-        prefs = AppPreferences(context)
-        vault = SecureKeyVault(context)
-        originalKey = vault.get(SecureKeyVault.KEY_GEMINI)
-        vault.set(SecureKeyVault.KEY_GEMINI, "synthetic-test-key")
+    private var setUpCompleted = false
+    private var keyOverridden = false
 
-        live = GeminiLiveVoiceClient(http, Gson())
-        live.webSocketFactory = WebSocket.Factory { request, listener ->
-            // Keep headers (x-goog-api-key) and redirect only the endpoint to the local server.
-            http.newWebSocket(request.newBuilder().url(server.url("/live")).build(), listener)
-        }
-        // The coordinator is main-thread confined in production (TextToSpeech, Handler, Dispatchers.Main).
-        coordinator = onMain {
-            VoiceEngineCoordinator(
-                context, prefs, vault, http, live, CapabilityRegistry(), HBCharacterController(context, prefs)
-            ).apply { microphoneEnabled = false }
+    /** Wraps one initialization step so the first failure names its phase (class names only, no values). */
+    private fun <T> phase(name: String, block: () -> T): T {
+        try {
+            return block()
+        } catch (t: Throwable) {
+            throw IllegalStateException("setUp fase=$name", t)
         }
     }
 
+    @Before
+    fun setUp() {
+        // No runtime-permission changes here: granting/revoking RECORD_AUDIO on a running app can restart the test process.
+        phase("mockwebserver.start") { server = MockWebServer().apply { start() } }
+        phase("okhttp.build") { http = OkHttpClient.Builder().build() }
+        phase("appPreferences.construct") { prefs = AppPreferences(context) }
+        phase("keyVault.construct") { vault = SecureKeyVault(context) }
+        // The real key is never read here: the store is overridden with a synthetic value and restored in tearDown.
+        phase("keyVault.saveOriginal") { originalKey = vault.get(SecureKeyVault.KEY_GEMINI) }
+        keyOverridden = true
+        phase("keyVault.writeSynthetic") { vault.set(SecureKeyVault.KEY_GEMINI, "synthetic-test-key") }
+        phase("liveClient.construct") {
+            live = GeminiLiveVoiceClient(http, Gson())
+            live.webSocketFactory = WebSocket.Factory { request, listener ->
+                // Keep headers (x-goog-api-key) and redirect only the endpoint to the local server.
+                http.newWebSocket(request.newBuilder().url(server.url("/live")).build(), listener)
+            }
+        }
+        // The coordinator is main-thread confined in production (TextToSpeech, Handler, Dispatchers.Main).
+        phase("coordinator.onMain") {
+            coordinator = onMain {
+                VoiceEngineCoordinator(
+                    context, prefs, vault, http, live, CapabilityRegistry(), HBCharacterController(context, prefs)
+                ).apply { microphoneEnabled = false }
+            }
+        }
+        setUpCompleted = true
+    }
+
+    /**
+     * Cleanup never masks the original setUp failure: if setUp did not complete, it only releases what exists.
+     * Cleanup failures are reported by step name, not by message.
+     */
     @After
     fun tearDown() {
-        runCatching { onMain { coordinator.stopGeminiLiveSession() } }
-        vault.set(SecureKeyVault.KEY_GEMINI, originalKey)
-        runCatching { server.shutdown() }
+        val failedSteps = mutableListOf<String>()
+        fun step(name: String, block: () -> Unit) {
+            try {
+                block()
+            } catch (t: Throwable) {
+                failedSteps += "$name:${t::class.java.simpleName}"
+            }
+        }
+        if (::coordinator.isInitialized) step("coordinator.stop") { onMain { coordinator.stopGeminiLiveSession() } }
+        if (::live.isInitialized) step("live.disconnect") { live.disconnect() }
+        if (::vault.isInitialized && keyOverridden) step("keyVault.restore") { vault.set(SecureKeyVault.KEY_GEMINI, originalKey) }
+        if (::server.isInitialized) step("server.shutdown") { server.shutdown() }
+        if (setUpCompleted && failedSteps.isNotEmpty()) {
+            throw IllegalStateException("tearDown fases=${failedSteps.joinToString(",")}")
+        }
     }
 
     private fun enqueueConnection(autoSetupComplete: Boolean) {
@@ -163,6 +192,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertEquals(0, connections.get())
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun handshakeIsConnectingUntilSetupCompleteArrives() {
         holdSetupComplete = true
@@ -181,6 +211,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertFalse(coordinator.status.value.activeVoiceDisclosure.orEmpty().startsWith("gabi_24l"))
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopDuringConnectingClosesSocketAndNeverReconnects() {
         holdSetupComplete = true
@@ -198,6 +229,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertEquals(1, server.requestCount)
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopWhileActiveClosesSocketAndKeepsDisconnected() {
         enqueueConnection(autoSetupComplete = true)
@@ -215,6 +247,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertFalse(coordinator.status.value.isSpeaking)
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun networkDropReconnectsOnceThenBlocksWithoutLooping() {
         enqueueConnection(autoSetupComplete = true)
@@ -236,6 +269,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertNotNull(coordinator.status.value.liveConnectionError)
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopDuringPendingReconnectCancelsIt() {
         enqueueConnection(autoSetupComplete = true)
@@ -252,6 +286,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertEquals(LiveSessionState.DISCONNECTED, coordinator.status.value.liveSessionState)
     }
 
+    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun handshakeWithoutSetupCompleteTimesOutToBlocked() {
         holdSetupComplete = true

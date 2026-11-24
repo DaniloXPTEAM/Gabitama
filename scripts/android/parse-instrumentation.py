@@ -15,6 +15,33 @@ EXCLUDED_CLASSES = {
 }
 EXCLUDED_FILES = {os.path.basename(c.replace('.', '/')) + '.kt' for c in EXCLUDED_CLASSES}
 
+EXC = r'(?:[a-zA-Z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error)'
+
+def describe_failure(stack):
+    """Sanitized diagnosis: first exception, first cause, the setUp/tearDown phase and the first project frames.
+    Messages are never copied; only class names, our own phase markers and project frame locations."""
+    first = re.search(r'\b' + EXC + r'\b', stack)
+    cause = re.search(r'Caused by: (' + EXC + r')', stack)
+    phase = re.search(r'setUp fase=([A-Za-z0-9_.]+)', stack)
+    teardown = re.search(r'tearDown fases=([A-Za-z0-9_.:,]+)', stack)
+    if phase:
+        where = 'setUp'
+    elif teardown or re.search(r'\.tearDown\(', stack):
+        where = 'tearDown'
+    elif re.search(r'\.setUp\(', stack):
+        where = 'setUp'
+    else:
+        where = 'body'
+    frames = re.findall(r'at (com\.novoagentehb\.app\.[\w.$]+\([\w.$]+(?::\d+)?\))', stack)
+    lines = [
+        'where=' + where,
+        'exception=' + (first.group(0) if first else 'UnknownError'),
+        'cause=' + (cause.group(1) if cause else 'none'),
+        'phase=' + (phase.group(1) if phase else (teardown.group(1) if teardown else 'none')),
+    ]
+    lines += ['at ' + frame for frame in frames[:3]]
+    return '\n'.join(lines)
+
 raw = open('/tmp/gabitama-instrumentation-ci.log', encoding='utf-8', errors='replace').read().replace('\r', '')
 status, started, completed, details = {}, set(), {}, {}
 last_key = None
@@ -40,9 +67,7 @@ for line in raw.splitlines():
             completed[key] = code
             if code in (-1, -2):
                 stack = status.get('stack', '')
-                exception = re.search(r'\b(?:[a-zA-Z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error)\b', stack)
-                frames = re.findall(r'at (com\.novoagentehb\.app\.[\w.$]+\([\w.$]+(?::\d+)?\))', stack)
-                details[key] = ((exception.group(0) if exception else 'UnknownError') + '\n' + '\n'.join('at ' + frame for frame in frames[:8]))
+                details[key] = describe_failure(stack)
         else:
             raise SystemExit('::error title=Instrumentation protocol::Unknown test status')
         status = {}
@@ -70,6 +95,15 @@ if (len(started) != expected or set(completed) != started or
         not re.search(r'^INSTRUMENTATION_CODE: -1\s*$', raw, re.M) or
         re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)):
     print(f'::error title=Instrumentation protocol::Incomplete run; expected={expected} started={len(started)} completed={len(completed)}')
+    unfinished = sorted(k for k in started if k not in completed)
+    for cls, name in unfinished[:3]:
+        print(f'::error title=Instrumentation abort::interrupted while running {cls.rsplit(".", 1)[-1]}.{name}')
+    markers = {
+        'process_crashed': len(re.findall(r'Process crashed|has died|Instrumentation run failed', raw)),
+        'code_minus1_seen': bool(re.search(r'^INSTRUMENTATION_CODE: -1\s*$', raw, re.M)),
+        'instrumentation_failed_line': bool(re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)),
+    }
+    print('::notice title=Instrumentation termination::' + ' '.join(f'{k}={v}' for k, v in markers.items()))
     sys.exit(1)
 failures = sum(code in (-1, -2) for code in completed.values())
 skipped = sum(code in (-3, -4) for code in completed.values())
