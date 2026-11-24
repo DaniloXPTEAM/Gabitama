@@ -95,8 +95,13 @@ class ComputerHelperPocAndroidTest {
             val probe = client.accessProbe()
             log("accessProbe code=${probe.code} text=${probe.text}")
             assertEquals(HelperContract.CODE_OK, probe.code)
-            assertTrue(probe.text, probe.text.contains("files/=EACCES"))
+            // Denial property: no target is readable. The errno may be EACCES (path visible, access
+            // refused) or ENOENT (path not visible to the helper's namespace); both mean no access.
+            // The exact errno per API is recorded in the log line above.
             assertFalse(probe.text, probe.text.contains("readable"))
+            for (target in HelperContract.PROBE_TARGETS) {
+                assertTrue(probe.text, probe.text.contains("$target=EACCES") || probe.text.contains("$target=ENOENT"))
+            }
             assertFalse(probe.text.contains(marker))
         } finally {
             client.close()
