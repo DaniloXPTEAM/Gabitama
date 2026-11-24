@@ -618,7 +618,8 @@ class VoiceEngineCoordinator @Inject constructor(
 
     fun startGeminiLiveSession() {
         if (liveReducerState.keepAlive) return
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        // The microphone gate is part of the microphone path; the test seam (microphoneEnabled = false) skips both.
+        if (microphoneEnabled && ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             val msg = "Permissão de microfone necessária para Gemini Live."
             updateStatus { it.copy(liveSessionState = LiveSessionState.BLOCKED, liveConnectionError = msg) }
             _events.tryEmit(VoiceTranscriptEvent.VoiceError(msg))

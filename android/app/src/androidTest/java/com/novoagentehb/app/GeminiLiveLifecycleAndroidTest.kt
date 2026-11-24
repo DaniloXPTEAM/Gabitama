@@ -1,6 +1,5 @@
 package com.novoagentehb.app
 
-import android.Manifest
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.gson.Gson
@@ -41,7 +40,6 @@ import java.util.concurrent.atomic.AtomicReference
 class GeminiLiveLifecycleAndroidTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val packageName = context.packageName
 
     private lateinit var server: MockWebServer
     private lateinit var http: OkHttpClient
@@ -60,7 +58,7 @@ class GeminiLiveLifecycleAndroidTest {
 
     @Before
     fun setUp() {
-        instrumentation.uiAutomation.grantRuntimePermission(packageName, Manifest.permission.RECORD_AUDIO)
+        // No runtime-permission changes here: granting/revoking RECORD_AUDIO on a running app can restart the test process.
         server = MockWebServer().apply { start() }
         http = OkHttpClient.Builder().build()
         prefs = AppPreferences(context)
