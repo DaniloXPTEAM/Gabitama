@@ -112,6 +112,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           API_LEVEL: ${{ matrix.api }}
+          # Diagnostic: the PRoot copy in this job prints the seccomp filter; run.sh fails if the dump is missing.
+          PROOT_DIAG_BPF: "1"
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64

@@ -1,6 +1,7 @@
 package com.novoagentehb.computerhelper
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.system.Os
 import android.system.OsConstants
 import com.novoagentehb.computerhelper.contract.HelperContract
@@ -88,6 +89,9 @@ class ProotRunner(
         if (op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE) {
             // Diagnostic: verbose PRoot output goes to a private file, never into the reply.
             env["PROOT_VERBOSE"] = HelperContract.PROOT_TRACE_VERBOSE
+            // Diagnostic only: the BPF dump is compiled into the CI copy of PRoot and enabled by this variable.
+            // Limited to this operation and to debuggable builds, so a release helper never sets it.
+            if (isDebuggable()) env["PROOT_DIAG_BPF"] = "1"
             builder.redirectOutput(traceFile)
         }
 
@@ -215,33 +219,103 @@ class ProotRunner(
     }
 
     /**
-     * Filtered view of the PRoot verbose log for the fork diagnostic. Keeps the markers, every
-     * SIGSYS / seccomp line and the syscall-register lines of clone, fork and vfork. The result is
-     * bounded by the reply limit; the full file stays in the helper's private cache.
+     * Filtered view of the PRoot verbose log for the fork diagnostic. The reply is bounded by
+     * PROOT_MAX_OUTPUT_BYTES, so the order is fixed: header, the seccomp filter decisions, then events.
+     *
+     * - Filter block: from the first BPF dump only (the same program is installed for every tracee), keep
+     *   RET instructions (the action) and JEQ instructions (the syscall number they test). Load and jump
+     *   instructions are counted, not printed.
+     * - Event block: markers, SIGSYS/seccomp lines and clone/fork/vfork lines, capped per line and in count.
+     *
+     * The full file stays in the helper's private cache. Filter decisions are data, not conclusions.
      */
     private fun traceSummary(file: File): String {
         if (!file.isFile) return "trace=absent"
         var total = 0
         var sigsys = 0
+        var bpfLines = 0
+        var programs = 0
+        val filterBlock = ArrayList<String>()
+        var filterChars = 0
         val keep = ArrayDeque<String>()
         file.bufferedReader().useLines { lines ->
             for (line in lines) {
                 total++
                 if (line.contains("SIGSYS")) sigsys++
+                val bpf = BPF_LINE.find(line)
+                if (bpf != null) {
+                    bpfLines++
+                    val index = bpf.groupValues[1].toInt()
+                    if (index == 0) programs++
+                    if (programs == 1 && filterBlock.size < BPF_KEEP_LINES) {
+                        val decoded = decodeFilterLine(index, bpf.groupValues)
+                        if (decoded != null && filterChars + decoded.length <= BPF_BLOCK_CHARS) {
+                            filterBlock.add(decoded)
+                            filterChars += decoded.length + 1
+                        }
+                    }
+                    continue
+                }
                 val interesting = line.contains(HelperContract.GUEST_FORK_BEGIN) ||
                     line.contains(HelperContract.GUEST_FORK_RC) ||
                     line.contains("SIGSYS") || line.contains("seccomp") ||
                     line.contains("clone") || line.contains("fork") || line.contains("vfork")
                 if (interesting) {
-                    keep.addLast(line.take(200))
+                    keep.addLast(line.take(EVENT_LINE_CHARS))
                     if (keep.size > TRACE_KEEP_LINES) keep.removeFirst()
                 }
             }
         }
-        val header = "trace lines=$total sigsys=$sigsys bytes=${file.length()}"
-        val body = keep.joinToString("\n")
-        return (header + "\n" + body).take(HelperContract.PROOT_MAX_OUTPUT_BYTES)
+        val header = "trace lines=$total sigsys=$sigsys bytes=${file.length()} bpf=$bpfLines programs=$programs"
+        val filter = if (filterBlock.isEmpty()) "" else "\nfilter:\n" + filterBlock.joinToString("\n")
+        val events = keep.joinToString("\n")
+        return (header + filter + "\n" + events).take(HelperContract.PROOT_MAX_OUTPUT_BYTES)
     }
+
+    /** Decodes one BPF instruction; returns null for instructions that are not printed. */
+    private fun decodeFilterLine(index: Int, g: List<String>): String? {
+        val code = g[2].toInt(16)
+        val jt = g[3]
+        val jf = g[4]
+        val k = g[5].toLong(16)
+        return when (code) {
+            BPF_RET_K -> "$index ret ${seccompAction(k)}"
+            BPF_JEQ_K -> "$index jeq ${syscallName(k)} jt=$jt jf=$jf"
+            else -> null
+        }
+    }
+
+    private fun seccompAction(k: Long): String {
+        val data = k and 0xffffL
+        return when (k and 0xffff0000L) {
+            0x7fff0000L -> "ALLOW"
+            0x7ff00000L -> "TRACE($data)"
+            0x7ffc0000L -> "LOG"
+            0x00030000L -> "TRAP($data)"
+            0x00050000L -> "ERRNO($data)"
+            0x80000000L -> "KILL_PROCESS"
+            0x00000000L -> "KILL_THREAD"
+            else -> "0x${k.toString(16)}"
+        }
+    }
+
+    /** Names only for the x86_64 numbers relevant to the fork diagnostic; other values stay numeric. */
+    private fun syscallName(k: Long): String = when (k) {
+        0L -> "${k}(read)"
+        1L -> "${k}(write)"
+        2L -> "${k}(open)"
+        4L -> "${k}(stat)"
+        56L -> "${k}(clone)"
+        57L -> "${k}(fork)"
+        58L -> "${k}(vfork)"
+        59L -> "${k}(execve)"
+        435L -> "${k}(clone3)"
+        0xc000003eL -> "arch(x86_64)"
+        else -> k.toString()
+    }
+
+    private fun isDebuggable(): Boolean =
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private fun deadlineFor(op: Int): Long = when (op) {
         HelperContract.PROOT_OP_HOST_SLEEP -> HelperContract.PROOT_SLEEP_DEADLINE_MS
@@ -365,7 +439,14 @@ class ProotRunner(
          * 45382920833), while execve of the guest program works. Output: marker plus Alpine release files.
          */
         private const val TRACE_FILE = "proot-fork-trace.log"
-        private const val TRACE_KEEP_LINES = 60
+        private const val TRACE_KEEP_LINES = 24
+        private const val EVENT_LINE_CHARS = 160
+        private const val BPF_KEEP_LINES = 90
+        private const val BPF_BLOCK_CHARS = 1800
+        // Lines emitted by the diagnostic PRoot copy (scripts/android/proot-original/diag-seccomp-patch.py).
+        private val BPF_LINE = Regex("""GABITAMA_BPF (\d+) code=0x([0-9a-f]+) jt=(\d+) jf=(\d+) k=0x([0-9a-f]+)""")
+        private const val BPF_RET_K = 0x06
+        private const val BPF_JEQ_K = 0x15
 
         /** Fork diagnostic: a shell that runs an external program (busybox fork path), then reports rc. */
         private val FORK_SCRIPT = listOf(

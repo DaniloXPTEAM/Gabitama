@@ -124,6 +124,7 @@ class ComputerProotRunAndroidTest {
             val terminal = awaitTerminal(client)
             log("p05 terminal=${terminal.text}")
             assertTrue(terminal.text, terminal.text.contains("trace lines="))
+            assertTrue(terminal.text, terminal.text.contains(" bpf="))
             assertTrue(terminal.text, terminal.text.contains("leftover=0"))
         } finally {
             client.close()
