@@ -1,0 +1,42 @@
+name: Gemini Live real smoke (free models)
+
+# Real network test against the Gemini Live API. Uses only free-tier models (see the script).
+# The key comes from the repository secret GEMINI_LIVE_TEST_KEY; it is never written to files or logs.
+on:
+  push:
+    paths:
+      - scripts/gemini-live/live_smoke.py
+      - .github/workflows/gemini-live-real-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install websockets
+        run: python3 -m pip install "websockets==13.1"
+      - name: Run live smoke
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_LIVE_TEST_KEY }}
+          GEMINI_LIVE_MODEL: gemini-3.8-live
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then echo '{"phase":"config","ok":false,"reason":"segredo ausente"}'; exit 1; fi
+          python3 scripts/gemini-live/live_smoke.py > live.jsonl 2>live.err
+          rc=$?
+          cat live.jsonl
+          echo "stderr_lines=$(wc -l < live.err)"
+          exit $rc
+      - name: Summary
+        if: always()
+        run: |
+          echo '### Gemini Live smoke (sanitizado)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat live.jsonl 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
