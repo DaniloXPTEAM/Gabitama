@@ -470,6 +470,8 @@ class VoiceEngineCoordinator @Inject constructor(
     private var liveReducerState = LiveReducerInput()
     private var activeLiveModel: String = AppPreferences.DEFAULT_GEMINI_LIVE_MODEL
     private var liveToolCallHandler: (suspend (callId: String, name: String, args: Map<String, String>) -> String)? = null
+    /** Test seam: when false the Live session never opens AudioRecord (CI emulators run without audio). Production keeps true. */
+    internal var microphoneEnabled: Boolean = true
 
     private val _status = MutableStateFlow(VoiceStatusSnapshot())
     val status: StateFlow<VoiceStatusSnapshot> = _status.asStateFlow()
@@ -723,6 +725,7 @@ class VoiceEngineCoordinator @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun startPcmMicCapture() {
+        if (!microphoneEnabled) return
         stopPcmMicCapture()
         val generation = micGeneration.get()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
