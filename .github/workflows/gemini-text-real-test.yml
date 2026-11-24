@@ -1,0 +1,32 @@
+name: Gemini text chat real check (free model)
+
+# Real network check for the Gabi chat default (gemini-3.5-flash-lite). Free tier only. Three short calls.
+# The key comes from the repository secret GEMINI_LIVE_TEST_KEY and is never written to files or logs.
+on:
+  push:
+    paths:
+      - scripts/gemini-text/text_latency.py
+
+permissions:
+  contents: read
+
+jobs:
+  text-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run text check
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_LIVE_TEST_KEY }}
+          GEMINI_TEXT_MODEL: gemini-3.5-flash-lite
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then echo '{"phase":"config","ok":false,"reason":"segredo ausente"}'; exit 1; fi
+          python3 scripts/gemini-text/text_latency.py > text.jsonl 2>text.err
+          rc=$?
+          while IFS= read -r line; do echo "::notice title=gemini-text::$line"; done < text.jsonl
+          echo "stderr_lines=$(wc -l < text.err)"
+          exit $rc
