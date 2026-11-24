@@ -100,6 +100,7 @@ class ComputerProotRunAndroidTest {
             assertTrue(text, text.contains("x86_64"))
             assertTrue(text, text.contains("/bin/busybox"))
             assertTrue(text, text.contains("BusyBox"))
+            assertTrue(text, text.contains("GUEST_RC=0"))
             assertTrue(text, text.contains("leftover=0"))
         } finally {
             client.close()
