@@ -26,6 +26,8 @@ Status: **Android x86_64 comprovado em CI (emulador); Android ARM64 NÃO comprov
 | `45385840869` | `4271db0` | Build APK falhou só no job API 26 (`chatImeInputDiagnosticsPersistsAcrossRestartAndClears`). |
 | `—` | `f2dd770` | Commit sem alteração de código; o job API 26 passou nessa reexecução. |
 | `45388725054` | `1ee1ad4` | Build APK **success** em JVM, IME e APIs 26, 29 e 34. A falha de IME não permanece no último build aprovado. |
+| `45409567326` | `2964af8` | PoC **success** nas APIs 26, 29 e 34 (p01–p05). Diagnóstico BPF ativo nesta cópia de teste; trace do `fork` reproduzido. |
+| `45409567582` | `2964af8` | Build APK **failure** só em `Testes IME isolados API 34`: `chatImeInputDiagnosticsPersistsAcrossRestartAndClears` (mesmo teste instável de `4271db0`). Não relacionado a PRoot/ambiente; não reexecutado. |
 
 Hipótese testada e não suficiente: `PROOT_NO_SECCOMP=1` (`f27bfae`) não removeu o `ENOSYS`. Isso mostra que a flag,
 sozinha, não corrige o problema. **Não exclui** os caminhos de `SYSCALL_AVOIDER` do próprio PRoot (ver abaixo).
@@ -48,6 +50,13 @@ com `PROOT_VERBOSE=4` gravado em arquivo privado. O resumo do log, lido pelas an
   nem `PR_clone`. O `default:` faz `set_result_after_seccomp(tracee, -ENOSYS)`. Esse é o ENOSYS observado.
 - `syscall/seccomp.c` (`proot_sysnums`) não lista `fork`, `vfork` nem `clone`. Por desenho, syscalls não listadas
   recebem `SECCOMP_RET_ALLOW`. Logo, o SIGSYS de `fork` **não** é explicado pela lista do PRoot.
+
+**Reprodução em `2964af8` (`45409567326`, anotações amostradas):** SIGSYS para `fork` (`0x39` = 57) repetido no vpid 1, seguido de
+`Setting result after SIGSYS to -38`. Na mesma execução, `open` e `stat` também chegam como SIGSYS e são tratados normalmente.
+Isso **contraria** a premissa de que `fork` está fora do filtro: o filtro entrega trap para `fork`. Ainda não se sabe
+se o trap vem do filtro do PRoot ou de um filtro instalado por outro componente. O dump do BPF (`GABITAMA_BPF`, impresso antes
+do `prctl`) está ativo no build de teste, mas não apareceu nas anotações amostradas; o artefato completo não é baixável
+neste ambiente (`gh run download` com `EOF`).
 
 **Não comprovado:** por que o kernel do emulador x86_64 entrega SIGSYS para `fork` quando o filtro do PRoot não o trata.
 Hipótese a verificar (não testada): diferença entre o filtro instalado e o esperado para o ABI do guest, ou ação
@@ -87,8 +96,8 @@ Classificação: **x86_64 (CI emulador)** e **ARM64 (dispositivo/emulador ARM64)
 
 | # | Item | Classe | Estado |
 |---|---|---|---|
-| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Localizado: SIGSYS `SYS_SECCOMP` em `fork` → `default: -ENOSYS` (`tracee/seccomp.c`). Falta explicar por que o filtro entrega SIGSYS (ver diagnóstico). |
-| 2 | Integração do `PRootKernel` original | x86_64 | Em andamento: construção de argv em `ProotCommandLine`, usada pelo app e pelo auxiliar. |
+| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Localizado: SIGSYS `SYS_SECCOMP` em `fork` → `default: -ENOSYS` (`tracee/seccomp.c`). Falta explicar por que o filtro entrega SIGSYS; o dump BPF está ativo em `2964af8`, leitura pendente do artefato. |
+| 2 | Integração do `PRootKernel` original | x86_64 | Em andamento: argv em `ProotCommandLine` e ambiente em `PRootEnvironment` (`sandbox-proot-core`), usados pelo app e pelo auxiliar. `p04` prova que `LD_LIBRARY_PATH` chega ao guest. |
 | 3 | `RootfsManager`, `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `NativeOffload` | x86_64 | Pendente por etapa; ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`. |
 | 4 | Execução de Alpine **aarch64** em Android ARM64 | ARM64 | Não comprovada (sem KVM e sem emulador Linux aarch64 no runner). Não repetir sondagem sem condição nova. |
 | 5 | Licenciamento (GPL/LGPL) para qualquer distribuição | Ambas | Pendente do proprietário. Nada publicado. |
