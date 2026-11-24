@@ -40,7 +40,7 @@ class GeminiLiveSocketLifecycleUnitTest {
         fun open(index: Int) = listeners[index].onOpen(sockets[index], Response.Builder()
             .request(sockets[index].request()).protocol(Protocol.HTTP_1_1).code(101).message("Switching Protocols").build())
         fun ready(index: Int) = listeners[index].onMessage(sockets[index], "{\"setupComplete\":{}}")
-        fun readyBinary(index: Int) = listeners[index].onMessage(sockets[index], ByteString.encodeUtf8("{\"setupComplete\":{}}"))
+        fun readyBinary(index: Int) = listeners[index].onMessage(sockets[index], ByteString.of(*"{\"setupComplete\":{}}".toByteArray()))
     }
 
     @Test fun binaryFrameSetupCompleteMakesSessionReady() {
