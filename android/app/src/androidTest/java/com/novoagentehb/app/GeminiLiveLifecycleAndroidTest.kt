@@ -73,14 +73,17 @@ class GeminiLiveLifecycleAndroidTest {
             // Keep headers (x-goog-api-key) and redirect only the endpoint to the local server.
             http.newWebSocket(request.newBuilder().url(server.url("/live")).build(), listener)
         }
-        coordinator = VoiceEngineCoordinator(
-            context, prefs, vault, http, live, CapabilityRegistry(), HBCharacterController(context, prefs)
-        ).apply { microphoneEnabled = false }
+        // The coordinator is main-thread confined in production (TextToSpeech, Handler, Dispatchers.Main).
+        coordinator = onMain {
+            VoiceEngineCoordinator(
+                context, prefs, vault, http, live, CapabilityRegistry(), HBCharacterController(context, prefs)
+            ).apply { microphoneEnabled = false }
+        }
     }
 
     @After
     fun tearDown() {
-        runCatching { coordinator.stopGeminiLiveSession() }
+        runCatching { onMain { coordinator.stopGeminiLiveSession() } }
         vault.set(SecureKeyVault.KEY_GEMINI, originalKey)
         runCatching { server.shutdown() }
     }
@@ -124,6 +127,22 @@ class GeminiLiveLifecycleAndroidTest {
         return condition()
     }
 
+    /** Runs on the app main thread, as production callers do. */
+    private fun <T> onMain(block: () -> T): T {
+        val result = AtomicReference<T?>(null)
+        val error = AtomicReference<Throwable?>(null)
+        instrumentation.runOnMainSync {
+            try {
+                result.set(block())
+            } catch (t: Throwable) {
+                error.set(t)
+            }
+        }
+        error.get()?.let { throw it }
+        @Suppress("UNCHECKED_CAST")
+        return result.get() as T
+    }
+
     private fun waitMs(ms: Long) = Thread.sleep(ms)
 
     @Test
@@ -131,7 +150,7 @@ class GeminiLiveLifecycleAndroidTest {
         vault.set(SecureKeyVault.KEY_GEMINI, "")
         enqueueConnection(autoSetupComplete = true)
 
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
 
         assertTrue(awaitState(LiveSessionState.BLOCKED))
         assertNotNull(coordinator.status.value.liveConnectionError)
@@ -145,7 +164,7 @@ class GeminiLiveLifecycleAndroidTest {
         holdSetupComplete = true
         enqueueConnection(autoSetupComplete = true)
 
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
 
         assertTrue("server should receive setup", setupReceived.get().await(8, TimeUnit.SECONDS))
         waitMs(300)
@@ -162,10 +181,10 @@ class GeminiLiveLifecycleAndroidTest {
     fun stopDuringConnectingClosesSocketAndNeverReconnects() {
         holdSetupComplete = true
         enqueueConnection(autoSetupComplete = true)
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
         assertTrue(setupReceived.get().await(8, TimeUnit.SECONDS))
 
-        coordinator.stopGeminiLiveSession()
+        onMain { coordinator.stopGeminiLiveSession() }
 
         assertEquals(LiveSessionState.DISCONNECTED, coordinator.status.value.liveSessionState)
         assertTrue("server must observe the client close", awaitUntil(5_000) { serverClosedCount.get() >= 1 })
@@ -178,10 +197,10 @@ class GeminiLiveLifecycleAndroidTest {
     @Test
     fun stopWhileActiveClosesSocketAndKeepsDisconnected() {
         enqueueConnection(autoSetupComplete = true)
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
         assertTrue(awaitState(LiveSessionState.ACTIVE))
 
-        coordinator.stopGeminiLiveSession()
+        onMain { coordinator.stopGeminiLiveSession() }
 
         assertEquals(LiveSessionState.DISCONNECTED, coordinator.status.value.liveSessionState)
         assertTrue(awaitUntil(5_000) { serverClosedCount.get() >= 1 })
@@ -197,7 +216,7 @@ class GeminiLiveLifecycleAndroidTest {
         enqueueConnection(autoSetupComplete = true)
         enqueueConnection(autoSetupComplete = true)
         enqueueConnection(autoSetupComplete = true) // must never be used
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
         assertTrue(awaitState(LiveSessionState.ACTIVE))
 
         // First network drop: one bounded reconnect is allowed (policy MAX_RECONNECT_ATTEMPTS = 1).
@@ -217,12 +236,12 @@ class GeminiLiveLifecycleAndroidTest {
     fun stopDuringPendingReconnectCancelsIt() {
         enqueueConnection(autoSetupComplete = true)
         enqueueConnection(autoSetupComplete = true)
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
         assertTrue(awaitState(LiveSessionState.ACTIVE))
 
         lastServerSocket.get()!!.cancel()
         assertTrue(awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
-        coordinator.stopGeminiLiveSession()
+        onMain { coordinator.stopGeminiLiveSession() }
 
         waitMs(1_500)
         assertEquals("stop must cancel the pending reconnect", 1, connections.get())
@@ -234,7 +253,7 @@ class GeminiLiveLifecycleAndroidTest {
         holdSetupComplete = true
         enqueueConnection(autoSetupComplete = true)
 
-        coordinator.startGeminiLiveSession()
+        onMain { coordinator.startGeminiLiveSession() }
 
         assertTrue("watchdog should block after ~15 s", awaitState(LiveSessionState.BLOCKED, timeoutMs = 25_000))
         assertTrue(coordinator.status.value.liveConnectionError.orEmpty().contains("Tempo limite"))
