@@ -101,6 +101,13 @@ class ComputerHelperClient(
 
     suspend fun prootCancel(): Reply = transact(HelperContract.TX_PROOT_CANCEL, idempotent = true) {}
 
+    /** Test-only Alpine x86_64 variant (debug/emulator proof). Same semantics as provisionStart. */
+    suspend fun testX86ProvisionStart(): Reply =
+        transact(HelperContract.TX_TEST_X86_PROVISION_START, idempotent = true) {}
+
+    suspend fun testX86ProvisionStatus(): Reply =
+        transact(HelperContract.TX_TEST_X86_PROVISION_STATUS, idempotent = true) {}
+
     /** Releases the binding. The next call binds again. */
     suspend fun close() {
         lock.withLock {

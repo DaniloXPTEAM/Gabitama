@@ -50,6 +50,21 @@ jobs:
           mkdir -p android/computer-helper/src/debug/assets
           bash scripts/android/alpine-provenance/verify.sh
           git check-ignore -q "$KEEP_TARBALL_TO" || { echo '::error title=Asset::tarball is not git-ignored'; exit 1; }
+      - name: Obter Alpine x86_64 verificado (variante só de teste no emulador x86_64; separada do aarch64)
+        env:
+          ALPINE_ARCH: x86_64
+          KEEP_TARBALL_TO: ${{ github.workspace }}/android/computer-helper/src/debug/assets/alpine-minirootfs-x86_64.bin
+          OUT_DIR: ${{ runner.temp }}/alpine-provenance
+        run: |
+          mkdir -p android/computer-helper/src/debug/assets
+          bash scripts/android/alpine-provenance/verify.sh
+          git check-ignore -q "$KEEP_TARBALL_TO" || { echo '::error title=Asset::x86_64 tarball is not git-ignored'; exit 1; }
+          python3 - <<'PYX'
+          import os
+          path = os.path.join(os.environ['RUNNER_TEMP'], 'alpine-provenance', 'alpine-minirootfs-provenance-x86_64.txt')
+          lines = open(path, encoding='utf-8').read().splitlines()
+          print('::notice title=Alpine x86_64 provenance::' + ' | '.join(l.strip() for l in lines if not l.startswith('  package')))
+          PYX
       - name: Compilar PRoot original para Android x86_64 (cópia descartável; só para o emulador)
         run: |
           set -euo pipefail

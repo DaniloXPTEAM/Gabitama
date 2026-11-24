@@ -74,6 +74,50 @@ class ComputerProotRunAndroidTest {
         }
     }
 
+    /**
+     * First real guest execution: the ORIGINAL PRoot runs /bin/sh of the Alpine x86_64 TEST rootfs.
+     * Evidence required: guest markers printed, /bin/sh is a link to Alpine busybox, release 3.21.3,
+     * exit 0, and no survivors. The output must not come from /system/bin.
+     */
+    @Test
+    fun p04_alpineX86GuestProgramRunsUnderOriginalProot(): Unit = runBlocking<Unit> {
+        val client = ComputerHelperClient(instrumentation.targetContext)
+        try {
+            val provision = awaitProvision(client)
+            log("p04 provision=${provision.text}")
+            assertTrue(provision.text, provision.text.contains("state=INSTALLED"))
+            val start = client.prootStart(HelperContract.PROOT_OP_ALPINE_X86_PROBE)
+            log("p04 start code=${start.code} text=${start.text}")
+            assertEquals(HelperContract.CODE_OK, start.code)
+            val terminal = awaitTerminal(client)
+            log("p04 terminal=${terminal.text}")
+            val text = terminal.text
+            assertTrue(text, text.contains("state=EXITED"))
+            assertTrue(text, text.contains("exit=0"))
+            assertTrue(text, text.contains(HelperContract.GUEST_PROBE_BEGIN))
+            assertTrue(text, text.contains(HelperContract.GUEST_PROBE_END))
+            assertTrue(text, text.contains("3.21.3"))
+            assertTrue(text, text.contains("x86_64"))
+            assertTrue(text, text.contains("/bin/busybox"))
+            assertTrue(text, text.contains("BusyBox"))
+            assertTrue(text, text.contains("leftover=0"))
+        } finally {
+            client.close()
+        }
+    }
+
+    private suspend fun awaitProvision(client: ComputerHelperClient): ComputerHelperClient.Reply {
+        val first = client.testX86ProvisionStart()
+        log("p04 provisionStart code=${first.code} text=${first.text}")
+        val deadline = System.currentTimeMillis() + PROVISION_DEADLINE_MS
+        var status = client.testX86ProvisionStatus()
+        while (status.text.contains("state=RUNNING") && System.currentTimeMillis() < deadline) {
+            delay(POLL_MS)
+            status = client.testX86ProvisionStatus()
+        }
+        return status
+    }
+
     private suspend fun awaitTerminal(client: ComputerHelperClient): ComputerHelperClient.Reply {
         val deadline = System.currentTimeMillis() + TERMINAL_DEADLINE_MS
         while (true) {
@@ -91,5 +135,6 @@ class ComputerProotRunAndroidTest {
         private const val RUN_BEFORE_CANCEL_MS = 1_000L
         private const val TERMINAL_DEADLINE_MS = 60_000L
         private const val POLL_MS = 500L
+        private const val PROVISION_DEADLINE_MS = 120_000L
     }
 }

@@ -28,9 +28,25 @@ object HelperContract {
     const val TX_PROOT_CANCEL = 12
     const val PROOT_OP_VERSION = 1
     const val PROOT_OP_HOST_SLEEP = 2
+    /** Fixed guest program: /bin/sh of the Alpine x86_64 TEST rootfs. No caller-supplied argv. */
+    const val PROOT_OP_ALPINE_X86_PROBE = 3
     const val PROOT_MAX_OUTPUT_BYTES = 4096
     const val PROOT_VERSION_DEADLINE_MS = 10_000L
     const val PROOT_SLEEP_DEADLINE_MS = 5_000L
+    const val PROOT_ALPINE_PROBE_DEADLINE_MS = 20_000L
+
+    // Test-only Alpine x86_64 variant (CI emulator proof). Separate from the aarch64 rootfs above:
+    // its own asset, directory and marker. Never replaces the aarch64 installation or its history.
+    const val TX_TEST_X86_PROVISION_START = 16
+    const val TX_TEST_X86_PROVISION_STATUS = 17
+    const val TX_TEST_X86_PROVISION_CANCEL = 18
+    const val ALPINE_X86_ASSET = "alpine-minirootfs-x86_64.bin"
+    // Official dl-cdn.alpinelinux.org v3.21/releases/x86_64 .sha256 for alpine-minirootfs-3.21.3-x86_64.tar.gz
+    const val ALPINE_X86_SHA256 = "1a694899e406ce55d32334c47ac0b2efb6c06d7e878102d1840892ad44cd5239"
+    const val ROOTFS_X86_DIR = "alpine-rootfs-x86_64-test"
+    /** Marker strings written by the fixed guest probe; the test asserts them. */
+    const val GUEST_PROBE_BEGIN = "GABITAMA_GUEST_BEGIN"
+    const val GUEST_PROBE_END = "GABITAMA_GUEST_END"
 
     // Fixed Alpine rootfs provisioning (experimental, debug/test builds only). No arguments accepted.
     const val ALPINE_VERSION = "3.21.3"

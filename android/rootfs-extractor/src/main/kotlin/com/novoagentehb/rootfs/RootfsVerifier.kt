@@ -19,7 +19,13 @@ object RootfsVerifier {
      * Throws IllegalStateException with a short fixed reason when the tree is not a valid rootfs.
      * Walks without following links: every symlink must resolve inside [root].
      */
-    fun verify(root: File, expectedRelease: String, maxEntries: Int, maxBytes: Long): Summary {
+    fun verify(
+        root: File,
+        expectedRelease: String,
+        maxEntries: Int,
+        maxBytes: Long,
+        expectedArch: String = "aarch64",
+    ): Summary {
         check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS)) { "root-missing" }
         val canonicalRoot = root.canonicalPath
         val prefix = canonicalRoot + File.separator
@@ -54,10 +60,10 @@ object RootfsVerifier {
         val busybox = File(root, "bin/busybox")
         check(Files.isRegularFile(busybox.toPath(), LinkOption.NOFOLLOW_LINKS)) { "busybox-missing" }
         val arch = elfArch(busybox)
-        check(arch == "aarch64") { "busybox-arch-not-aarch64" }
+        check(arch == expectedArch) { "busybox-arch-mismatch" }
 
         // Both must exist and resolve inside the tree (links followed here on purpose).
-        val loader = File(root, "lib/ld-musl-aarch64.so.1")
+        val loader = File(root, "lib/ld-musl-$expectedArch.so.1")
         check(loader.exists() && loader.canonicalPath.startsWith(prefix)) { "musl-loader-missing" }
         val sh = File(root, "bin/sh")
         check(sh.exists() && sh.canonicalPath.startsWith(prefix)) { "sh-missing" }
@@ -65,7 +71,7 @@ object RootfsVerifier {
         return Summary(release = release, arch = arch, files = entries, bytes = bytes)
     }
 
-    /** Returns "aarch64" for a 64-bit little-endian ELF with e_machine EM_AARCH64; throws otherwise. */
+    /** Returns "aarch64" (EM_AARCH64) or "x86_64" (EM_X86_64) for a 64-bit little-endian ELF; throws otherwise. */
     fun elfArch(file: File): String {
         val header = ByteArray(20)
         file.inputStream().use { input ->
@@ -80,6 +86,10 @@ object RootfsVerifier {
             header[2] == 'L'.code.toByte() && header[3] == 'F'.code.toByte()) { "not-elf" }
         check(header[4].toInt() == 2 && header[5].toInt() == 1) { "not-elf64-le" }
         val machine = (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
-        return if (machine == 0xB7) "aarch64" else "elf-machine-$machine"
+        return when (machine) {
+            0xB7 -> "aarch64"
+            0x3E -> "x86_64"
+            else -> "elf-machine-$machine"
+        }
     }
 }

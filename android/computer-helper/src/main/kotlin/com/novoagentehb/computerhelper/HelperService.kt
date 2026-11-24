@@ -108,6 +108,9 @@ class HelperService : Service() {
             val (code, snapshot) = prootRunner.start(data.readInt())
             OpResult(code, snapshot.render())
         }
+        HelperContract.TX_TEST_X86_PROVISION_START -> provision(x86Provisioner.start())
+        HelperContract.TX_TEST_X86_PROVISION_STATUS -> provision(x86Provisioner.status())
+        HelperContract.TX_TEST_X86_PROVISION_CANCEL -> provision(x86Provisioner.cancel())
         HelperContract.TX_PROOT_STATUS -> OpResult(HelperContract.CODE_OK, prootRunner.status().render())
         HelperContract.TX_PROOT_CANCEL -> OpResult(HelperContract.CODE_OK, prootRunner.cancel().render())
         else -> OpResult(HelperContract.CODE_BAD_REQUEST, "")
@@ -115,7 +118,10 @@ class HelperService : Service() {
 
     private val provisioner by lazy { RootfsProvisioner(this) }
 
-    private val prootRunner by lazy { ProotRunner(this) }
+    /** Test-only Alpine x86_64 variant; kept apart from [provisioner] (aarch64 product path). */
+    private val x86Provisioner by lazy { RootfsProvisioner(this, RootfsProvisioner.Variant.X86_64_TEST) }
+
+    private val prootRunner by lazy { ProotRunner(this, x86Provisioner) }
 
     private fun provision(snapshot: RootfsProvisioner.Snapshot): OpResult = OpResult(
         when (snapshot.state) {

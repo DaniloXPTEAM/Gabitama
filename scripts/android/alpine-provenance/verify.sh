@@ -11,14 +11,27 @@
 #   4. GPG signature of the tarball must verify against that key.
 #   5. Tar entries are inspected with Python tarfile (no extraction): no absolute paths,
 #      no '..' components, no device nodes, every link target stays inside the rootfs.
-#   6. bin/busybox ELF header must be 64-bit little-endian aarch64 (e_machine 0xB7).
+#   6. bin/busybox ELF header must be 64-bit little-endian for the selected arch (aarch64 0xB7, x86_64 0x3E).
 set -euo pipefail
 
 ALPINE_VERSION="3.21.3"
-ARCH="aarch64"
+# ALPINE_ARCH selects the variant: aarch64 (product rootfs) or x86_64 (CI emulator test only).
+ARCH="${ALPINE_ARCH:-aarch64}"
+case "$ARCH" in
+  aarch64)
+    # Official dl-cdn .sha256 for alpine-minirootfs-3.21.3-aarch64.tar.gz
+    PINNED_SHA256="ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea"
+    EXPECTED_EM="0xB7"; EXPECTED_NAME="aarch64" ;;
+  x86_64)
+    # Official dl-cdn .sha256 for alpine-minirootfs-3.21.3-x86_64.tar.gz (fetched from the same mirror)
+    PINNED_SHA256="1a694899e406ce55d32334c47ac0b2efb6c06d7e878102d1840892ad44cd5239"
+    EXPECTED_EM="0x3E"; EXPECTED_NAME="x86_64" ;;
+  *) echo "FAIL unsupported ALPINE_ARCH=$ARCH" >&2; exit 1 ;;
+esac
+# The aarch64 report keeps its historical name (consumed by verify-alpine-provenance.yml).
+if [ "$ARCH" = "aarch64" ]; then REPORT_NAME="alpine-minirootfs-provenance.txt"; else REPORT_NAME="alpine-minirootfs-provenance-$ARCH.txt"; fi
 BASE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/${ARCH}"
 TARBALL="alpine-minirootfs-${ALPINE_VERSION}-${ARCH}.tar.gz"
-PINNED_SHA256="ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea"
 PUBLISHED_FPR="0482D84022F52DF1C4E7CD43293ACD0907D9495A"
 KEY_URL="https://alpinelinux.org/keys/ncopa.asc"
 
@@ -65,10 +78,11 @@ if [ -n "${KEEP_TARBALL_TO:-}" ]; then
 fi
 
 echo "[5-6] tar inspection (no extraction)"
-python3 - "$WORK/$TARBALL" "$OUT_DIR/alpine-minirootfs-provenance.txt" "$ALPINE_VERSION" <<'PY'
+python3 - "$WORK/$TARBALL" "$OUT_DIR/$REPORT_NAME" "$ALPINE_VERSION" "$EXPECTED_EM" "$EXPECTED_NAME" <<'PY'
 import posixpath, sys, tarfile
 
 tar_path, report_path, version = sys.argv[1], sys.argv[2], sys.argv[3]
+expected_em, expected_name = int(sys.argv[4], 16), sys.argv[5]
 problems = []
 counts = {"file": 0, "dir": 0, "symlink": 0, "hardlink": 0, "other": 0}
 busybox_header = None
@@ -123,8 +137,8 @@ if busybox_header is not None:
         elf_note = "not ELF64 little-endian"
     else:
         e_machine = int.from_bytes(busybox_header[18:20], "little")
-        elf_ok = e_machine == 0xB7
-        elf_note = f"e_machine=0x{e_machine:x} ({'aarch64' if elf_ok else 'NOT aarch64'})"
+        elf_ok = e_machine == expected_em
+        elf_note = f"e_machine=0x{e_machine:x} ({expected_name if elf_ok else 'NOT ' + expected_name})"
 if not elf_ok:
     problems.append(f"bin/busybox architecture check failed: {elf_note}")
 if release is None or release != version:
@@ -154,4 +168,4 @@ print("\n".join(lines))
 if problems:
     sys.exit(1)
 PY
-echo "OK provenance report: $OUT_DIR/alpine-minirootfs-provenance.txt"
+echo "OK provenance report: $OUT_DIR/$REPORT_NAME"

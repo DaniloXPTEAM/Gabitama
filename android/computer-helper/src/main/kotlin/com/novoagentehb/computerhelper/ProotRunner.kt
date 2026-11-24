@@ -15,12 +15,18 @@ import java.util.concurrent.TimeUnit
  *
  * - The caller sends an operation id, never argv, paths or environment.
  * - One run at a time; each run has a hard deadline and its output is capped.
- * - Cancel and timeout kill the whole process tree (PRoot and its tracees), then report leftovers.
+ * - Cancel, timeout and normal exit all end with a sweep of the operation's processes:
+ *   (1) the PRoot process tree by ppid, then (2) every process of this UID whose executable
+ *   lives inside the guest rootfs (catches daemonized or re-parented tracees). Leftovers are counted.
  *
- * Passing these operations shows that the binary loads and that its lifecycle is controlled on this
- * device. It does not prove an Alpine rootfs, a PTY, a persistent shell or isolation from the caller.
+ * Limits (not solved here): a process that leaves the UID or the rootfs tree is not seen; the sweep
+ * reads /proc, so a PID can be reused between the read and the kill (the exe check narrows this to
+ * processes of this helper UID only). This is not a security sandbox; PRoot alone is not isolation.
  */
-class ProotRunner(private val context: Context) {
+class ProotRunner(
+    private val context: Context,
+    private val alpineX86: RootfsProvisioner,
+) {
 
     enum class State { IDLE, RUNNING, EXITED, TIMEOUT, CANCELLED, FAILED }
 
@@ -51,7 +57,11 @@ class ProotRunner(private val context: Context) {
     fun start(op: Int): Pair<Int, Snapshot> = synchronized(lock) {
         run?.takeIf { it.terminal == null }?.let { return Pair(HelperContract.CODE_BUSY, snapshotOf(it)) }
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY)
-        val argv = argvFor(op, binary.absolutePath)
+        val guestRoot = if (op == HelperContract.PROOT_OP_ALPINE_X86_PROBE) alpineX86.rootDir() else null
+        if (op == HelperContract.PROOT_OP_ALPINE_X86_PROBE && !alpineX86.isInstalled()) {
+            return Pair(HelperContract.CODE_NOT_INSTALLED, plain(State.FAILED, op, "rootfs-absent"))
+        }
+        val argv = argvFor(op, binary.absolutePath, guestRoot)
             ?: return Pair(HelperContract.CODE_BAD_REQUEST, plain(State.FAILED, op, "bad-op"))
         if (!binary.isFile || !binary.canExecute()) {
             return Pair(HelperContract.CODE_NOT_INSTALLED, plain(State.FAILED, op, "binary-missing"))
@@ -59,7 +69,7 @@ class ProotRunner(private val context: Context) {
         val builder = ProcessBuilder(argv).redirectErrorStream(true)
         val env = builder.environment()
         env.clear()
-        env["PATH"] = "/system/bin"
+        env["PATH"] = if (guestRoot != null) GUEST_PATH else "/system/bin"
         val loader = File(context.applicationInfo.nativeLibraryDir, LOADER)
         if (loader.isFile) env["PROOT_LOADER"] = loader.absolutePath
         val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
@@ -80,7 +90,7 @@ class ProotRunner(private val context: Context) {
             isDaemon = true
             start()
         }
-        Thread({ supervise(current, process, reader, output) }, "proot-supervisor").apply {
+        Thread({ supervise(current, process, reader, output, guestRoot) }, "proot-supervisor").apply {
             isDaemon = true
             start()
         }
@@ -99,7 +109,13 @@ class ProotRunner(private val context: Context) {
         return snapshotOf(current)
     }
 
-    private fun supervise(current: Run, process: Process, reader: Thread, output: ByteArrayOutputStream) {
+    private fun supervise(
+        current: Run,
+        process: Process,
+        reader: Thread,
+        output: ByteArrayOutputStream,
+        guestRoot: File?,
+    ) {
         val deadline = deadlineFor(current.op)
         val finished = process.waitFor(deadline, TimeUnit.MILLISECONDS)
         var state: State
@@ -118,10 +134,13 @@ class ProotRunner(private val context: Context) {
             exit = process.exitValue()
             state = State.EXITED
         }
+        // Sweep before joining the reader: a surviving holder of stdout would keep the pipe open.
+        if (guestRoot != null) sweepUnder(guestRoot)
         reader.join(READER_WAIT_MS)
         val text = synchronized(output) { String(output.toByteArray(), Charsets.UTF_8) }
-        if (current.op == HelperContract.PROOT_OP_HOST_SLEEP) {
-            note += " leftover=${countSleepSurvivors()}"
+        when {
+            current.op == HelperContract.PROOT_OP_HOST_SLEEP -> note += " leftover=${countSleepSurvivors()}"
+            guestRoot != null -> note += " leftover=${countUnder(guestRoot)}"
         }
         current.terminal = Snapshot(
             state = state,
@@ -145,15 +164,20 @@ class ProotRunner(private val context: Context) {
 
     private fun plain(state: State, op: Int, note: String) = Snapshot(state, op, -1, 0, note, "")
 
-    private fun argvFor(op: Int, binary: String): List<String>? = when (op) {
+    private fun argvFor(op: Int, binary: String, guestRoot: File?): List<String>? = when (op) {
         HelperContract.PROOT_OP_VERSION -> listOf(binary, "--version")
         // Fixed host-root sleep: used only to exercise timeout and cancellation of a live tracee.
         HelperContract.PROOT_OP_HOST_SLEEP -> listOf(binary, "--kill-on-exit", "-r", "/", SLEEP_BIN, "60")
+        // Fixed guest program inside the Alpine x86_64 test rootfs. Absolute paths only; no caller input.
+        HelperContract.PROOT_OP_ALPINE_X86_PROBE -> guestRoot?.let {
+            listOf(binary, "--kill-on-exit", "-r", it.canonicalPath, "-w", "/", "/bin/sh", "-c", GUEST_SCRIPT)
+        }
         else -> null
     }
 
     private fun deadlineFor(op: Int): Long = when (op) {
         HelperContract.PROOT_OP_HOST_SLEEP -> HelperContract.PROOT_SLEEP_DEADLINE_MS
+        HelperContract.PROOT_OP_ALPINE_X86_PROBE -> HelperContract.PROOT_ALPINE_PROBE_DEADLINE_MS
         else -> HelperContract.PROOT_VERSION_DEADLINE_MS
     }
 
@@ -180,6 +204,31 @@ class ProotRunner(private val context: Context) {
             runCatching { Os.kill(pid, OsConstants.SIGKILL) }
         }
         process?.destroyForcibly()
+    }
+
+    /** Kills every process of this UID whose executable is inside [root] (re-parented tracees too). */
+    private fun sweepUnder(root: File) {
+        for (pid in pidsUnder(root)) runCatching { Os.kill(pid, OsConstants.SIGKILL) }
+    }
+
+    private fun countUnder(root: File): Int = pidsUnder(root).size
+
+    private fun pidsUnder(root: File): List<Int> {
+        val prefix = root.canonicalPath + File.separator
+        val myUid = android.os.Process.myUid()
+        val found = mutableListOf<Int>()
+        File("/proc").listFiles()?.forEach { entry ->
+            val pid = entry.name.toIntOrNull() ?: return@forEach
+            if (pid == android.os.Process.myPid()) return@forEach
+            val uid = runCatching {
+                File(entry, "status").readLines().first { it.startsWith("Uid:") }
+                    .split(Regex("\\s+"))[1].toInt()
+            }.getOrNull() ?: return@forEach
+            if (uid != myUid) return@forEach
+            val exe = runCatching { Os.readlink("/proc/$pid/exe") }.getOrNull() ?: return@forEach
+            if (exe.startsWith(prefix)) found.add(pid)
+        }
+        return found
     }
 
     private fun descendantsOf(root: Int): List<Int> {
@@ -237,7 +286,18 @@ class ProotRunner(private val context: Context) {
         const val BINARY = "libproot.so"
         const val LOADER = "libproot-loader.so"
         private const val SLEEP_BIN = "/system/bin/sleep"
+        private const val GUEST_PATH = "/bin:/usr/bin:/sbin:/usr/sbin"
         private const val CLEANUP_WAIT_MS = 2_000L
         private const val READER_WAIT_MS = 2_000L
+
+        /** Guest script: constant text, markers for the test, and busybox identity and link evidence. */
+        private val GUEST_SCRIPT = listOf(
+            "echo ${HelperContract.GUEST_PROBE_BEGIN}",
+            "/bin/busybox uname -m",
+            "/bin/busybox cat /etc/alpine-release",
+            "/bin/busybox readlink /bin/sh",
+            "/bin/busybox | /bin/busybox head -n 1",
+            "echo ${HelperContract.GUEST_PROBE_END}",
+        ).joinToString("; ")
     }
 }

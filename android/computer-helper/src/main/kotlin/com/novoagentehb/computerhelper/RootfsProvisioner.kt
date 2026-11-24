@@ -30,7 +30,23 @@ import java.util.zip.GZIPInputStream
  * activate with an atomic rename. A valid installation is never replaced; a partial one never
  * becomes active. Any failure or cancel deletes the staging directory.
  */
-class RootfsProvisioner(private val context: Context) {
+class RootfsProvisioner(
+    private val context: Context,
+    private val variant: Variant = Variant.AARCH64,
+) {
+
+    /** One Alpine rootfs installation: asset, pinned digest, private directory and expected ELF arch. */
+    data class Variant(val asset: String, val sha256: String, val dir: String, val arch: String) {
+        companion object {
+            val AARCH64 = Variant(
+                HelperContract.ALPINE_ASSET, HelperContract.ALPINE_SHA256, HelperContract.ROOTFS_DIR, "aarch64",
+            )
+            /** Test-only emulator proof variant (x86_64). Never the product rootfs. */
+            val X86_64_TEST = Variant(
+                HelperContract.ALPINE_X86_ASSET, HelperContract.ALPINE_X86_SHA256, HelperContract.ROOTFS_X86_DIR, "x86_64",
+            )
+        }
+    }
 
     enum class State { NOT_STARTED, RUNNING, INSTALLED, CANCELLED, FAILED, NO_ASSET }
 
@@ -46,7 +62,13 @@ class RootfsProvisioner(private val context: Context) {
     private var current = Snapshot(State.NOT_STARTED)
 
     private val filesDir: File get() = context.filesDir
-    private val root: File get() = File(filesDir, HelperContract.ROOTFS_DIR)
+    private val root: File get() = File(filesDir, variant.dir)
+
+    /** Private rootfs directory of this variant (guest root for PRoot). */
+    fun rootDir(): File = root
+
+    /** True only when the on-disk tree verifies against the marker and pinned digest. */
+    fun isInstalled(): Boolean = validInstall() != null
 
     /** Starts the job unless one is running or a valid installation exists. Idempotent. */
     fun start(): Snapshot = synchronized(lock) {
@@ -99,9 +121,10 @@ class RootfsProvisioner(private val context: Context) {
             checkCancelled()
             val summary = RootfsVerifier.verify(
                 staging, HelperContract.ALPINE_VERSION, HelperContract.ROOTFS_MAX_ENTRIES, HelperContract.ROOTFS_MAX_BYTES,
+                variant.arch,
             )
             File(staging, MARKER).writeText(
-                "version=${HelperContract.ALPINE_VERSION}\nsha256=${HelperContract.ALPINE_SHA256}\n" +
+                "version=${HelperContract.ALPINE_VERSION}\nsha256=${variant.sha256}\n" +
                     "files=${summary.files}\nbytes=${summary.bytes}\n",
             )
             checkCancelled()
@@ -138,7 +161,7 @@ class RootfsProvisioner(private val context: Context) {
             }
         }
         val actual = digest.digest().joinToString("") { "%02x".format(it) }
-        if (actual != HelperContract.ALPINE_SHA256) throw ProvisionFailed("sha256-mismatch")
+        if (actual != variant.sha256) throw ProvisionFailed("sha256-mismatch")
     }
 
     /** Replaces the rootfs only if it is absent or invalid; never replaces a valid installation. */
@@ -170,19 +193,19 @@ class RootfsProvisioner(private val context: Context) {
         if (!marker.isFile) return null
         val text = runCatching { marker.readText() }.getOrNull() ?: return null
         if (!text.contains("version=${HelperContract.ALPINE_VERSION}\n") ||
-            !text.contains("sha256=${HelperContract.ALPINE_SHA256}\n")
+            !text.contains("sha256=${variant.sha256}\n")
         ) return null
         return try {
-            RootfsVerifier.verify(root, HelperContract.ALPINE_VERSION, HelperContract.ROOTFS_MAX_ENTRIES, HelperContract.ROOTFS_MAX_BYTES)
+            RootfsVerifier.verify(root, HelperContract.ALPINE_VERSION, HelperContract.ROOTFS_MAX_ENTRIES, HelperContract.ROOTFS_MAX_BYTES, variant.arch)
         } catch (invalid: Exception) {
             null
         }
     }
 
     private fun assetPresent(): Boolean =
-        runCatching { context.assets.open(HelperContract.ALPINE_ASSET).close() }.isSuccess
+        runCatching { context.assets.open(variant.asset).close() }.isSuccess
 
-    private fun openAsset(): InputStream = context.assets.open(HelperContract.ALPINE_ASSET)
+    private fun openAsset(): InputStream = context.assets.open(variant.asset)
 
     private fun checkCancelled() {
         if (cancelRequested) throw ProvisionCancelled()
@@ -190,7 +213,7 @@ class RootfsProvisioner(private val context: Context) {
 
     private fun render(summary: RootfsVerifier.Summary): String =
         "release=${summary.release} arch=${summary.arch} files=${summary.files} bytes=${summary.bytes} " +
-            "sha256=${HelperContract.ALPINE_SHA256}"
+            "sha256=${variant.sha256}"
 
     /** Deletes a tree without following links: a symlink is removed itself, never its target. */
     private fun deleteTree(target: File) {
