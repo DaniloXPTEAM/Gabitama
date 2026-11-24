@@ -34,6 +34,10 @@ class ComputerRootfsProvisionAndroidTest {
 
     @Test
     fun a01_provisionInstallsVerifiedAlpineInHelperPrivateStorage(): Unit = runBlocking<Unit> {
+        // Probe: the shell channel must answer before any file-level assertion can mean anything.
+        val probe = shell("echo probe").trim()
+        log("a01 probe out=$probe rc=$lastShellRc")
+        assertEquals("probe", probe)
         val client = ComputerHelperClient(instrumentation.targetContext)
         try {
             val reply = client.provisionStart()
@@ -168,12 +172,18 @@ class ComputerRootfsProvisionAndroidTest {
     }
 
     /** Runs a shell command as the shell user (run-as for the helper), returning stdout. */
+    private var lastShellRc: String? = null
+
     private fun shell(command: String): String {
-        // stderr is merged into stdout: executeShellCommand returns stdout only, so errors would vanish.
-        val wrapped = "run-as $helper sh -c '${command.replace("'", "'\\''")}' 2>&1"
+        // stderr is merged into stdout and the exit code is appended, so an empty body can be told apart
+        // from "run-as produced nothing at all".
+        val wrapped = "run-as $helper sh -c '${command.replace("'", "'\\''")}' 2>&1; echo __rc=\$?"
         val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(wrapped)
-        val out = ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
-        if (out.isBlank()) log("shell empty for: ${command.take(120)}")
+        val raw = ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
+        val rc = Regex("__rc=(\\d+)").find(raw)?.groupValues?.get(1)
+        val out = raw.replace(Regex("__rc=\\d+\\n?"), "")
+        if (out.isBlank()) log("shell empty for: ${command.take(120)} rc=$rc raw=${raw.take(200)}")
+        lastShellRc = rc
         return out
     }
 
