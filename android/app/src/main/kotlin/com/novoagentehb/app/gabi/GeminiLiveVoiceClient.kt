@@ -17,6 +17,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -84,22 +85,11 @@ class GeminiLiveVoiceClient @Inject constructor(
                 }
             }
 
-            override fun onMessage(webSocket: WebSocket, text: String) = synchronized(this@GeminiLiveVoiceClient) {
-                if (activeSocket !== webSocket) return@synchronized
-                val parsed = parseServerMessage(text)
-                val failure = parsed.filterIsInstance<GeminiLiveEvent.ConnectionFailed>().firstOrNull()
-                if (failure != null) {
-                    _connected.value = false
-                    activeSocket = null
-                    _events.tryEmit(failure)
-                    webSocket.cancel()
-                    return@synchronized
-                }
-                parsed.forEach {
-                    if (it is GeminiLiveEvent.Ready) _connected.value = true
-                    if (_connected.value || it is GeminiLiveEvent.GoingAway) _events.tryEmit(it)
-                }
-            }
+            override fun onMessage(webSocket: WebSocket, text: String) = onServerText(webSocket, text)
+
+            // The Live service may deliver its JSON as binary frames. Treat them exactly like text frames
+            // (UTF-8); otherwise setupComplete is never parsed and the handshake times out.
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) = onServerText(webSocket, bytes.utf8())
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = synchronized(this@GeminiLiveVoiceClient) {
                 if (activeSocket !== webSocket) return@synchronized
@@ -132,6 +122,24 @@ class GeminiLiveVoiceClient @Inject constructor(
             }
         })
         return true
+    }
+
+    @Synchronized
+    private fun onServerText(webSocket: WebSocket, text: String) {
+        if (activeSocket !== webSocket) return
+        val parsed = parseServerMessage(text)
+        val failure = parsed.filterIsInstance<GeminiLiveEvent.ConnectionFailed>().firstOrNull()
+        if (failure != null) {
+            _connected.value = false
+            activeSocket = null
+            _events.tryEmit(failure)
+            webSocket.cancel()
+            return
+        }
+        parsed.forEach {
+            if (it is GeminiLiveEvent.Ready) _connected.value = true
+            if (_connected.value || it is GeminiLiveEvent.GoingAway) _events.tryEmit(it)
+        }
     }
 
     @Synchronized

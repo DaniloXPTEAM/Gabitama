@@ -40,6 +40,18 @@ class GeminiLiveSocketLifecycleUnitTest {
         fun open(index: Int) = listeners[index].onOpen(sockets[index], Response.Builder()
             .request(sockets[index].request()).protocol(Protocol.HTTP_1_1).code(101).message("Switching Protocols").build())
         fun ready(index: Int) = listeners[index].onMessage(sockets[index], "{\"setupComplete\":{}}")
+        fun readyBinary(index: Int) = listeners[index].onMessage(sockets[index], ByteString.encodeUtf8("{\"setupComplete\":{}}"))
+    }
+
+    @Test fun binaryFrameSetupCompleteMakesSessionReady() {
+        val factory = Factory()
+        val client = GeminiLiveVoiceClient(OkHttpClient(), Gson()).apply { webSocketFactory = factory }
+        assertTrue(client.connect("synthetic-key", systemInstruction = "test"))
+        factory.open(0)
+        assertFalse(client.connected.value)
+        factory.readyBinary(0)
+        assertTrue("binary setupComplete must be parsed like text", client.connected.value)
+        assertTrue(client.sendPcm16AudioChunk(byteArrayOf(1, 2)))
     }
 
     @Test fun lateCallbacksCannotReviveOrDisconnectNewSession() {
