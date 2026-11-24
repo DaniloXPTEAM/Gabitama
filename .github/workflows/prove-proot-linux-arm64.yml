@@ -25,12 +25,15 @@ jobs:
         # The preserved source is copied, never modified. Two host-only deviations, both documented in
         # docs/LICENSE_MATRIX_COMPUTER_RUNTIME.md §5 and docs/TAMA_TWO_PACKAGE_POC.md:
         #  - HAS_LOADER_32BIT= : no 32-bit loader (the host has no -m32; this test runs only aarch64 guests);
-        #  - LD=cc -fuse-ld=gold : the loader uses --rosegment, which GNU ld 2.40 does not accept (gold does);
+        #  - --rosegment removed from the loader link and the default GNU ld used. Measured: the gold-linked
+        #    loader (with --rosegment) segfaults when run directly (exit 139); the same loader linked by the
+        #    default ld runs the Alpine userland under PRoot. Host-only; the Android build keeps upstream flags;
         #  - a compile-only linux/ashmem.h shim: the ashmem extension is Android-only and stays inert
         #    unless --ashmem-memfd is passed, which this test never does.
         run: |
           set -u
           cp -a third_party/tama-runtime/android/deps/proot "$RUNNER_TEMP/proot-src"
+          sed -i 's/,--rosegment//' "$RUNNER_TEMP/proot-src/src/GNUmakefile"
           mkdir -p "$RUNNER_TEMP/shim/linux"
           cat > "$RUNNER_TEMP/shim/linux/ashmem.h" <<'SHIM'
           #ifndef LINUX_ASHMEM_HOST_SHIM
@@ -43,22 +46,13 @@ jobs:
           SHIM
           export CPPFLAGS="-I$RUNNER_TEMP/shim"
           set +e
-          make -C "$RUNNER_TEMP/proot-src/src" -j2 HAS_LOADER_32BIT= LD="cc -fuse-ld=gold" proot > "$RUNNER_TEMP/proot-build.log" 2>&1
+          make -C "$RUNNER_TEMP/proot-src/src" -j2 HAS_LOADER_32BIT= proot > "$RUNNER_TEMP/proot-build.log" 2>&1
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
             { grep -iE 'error|\*\*\*|undefined|no such|cannot|killed' "$RUNNER_TEMP/proot-build.log" | tail -n 8; echo '--- last lines ---'; tail -n 6 "$RUNNER_TEMP/proot-build.log"; } | cut -c1-300 | sed -e 's/%/%25/g' -e 's/^/::error title=PRoot build::/'
           fi
           exit $status
-      - name: Variante de diagnóstico do loader (ld padrão, sem --rosegment; cópia temporária)
-        # Diagnostic only: the PRoot segfaults even on the host rootfs (-r /), so the suspect is the loader.
-        # This builds the same loader with the default GNU ld and without --rosegment, to test that hypothesis.
-        run: |
-          set -u
-          cp -a "$RUNNER_TEMP/proot-src" "$RUNNER_TEMP/proot-src-b"
-          sed -i 's/,--rosegment//' "$RUNNER_TEMP/proot-src-b/src/GNUmakefile"
-          make -C "$RUNNER_TEMP/proot-src-b/src" -j2 HAS_LOADER_32BIT= LD=cc loader/loader > "$RUNNER_TEMP/loader-b.log" 2>&1 || { echo "::notice title=Loader B build::failed: $(tail -c 300 "$RUNNER_TEMP/loader-b.log" | tr '\n' ' ')"; }
-          test -x "$RUNNER_TEMP/proot-src-b/src/loader/loader" && echo "::notice title=Loader B build::built" || true
       - name: Obter Alpine verificado (fora do repositório)
         env:
           KEEP_TARBALL_TO: ${{ runner.temp }}/alpine-minirootfs-3.21.3-aarch64.tar.gz
@@ -72,5 +66,4 @@ jobs:
         env:
           ROOTFS: ${{ runner.temp }}/alpine-root
           PROOT_SRC: ${{ runner.temp }}/proot-src/src
-          LOADER_B: ${{ runner.temp }}/proot-src-b/src/loader/loader
         run: bash scripts/linux-arm64/proot/run-level-c-d.sh

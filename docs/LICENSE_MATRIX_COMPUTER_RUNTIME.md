@@ -55,3 +55,13 @@ transcrever de memória.
 - Não prova conformidade de licença de nenhum componente.
 - Não prova que o PRoot de `third_party` é o binário usado (não há binário compilado no repositório).
 - Não prova que o Alpine é seguro para distribuição; só que o arquivo oficial foi verificado.
+
+## 5. Desvios de compilação no host de teste (não Android; só CI privado)
+
+Aplicados apenas à cópia temporária do PRoot no job `prove-proot-linux-arm64.yml` (fonte preservada, não modificada):
+
+- `HAS_LOADER_32BIT=`: sem loader de 32 bits; o teste roda só guests aarch64.
+- `--rosegment` removido do link do loader, com o `ld` padrão do host. Medido: o loader ligado com gold e `--rosegment` sai com SIGSEGV (139) ao ser executado diretamente; o mesmo loader ligado pelo `ld` padrão executa o userland Alpine sob o PRoot (exit 0). `--rosegment` é uma opção que o GNU ld 2.40 não aceita.
+- Shim `linux/ashmem.h` apenas de compilação: a extensão ashmem é exclusiva do Android e fica inerte sem `--ashmem-memfd`, que este teste nunca usa.
+
+Nenhum desses desvios é distribuído. A compilação Android mantém as flags upstream. Estes desvios não provam que o loader upstream funciona no Android.
