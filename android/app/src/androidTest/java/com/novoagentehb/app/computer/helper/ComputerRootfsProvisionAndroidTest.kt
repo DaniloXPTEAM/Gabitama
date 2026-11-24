@@ -169,9 +169,12 @@ class ComputerRootfsProvisionAndroidTest {
 
     /** Runs a shell command as the shell user (run-as for the helper), returning stdout. */
     private fun shell(command: String): String {
-        val wrapped = "run-as $helper sh -c '${command.replace("'", "'\\''")}'"
+        // stderr is merged into stdout: executeShellCommand returns stdout only, so errors would vanish.
+        val wrapped = "run-as $helper sh -c '${command.replace("'", "'\\''")}' 2>&1"
         val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(wrapped)
-        return ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
+        val out = ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
+        if (out.isBlank()) log("shell empty for: ${command.take(120)}")
+        return out
     }
 
     /** Runs a command with the shell user's privileges (needed for `am`), returning stdout. */
