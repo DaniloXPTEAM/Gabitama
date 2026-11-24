@@ -101,8 +101,22 @@ class HelperService : Service() {
             else OpResult(HelperContract.CODE_OK, sha256(r.bytes))
         }
         HelperContract.TX_ACCESS_PROBE -> accessProbe(data.readString().orEmpty())
+        HelperContract.TX_PROVISION_START -> provision(provisioner.start())
+        HelperContract.TX_PROVISION_STATUS -> provision(provisioner.status())
+        HelperContract.TX_PROVISION_CANCEL -> provision(provisioner.cancel())
         else -> OpResult(HelperContract.CODE_BAD_REQUEST, "")
     }
+
+    private val provisioner by lazy { RootfsProvisioner(this) }
+
+    private fun provision(snapshot: RootfsProvisioner.Snapshot): OpResult = OpResult(
+        when (snapshot.state) {
+            RootfsProvisioner.State.FAILED -> HelperContract.CODE_IO
+            RootfsProvisioner.State.NO_ASSET -> HelperContract.CODE_NOT_INSTALLED
+            else -> HelperContract.CODE_OK
+        },
+        snapshot.render(),
+    )
 
     private fun root(): File = File(filesDir, TREE_DIR).apply { mkdirs() }
 

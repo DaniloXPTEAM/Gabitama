@@ -8,7 +8,10 @@ import sys
 import xml.etree.ElementTree as ET
 
 # Classes run by their own workflow with extra APKs; excluded from this shared suite (see connected-tests.sh).
-EXCLUDED_CLASSES = {'com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest'}
+EXCLUDED_CLASSES = {
+    'com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest',
+    'com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest',
+}
 EXCLUDED_FILES = {os.path.basename(c.replace('.', '/')) + '.kt' for c in EXCLUDED_CLASSES}
 
 raw = open('/tmp/gabitama-instrumentation-ci.log', encoding='utf-8', errors='replace').read().replace('\r', '')

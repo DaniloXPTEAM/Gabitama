@@ -34,7 +34,7 @@ android {
 
     sourceSets {
         named("main") {
-            java.setSrcDirs(listOf("src/main/kotlin", "../computer-contract/src/main/kotlin"))
+            java.setSrcDirs(listOf("src/main/kotlin", "../computer-contract/src/main/kotlin", "../rootfs-extractor/src/main/kotlin"))
         }
     }
 }

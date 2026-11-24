@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Experimental two-package proof of concept (option 1). Runs on an emulator in CI with disposable builds.
-# Fixed operations only; synthetic data only. Passing this does NOT prove that PRoot, Alpine or a terminal work.
+# Fixed operations only; the Alpine rootfs comes from a CI-only debug asset (see the workflow).
+# Passing this does NOT prove that PRoot, a terminal or Alpine execution work.
 set -u
 trap 'status=$?; echo "::error title=Helper PoC::Failure at line $LINENO (status $status)"' ERR
 HELPER_APK=android/computer-helper/build/outputs/apk/debug/computer-helper-debug.apk
@@ -12,25 +13,38 @@ adb install -r "$APP_APK" || { echo '::error title=Helper PoC setup::app install
 adb install -r "$TEST_APK" || { echo '::error title=Helper PoC setup::test install failed'; exit 1; }
 adb shell pm clear com.novoagentehb.computerhelper >/dev/null || true
 adb logcat -c || echo '::warning title=Helper PoC::Could not clear log buffer'
+RUNNER=com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner
 set +e
 adb shell am instrument -w -r -e class com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest \
-  com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/helper-poc.txt 2>&1
-INSTRUMENT_STATUS=$?
+  "$RUNNER" > /tmp/helper-poc.txt 2>&1
+POC_STATUS=$?
+adb shell am instrument -w -r -e class com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest \
+  "$RUNNER" > /tmp/helper-rootfs.txt 2>&1
+ROOTFS_STATUS=$?
 set -e
 adb logcat -d -s TamaIsolationFixture:V > /tmp/helper-poc-log.txt || true
+export POC_STATUS ROOTFS_STATUS
 python3 - <<'PY'
 import os, re
 from pathlib import Path
-out = Path('/tmp/helper-poc.txt').read_text(errors='replace')
+checks = [
+    ('Helper PoC', '/tmp/helper-poc.txt', int(os.environ['POC_STATUS']), 10),
+    ('Helper rootfs', '/tmp/helper-rootfs.txt', int(os.environ['ROOTFS_STATUS']), 6),
+]
 for line in Path('/tmp/helper-poc-log.txt').read_text(errors='replace').splitlines():
     if 'pocHelper:' in line:
         print('::notice title=Helper PoC::' + line.split('TamaIsolationFixture:', 1)[1].strip()[:400].replace('%', '%25'))
-failed = 'FAILURES!!!' in out or re.search(r'\bFAILURES\b', out) is not None
-if os.environ.get('INSTRUMENT_STATUS', '0') != '0' or not re.search(r'OK \(10 tests\)', out) or failed:
-    print('::error title=Helper PoC::FAIL; instrumentation output follows')
-    for line in out.splitlines():
-        if re.search(r'Error|Exception|FAIL|expected|Caused by|at com\.novoagentehb', line):
-            print('::error title=Helper PoC diagnostic::' + line.strip()[:400].replace('%', '%25'))
-    raise SystemExit(1)
-print('::notice title=Helper PoC::OK (10 tests) on API ' + os.environ.get('API_LEVEL', '?'))
+failed = False
+for title, path, status, expected in checks:
+    out = Path(path).read_text(errors='replace')
+    ok = status == 0 and re.search(rf'OK \({expected} tests\)', out) is not None and not re.search(r'\bFAILURES\b', out)
+    if not ok:
+        failed = True
+        print(f'::error title={title}::FAIL (exit {status}); instrumentation output follows')
+        for line in out.splitlines():
+            if re.search(r'Error|Exception|FAIL|expected|Caused by|at com\.novoagentehb', line):
+                print(f'::error title={title} diagnostic::' + line.strip()[:400].replace('%', '%25'))
+    else:
+        print(f'::notice title={title}::OK ({expected} tests)')
+raise SystemExit(1 if failed else 0)
 PY

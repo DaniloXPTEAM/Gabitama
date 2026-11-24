@@ -12,6 +12,9 @@ on:
       - android/app/build.gradle.kts
       - android/settings.gradle.kts
       - scripts/android/computer-helper-poc/**
+      - android/rootfs-extractor/**
+      - android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
+      - scripts/android/alpine-provenance/**
       - .github/workflows/test-computer-helper-poc.yml
 permissions:
   contents: read
@@ -37,6 +40,14 @@ jobs:
           cmd = os.path.join(os.environ['ANDROID_HOME'], 'cmdline-tools/latest/bin/sdkmanager')
           subprocess.run([cmd, '--install', 'ndk;27.0.12077973'], input='y\n' * 100, text=True, check=True)
           PYNDK
+      - name: Obter Alpine verificado como asset de teste do auxiliar (debug, fora do Git)
+        env:
+          KEEP_TARBALL_TO: ${{ github.workspace }}/android/computer-helper/src/debug/assets/alpine-minirootfs-3.21.3-aarch64.tar.gz
+          OUT_DIR: ${{ runner.temp }}/alpine-provenance
+        run: |
+          mkdir -p android/computer-helper/src/debug/assets
+          bash scripts/android/alpine-provenance/verify.sh
+          git check-ignore -q "$KEEP_TARBALL_TO" || { echo '::error title=Asset::tarball is not git-ignored'; exit 1; }
       - name: Construir APKs descartáveis (app, teste e auxiliar)
         working-directory: android
         run: |

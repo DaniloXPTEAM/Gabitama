@@ -77,7 +77,7 @@ android {
     sourceSets {
         named("main") {
             // computer-contract: shared, Android-free contract of the experimental computer helper.
-            java.setSrcDirs(listOf("src/main/kotlin", "../computer-contract/src/main/kotlin"))
+            java.setSrcDirs(listOf("src/main/kotlin", "../computer-contract/src/main/kotlin", "../rootfs-extractor/src/main/kotlin"))
         }
         named("test") {
             java.setSrcDirs(listOf("src/test/kotlin", "../computer-contract/src/test/kotlin"))

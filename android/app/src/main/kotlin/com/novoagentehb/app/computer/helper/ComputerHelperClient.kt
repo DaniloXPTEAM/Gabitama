@@ -79,6 +79,16 @@ class ComputerHelperClient(
         it.writeString(context.packageName)
     }
 
+    /**
+     * Starts the fixed Alpine provisioning job in the helper. Takes no arguments. Idempotent: a running
+     * or completed job is reported, not repeated, so a retried call after a dead binder is safe.
+     */
+    suspend fun provisionStart(): Reply = transact(HelperContract.TX_PROVISION_START, idempotent = true) {}
+
+    suspend fun provisionStatus(): Reply = transact(HelperContract.TX_PROVISION_STATUS, idempotent = true) {}
+
+    suspend fun provisionCancel(): Reply = transact(HelperContract.TX_PROVISION_CANCEL, idempotent = true) {}
+
     /** Releases the binding. The next call binds again. */
     suspend fun close() {
         lock.withLock {

@@ -18,6 +18,18 @@ object HelperContract {
     const val TX_READ = 3
     const val TX_SHA256 = 4
     const val TX_ACCESS_PROBE = 5
+    const val TX_PROVISION_START = 6
+    const val TX_PROVISION_STATUS = 7
+    const val TX_PROVISION_CANCEL = 8
+
+    // Fixed Alpine rootfs provisioning (experimental, debug/test builds only). No arguments accepted.
+    const val ALPINE_VERSION = "3.21.3"
+    const val ALPINE_ASSET = "alpine-minirootfs-3.21.3-aarch64.tar.gz"
+    const val ALPINE_SHA256 = "ead8a4b37867bd19e7417dd078748e2312c0aea364403d96758d63ea8ff261ea"
+    const val ROOTFS_DIR = "alpine-rootfs"
+    const val ROOTFS_MAX_ENTRIES = 20_000
+    const val ROOTFS_MAX_BYTES = 256L * 1024 * 1024
+    const val ROOTFS_MIN_FREE_BYTES = 256L * 1024 * 1024
 
     // Result codes written as the first int of every reply.
     const val CODE_OK = 0

@@ -36,3 +36,6 @@ Thumbs.db
 
 # Entregas locais geradas, não publicar artefatos binários no repositório
 /entrega-r1-4-2/
+
+# Alpine minirootfs: CI-only debug test asset, never committed or distributed (see docs/TAMA_TWO_PACKAGE_POC.md)
+android/computer-helper/src/debug/assets/alpine-minirootfs-*.tar.gz

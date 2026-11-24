@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Verifies the provenance of the official Alpine aarch64 minirootfs WITHOUT extracting
-# or executing anything from it. Used only as CI evidence; nothing is bundled into an APK.
+# or executing anything from it. Nothing is bundled into a published APK. CI may copy the verified
+# tarball to a debug-only test asset via KEEP_TARBALL_TO (never committed, never uploaded).
 #
 # Trust chain:
 #   1. Tarball + .sha256 + .asc fetched from the official dl-cdn.alpinelinux.org mirror.
@@ -57,6 +58,11 @@ if ! grep -q "^\[GNUPG:\] VALIDSIG ${PUBLISHED_FPR}" "$WORK/status"; then
   exit 1
 fi
 echo "OK VALIDSIG from published key"
+if [ -n "${KEEP_TARBALL_TO:-}" ]; then
+  # Only after every check above passed. Callers must keep the copy out of Git and out of artifacts.
+  cp "$WORK/$TARBALL" "$KEEP_TARBALL_TO"
+  echo "OK kept verified tarball at $KEEP_TARBALL_TO (not for distribution)"
+fi
 
 echo "[5-6] tar inspection (no extraction)"
 python3 - "$WORK/$TARBALL" "$OUT_DIR/alpine-minirootfs-provenance.txt" "$ALPINE_VERSION" <<'PY'

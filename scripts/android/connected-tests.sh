@@ -28,7 +28,7 @@ adb shell pm list instrumentation | grep -F 'com.novoagentehb.app.debug.test/and
 if [ "$status" -eq 0 ]; then
   # The computer-helper PoC needs its separate helper APK, installed only by its own workflow
   # (test-computer-helper-poc.yml). This shared suite does not install it, so exclude that class here.
-  adb shell am instrument -w -r -e notClass com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1 || status=1
+  adb shell am instrument -w -r -e notClass com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest,com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1 || status=1
   python3 scripts/android/parse-instrumentation.py || status=1
 fi
 # Capture files once more before stopping the collector.
