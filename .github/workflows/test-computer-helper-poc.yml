@@ -117,3 +117,11 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: scripts/android/computer-helper-poc/run.sh
+      - name: Guardar traço diagnóstico do fork (texto, artefato privado de CI, 7 dias)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proot-fork-trace-api-${{ matrix.api }}
+          path: /tmp/poc-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

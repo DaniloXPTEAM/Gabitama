@@ -25,6 +25,9 @@ adb shell am instrument -w -r -e class com.novoagentehb.app.computer.helper.Comp
   "$RUNNER" > /tmp/helper-proot.txt 2>&1
 PROOT_STATUS=$?
 set -e
+# Diagnostic artefact (text only, CI-private): the fork trace the helper kept in its cache.
+mkdir -p /tmp/poc-artifacts
+adb shell run-as com.novoagentehb.computerhelper cat cache/proot-fork-trace.log > /tmp/poc-artifacts/proot-fork-trace.log 2>/dev/null || echo '::warning title=Helper PoC::fork trace not copied (run-as unavailable)'
 adb logcat -d -s TamaIsolationFixture:V > /tmp/helper-poc-log.txt || true
 export POC_STATUS ROOTFS_STATUS PROOT_STATUS
 python3 - <<'PY'
