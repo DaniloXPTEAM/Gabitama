@@ -33,7 +33,7 @@ class ProotRunner(private val context: Context) {
         val output: String,
     ) {
         fun render(): String =
-            "state=${state.name} op=$op exit=$exitCode elapsedMs=$elapsedMs note=$note output=${output.replace('\n', ' | ')}"
+            "state=${state.name} op=$op exit=$exitCode elapsedMs=$elapsedMs note=$note output=${output.replace("\n", " | ")}"
     }
 
     private class Run(val op: Int) {
