@@ -1,11 +1,9 @@
 name: Gemini text chat real check (free model)
 
-# Real network check for the Gabi chat default (gemini-3.5-flash-lite). Free tier only. Three short calls.
+# Manual only (workflow_dispatch). Real network check for the Gabi chat default (gemini-3.5-flash-lite). Free tier only. Three short calls.
 # The key comes from the repository secret GEMINI_LIVE_TEST_KEY and is never written to files or logs.
 on:
-  push:
-    paths:
-      - scripts/gemini-text/text_latency.py
+  workflow_dispatch:
 
 permissions:
   contents: read
