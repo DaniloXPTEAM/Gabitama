@@ -89,6 +89,18 @@ class ComputerHelperClient(
 
     suspend fun provisionCancel(): Reply = transact(HelperContract.TX_PROVISION_CANCEL, idempotent = true) {}
 
+    /**
+     * Starts one fixed PRoot operation in the helper. Only an operation id is sent. Not idempotent:
+     * a dead binder is reported instead of retried, so a second run is never started silently.
+     */
+    suspend fun prootStart(operation: Int): Reply = transact(HelperContract.TX_PROOT_START, idempotent = false) {
+        it.writeInt(operation)
+    }
+
+    suspend fun prootStatus(): Reply = transact(HelperContract.TX_PROOT_STATUS, idempotent = true) {}
+
+    suspend fun prootCancel(): Reply = transact(HelperContract.TX_PROOT_CANCEL, idempotent = true) {}
+
     /** Releases the binding. The next call binds again. */
     suspend fun close() {
         lock.withLock {

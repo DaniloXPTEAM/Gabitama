@@ -21,15 +21,19 @@ POC_STATUS=$?
 adb shell am instrument -w -r -e class com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest \
   "$RUNNER" > /tmp/helper-rootfs.txt 2>&1
 ROOTFS_STATUS=$?
+adb shell am instrument -w -r -e class com.novoagentehb.app.computer.helper.ComputerProotRunAndroidTest \
+  "$RUNNER" > /tmp/helper-proot.txt 2>&1
+PROOT_STATUS=$?
 set -e
 adb logcat -d -s TamaIsolationFixture:V > /tmp/helper-poc-log.txt || true
-export POC_STATUS ROOTFS_STATUS
+export POC_STATUS ROOTFS_STATUS PROOT_STATUS
 python3 - <<'PY'
 import os, re
 from pathlib import Path
 checks = [
     ('Helper PoC', '/tmp/helper-poc.txt', int(os.environ['POC_STATUS']), 10),
     ('Helper rootfs', '/tmp/helper-rootfs.txt', int(os.environ['ROOTFS_STATUS']), 6),
+    ('Helper PRoot run', '/tmp/helper-proot.txt', int(os.environ['PROOT_STATUS']), 3),
 ]
 for line in Path('/tmp/helper-poc-log.txt').read_text(errors='replace').splitlines():
     if 'pocHelper:' in line:

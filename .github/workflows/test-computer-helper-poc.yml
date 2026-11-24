@@ -12,6 +12,8 @@ on:
       - android/app/build.gradle.kts
       - android/settings.gradle.kts
       - scripts/android/computer-helper-poc/**
+      - scripts/android/proot-original/**
+      - third_party/tama-runtime/android/deps/**
       - android/rootfs-extractor/**
       - android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
       - scripts/android/alpine-provenance/**
@@ -48,6 +50,14 @@ jobs:
           mkdir -p android/computer-helper/src/debug/assets
           bash scripts/android/alpine-provenance/verify.sh
           git check-ignore -q "$KEEP_TARBALL_TO" || { echo '::error title=Asset::tarball is not git-ignored'; exit 1; }
+      - name: Compilar PRoot original para Android x86_64 (cópia descartável; só para o emulador)
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
+          bash scripts/android/proot-original/build-original.sh x86_64 "$RUNNER_TEMP/proot-x86_64"
+          mkdir -p android/computer-helper/src/debug/jniLibs/x86_64
+          cp "$RUNNER_TEMP/proot-x86_64/libproot.so" "$RUNNER_TEMP/proot-x86_64/libproot-loader.so" android/computer-helper/src/debug/jniLibs/x86_64/
+          git check-ignore -q android/computer-helper/src/debug/jniLibs/x86_64/libproot.so || { echo '::error title=PRoot::jniLibs not git-ignored'; exit 1; }
       - name: Construir APKs descartáveis (app, teste e auxiliar)
         working-directory: android
         run: |
@@ -67,6 +77,8 @@ jobs:
           for apk in glob.glob('android/computer-helper/build/outputs/apk/debug/*.apk'):
               names = [n for n in zipfile.ZipFile(apk).namelist() if n.startswith('assets/')]
               print('::notice title=Helper APK assets::' + os.path.basename(apk) + ' ' + repr(names[:20]) + ' count=' + str(len(names)))
+              libs = [n for n in zipfile.ZipFile(apk).namelist() if n.startswith('lib/')]
+              print('::notice title=Helper APK native::' + os.path.basename(apk) + ' ' + repr(libs[:10]))
           PYDIAG
       - name: Habilitar KVM
         run: |

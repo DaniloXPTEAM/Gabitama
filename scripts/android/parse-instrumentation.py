@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 EXCLUDED_CLASSES = {
     'com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest',
     'com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest',
+    'com.novoagentehb.app.computer.helper.ComputerProotRunAndroidTest',
 }
 EXCLUDED_FILES = {os.path.basename(c.replace('.', '/')) + '.kt' for c in EXCLUDED_CLASSES}
 

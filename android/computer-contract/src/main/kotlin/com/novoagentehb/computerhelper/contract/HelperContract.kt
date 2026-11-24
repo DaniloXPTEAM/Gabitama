@@ -22,6 +22,16 @@ object HelperContract {
     const val TX_PROVISION_STATUS = 7
     const val TX_PROVISION_CANCEL = 8
 
+    // Fixed PRoot runs (experimental, debug/test builds only). The caller sends only an operation id.
+    const val TX_PROOT_START = 10
+    const val TX_PROOT_STATUS = 11
+    const val TX_PROOT_CANCEL = 12
+    const val PROOT_OP_VERSION = 1
+    const val PROOT_OP_HOST_SLEEP = 2
+    const val PROOT_MAX_OUTPUT_BYTES = 4096
+    const val PROOT_VERSION_DEADLINE_MS = 10_000L
+    const val PROOT_SLEEP_DEADLINE_MS = 5_000L
+
     // Fixed Alpine rootfs provisioning (experimental, debug/test builds only). No arguments accepted.
     const val ALPINE_VERSION = "3.21.3"
     // Asset name without a compressed-file extension: the Android build stored "*.tar.gz" as "*.tar".

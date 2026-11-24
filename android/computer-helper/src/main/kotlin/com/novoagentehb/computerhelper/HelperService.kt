@@ -104,10 +104,18 @@ class HelperService : Service() {
         HelperContract.TX_PROVISION_START -> provision(provisioner.start())
         HelperContract.TX_PROVISION_STATUS -> provision(provisioner.status())
         HelperContract.TX_PROVISION_CANCEL -> provision(provisioner.cancel())
+        HelperContract.TX_PROOT_START -> {
+            val (code, snapshot) = prootRunner.start(data.readInt())
+            OpResult(code, snapshot.render())
+        }
+        HelperContract.TX_PROOT_STATUS -> OpResult(HelperContract.CODE_OK, prootRunner.status().render())
+        HelperContract.TX_PROOT_CANCEL -> OpResult(HelperContract.CODE_OK, prootRunner.cancel().render())
         else -> OpResult(HelperContract.CODE_BAD_REQUEST, "")
     }
 
     private val provisioner by lazy { RootfsProvisioner(this) }
+
+    private val prootRunner by lazy { ProotRunner(this) }
 
     private fun provision(snapshot: RootfsProvisioner.Snapshot): OpResult = OpResult(
         when (snapshot.state) {

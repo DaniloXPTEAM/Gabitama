@@ -10,7 +10,7 @@
     <application
         android:allowBackup="false"
         android:label="Computador auxiliar (PoC)"
-        android:extractNativeLibs="false">
+        android:extractNativeLibs="true">
 
         <service
             android:name=".HelperService"

@@ -39,3 +39,5 @@ Thumbs.db
 
 # Alpine minirootfs: CI-only debug test asset, never committed or distributed (see docs/TAMA_TWO_PACKAGE_POC.md)
 android/computer-helper/src/debug/assets/alpine-minirootfs-*
+# CI-only PRoot build outputs copied into the helper debug source set (never committed, never distributed).
+android/computer-helper/src/debug/jniLibs/
