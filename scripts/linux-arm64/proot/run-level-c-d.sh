@@ -5,12 +5,14 @@
 #   D: a fixed diagnostic bootstrap inside that root (uname, release file, busybox applet).
 # Passing this does NOT prove the Android app, bionic, Termux loaders, a PTY or a persistent shell.
 set -euo pipefail
+trap 'echo "::error title=Level C/D::failed at line $LINENO: $BASH_COMMAND (exit $?)"' ERR
 PROOT_SRC="${PROOT_SRC:-third_party/tama-runtime/android/deps/proot/src}"
 PROOT="$PROOT_SRC/proot"
 LOADER="$PROOT_SRC/loader/loader"
 ROOTFS="${ROOTFS:?set ROOTFS to the extracted Alpine tree}"
 
 echo "== Level C: PRoot binary"
+echo "::notice title=Host::uname=$(uname -m) kernel=$(uname -r) proot=$PROOT loader=$LOADER"
 test -x "$PROOT" || { echo "::error title=Level C::proot not built"; exit 1; }
 test -x "$LOADER" || { echo "::error title=Level C::loader not built"; exit 1; }
 machine=$(python3 -c "import struct,sys;d=open(sys.argv[1],'rb').read(20);print(struct.unpack('<H',d[18:20])[0])" "$PROOT")
