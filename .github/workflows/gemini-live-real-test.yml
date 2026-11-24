@@ -32,6 +32,7 @@ jobs:
           rc=$?
           cat live.jsonl
           echo "stderr_lines=$(wc -l < live.err)"
+          while IFS= read -r line; do echo "::notice title=gemini-live::$line"; done < live.jsonl
           exit $rc
       - name: Summary
         if: always()
