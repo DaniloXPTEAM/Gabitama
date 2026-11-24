@@ -78,7 +78,9 @@ jobs:
               names = [n for n in zipfile.ZipFile(apk).namelist() if n.startswith('assets/')]
               print('::notice title=Helper APK assets::' + os.path.basename(apk) + ' ' + repr(names[:20]) + ' count=' + str(len(names)))
               libs = [n for n in zipfile.ZipFile(apk).namelist() if n.startswith('lib/')]
-              print('::notice title=Helper APK native::' + os.path.basename(apk) + ' ' + repr(libs[:10]))
+              print('::notice title=APK native libs::' + os.path.basename(apk) + ' count=' + str(len(libs)) + ' ' + repr(libs[:12]))
+              hits = [n for n in zipfile.ZipFile(apk).namelist() if any(k in n.lower() for k in ('ffmpeg', 'lame', 'ish', 'proot', 'alpine'))]
+              print('::notice title=APK component scan::' + os.path.basename(apk) + ' ffmpeg/lame/ish/proot/alpine entries=' + repr(hits))
           PYDIAG
       - name: Habilitar KVM
         run: |

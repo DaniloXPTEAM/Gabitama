@@ -21,8 +21,8 @@ afirmado por outra fonte, não reproduzido; **pendente** = exige decisão ou ver
 | talloc (Samba) | 2.4.2 (script de build) | **LGPL-3.0-or-later** (`deps/talloc/COPYING.LESSER`) | samba.org (`download.samba.org/pub/talloc/talloc-2.4.2.tar.gz`) | `third_party/.../deps/talloc/` | **verificado** (texto presente) | LGPL: vinculação estática exige revisão. Ver §3. |
 | Loaders Termux `libproot-loader*.so` | `termux/proot` `4dba3afbf3a63af89b4d9c1a59bf2bda10f4d10f` (candidato, não provado) | GPL-2.0 (PRoot) | Tama snapshot, bytes vendorados | `third_party/.../deps/` | **pendente** | Sem correspondência fonte↔binário comprovada. **Não incluir em release.** Não estão no APK. |
 | Alpine Linux minirootfs | `3.21.3` aarch64 | agregado de pacotes | `https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/aarch64/alpine-minirootfs-3.21.3-aarch64.tar.gz` | só CI (asset de teste do auxiliar) | **verificado** (SHA-256, GPG, run `45301152901`) | Licença por pacote: ver §2 (lida do APK DB do próprio tarball no CI). |
-| BusyBox (dentro do Alpine) | versão a confirmar no APK DB (§2) | GPL-2.0-only (declarado no notice do Tama e no APK DB) | pacote Alpine | dentro do rootfs | declarado | Qualquer distribuição do rootfs exige avisos e fonte. |
-| musl libc (dentro do Alpine) | versão a confirmar no APK DB (§2) | MIT (declarado e no APK DB) | pacote Alpine | dentro do rootfs | declarado | Avisos de copyright. |
+| BusyBox (dentro do Alpine) | 1.37.0-r12 (APK DB, §2) | GPL-2.0-only (APK DB) | pacote Alpine | dentro do rootfs | verificado (APK DB) | Qualquer distribuição do rootfs exige avisos e fonte. |
+| musl libc (dentro do Alpine) | 1.2.5-r9 (APK DB, §2) | MIT (APK DB) | pacote Alpine | dentro do rootfs | verificado (APK DB) | Avisos de copyright. |
 | Demais pacotes Alpine | ver §2 | ver §2 | Alpine | dentro do rootfs | pendente | Cada licença de pacote deve ser revisada antes de distribuição. |
 | Bibliotecas Gradle (AndroidX, Compose, Kotlin, OkHttp, Retrofit, Gson, Hilt etc.) | conforme `libs.versions.toml` | Apache-2.0 / MIT / EPL-1.0 (teste) | Maven/Google | APK | verificado | Já listadas em `THIRD_PARTY_NOTICES.md` §2. Árvore transitiva não resolvida offline. |
 | Gradle Wrapper 8.9 | 8.9.0 | Apache-2.0 | gradle/gradle | `android/gradlew` | verificado | Listado em `THIRD_PARTY_NOTICES.md` §1. |
@@ -33,11 +33,32 @@ afirmado por outra fonte, não reproduzido; **pendente** = exige decisão ou ver
 
 ## 2. Inventário de pacotes Alpine 3.21.3 aarch64
 
-O inventário sai da base `lib/apk/db/installed` **dentro do próprio tarball verificado**, lido pelo
-`scripts/android/alpine-provenance/verify.sh` no CI (`::notice title=Alpine package::`). Os nomes,
-versões e licenças abaixo devem ser copiados do log do job `provenance` do run `45301152901` ou de um
-run posterior que execute a versão atual do script. Esta seção fica **pendente** até essa cópia, para não
-transcrever de memória.
+Fonte: `lib/apk/db/installed` **dentro do tarball oficial verificado** (SHA-256 `ead8a4b3…ff261ea`, assinatura GPG
+do emissor `293ACD0907D9495A`), lido pelo `scripts/android/alpine-provenance/verify.sh` no job de Nível C/D
+(run [45311152712](https://github.com/DaniloXPTEAM/Gabitama/actions/runs/45311152712), commit `0471cde`).
+O tarball não foi distribuído. Licenças são as declaradas pelo próprio pacote no APK DB; **não** são uma
+análise de conformidade.
+
+| Pacote | Versão | Licença declarada |
+|---|---|---|
+| alpine-baselayout | 3.6.8-r1 | GPL-2.0-only |
+| alpine-baselayout-data | 3.6.8-r1 | GPL-2.0-only |
+| alpine-keys | 2.5-r0 | MIT |
+| alpine-release | 3.21.3-r0 | MIT |
+| apk-tools | 2.14.6-r3 | GPL-2.0-only |
+| busybox | 1.37.0-r12 | GPL-2.0-only |
+| busybox-binsh | 1.37.0-r12 | GPL-2.0-only |
+| ca-certificates-bundle | 20241121-r1 | MPL-2.0 AND MIT |
+| libcrypto3 | 3.3.3-r0 | Apache-2.0 |
+| libssl3 | 3.3.3-r0 | Apache-2.0 |
+| musl | 1.2.5-r9 | MIT |
+| musl-utils | 1.2.5-r9 | MIT AND BSD-2-Clause AND GPL-2.0-or-later |
+| scanelf | 1.3.8-r1 | GPL-2.0-only |
+| ssl_client | 1.37.0-r12 | GPL-2.0-only |
+| zlib | 1.3.1-r2 | Zlib |
+
+Total: 15 pacotes. Qualquer distribuição do rootfs exige avisos, texto das licenças e fonte correspondente de
+cada pacote GPL/LGPL/MPL; isso permanece **pendente**.
 
 ## 3. Obrigações não resolvidas antes de qualquer distribuição
 
