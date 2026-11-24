@@ -3,7 +3,16 @@
 Este arquivo registra bibliotecas de terceiros declaradas no build Android
 (`android/gradle/libs.versions.toml` e `android/app/build.gradle.kts`),
 ferramentas de empacotamento Gradle e referências históricas sob licença
-permissiva. Nenhum componente GNU GPL, LGPL ou AGPL é declarado ou incorporado.
+permissiva.
+
+> **Correção factual (2026-11-23).** A frase anterior, "Nenhum componente GNU GPL, LGPL ou AGPL é
+> declarado ou incorporado", estava **desatualizada e não deve ser usada**. O repositório contém código
+> e textos sob GPL/LGPL: `third_party/tama-runtime/android/deps/proot` (GPL-2.0), `deps/talloc`
+> (LGPL-3.0-or-later), `android/app/src/main/cpp/pty_bridge.c` (compilado no APK via CMake, origem Tama,
+> licença do arquivo a confirmar) e textos GPL-3.0 em `android/app/src/main/assets/licenses/tama-runtime/`.
+> O inventário completo, com fontes e pendências, está em `docs/LICENSE_MATRIX_COMPUTER_RUNTIME.md`.
+> Presença de código GPL/LGPL não significa proibição de uso; a conformidade de qualquer distribuição
+> será analisada separadamente pelo proprietário.
 
 > **Escopo honesto de auditoria:** `evidence/SBOM.json` lista todas as coordenadas
 > diretas declaradas em `libs.versions.toml` e o Gradle Wrapper 8.9. A árvore

@@ -57,6 +57,17 @@ jobs:
             python3 ../scripts/android/computer-helper-poc/summarize-build.py /tmp/helper-build.log
             exit 1
           }
+      - name: Diagnóstico do asset do auxiliar (somente nomes)
+        if: always()
+        run: |
+          python3 - <<'PYDIAG'
+          import glob, os, zipfile
+          src = 'android/computer-helper/src/debug/assets'
+          print('::notice title=Asset source::' + repr(sorted(os.listdir(src)) if os.path.isdir(src) else 'missing dir'))
+          for apk in glob.glob('android/computer-helper/build/outputs/apk/debug/*.apk'):
+              names = [n for n in zipfile.ZipFile(apk).namelist() if n.startswith('assets/')]
+              print('::notice title=Helper APK assets::' + os.path.basename(apk) + ' ' + repr(names[:20]) + ' count=' + str(len(names)))
+          PYDIAG
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

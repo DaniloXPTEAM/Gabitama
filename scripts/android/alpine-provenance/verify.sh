@@ -73,6 +73,7 @@ problems = []
 counts = {"file": 0, "dir": 0, "symlink": 0, "hardlink": 0, "other": 0}
 busybox_header = None
 release = None
+apk_db = None
 
 with tarfile.open(tar_path, "r:gz") as tf:
     for m in tf:
@@ -106,6 +107,9 @@ with tarfile.open(tar_path, "r:gz") as tf:
         if norm == "bin/busybox" and m.isfile():
             f = tf.extractfile(m)
             busybox_header = f.read(20) if f else b""
+        if norm == "lib/apk/db/installed" and m.isfile():
+            f = tf.extractfile(m)
+            apk_db = f.read().decode("utf-8", "replace") if f else ""
         if norm == "etc/alpine-release" and m.isfile():
             f = tf.extractfile(m)
             release = (f.read().decode("utf-8", "replace").strip() if f else "")
@@ -126,8 +130,18 @@ if not elf_ok:
 if release is None or release != version:
     problems.append(f"etc/alpine-release is {release!r}, expected {version!r}")
 
+# Package inventory from the APK database inside the tarball: name, version and declared license.
+packages = []
+for record in (apk_db or "").split("\n\n"):
+    fields = dict(line.split(":", 1) for line in record.splitlines() if ":" in line)
+    if "P" in fields:
+        packages.append((fields["P"], fields.get("V", "?"), fields.get("L", "?")))
+for name, version, license_id in packages:
+    print(f"::notice title=Alpine package::{name} {version} license={license_id}")
 lines = [
     f"tarball: {tar_path.rsplit('/', 1)[-1]}",
+    f"packages: {len(packages)}",
+    *[f"  package {name} {version} license={license_id}" for name, version, license_id in packages],
     f"alpine-release: {release}",
     f"bin/busybox: {elf_note}",
     "entries: " + ", ".join(f"{k}={v}" for k, v in counts.items()),
