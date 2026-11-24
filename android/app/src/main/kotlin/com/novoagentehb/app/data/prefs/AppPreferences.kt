@@ -32,6 +32,12 @@ enum class ProviderId(val id: String, val displayName: String) {
         DEEPSEEK -> "deepseek-chat"
         ANTHROPIC -> "claude-sonnet-4-20250514"
     }
+
+    /** Default for the text chat and task synthesis roles only. Vision and screen operation keep [defaultTextModel]. */
+    val defaultChatModel: String get() = when (this) {
+        GEMINI -> AppPreferences.DEFAULT_GEMINI_CHAT_MODEL
+        else -> defaultTextModel
+    }
 }
 
 enum class VoiceModeId(val id: String, val label: String) {
@@ -59,7 +65,7 @@ class AppPreferences @Inject constructor(
         runCatching { ProviderId.valueOf(it[KEY_PRIMARY_PROVIDER] ?: ProviderId.GEMINI.name) }
             .getOrDefault(ProviderId.GEMINI)
     }
-    val chatModel: Flow<String> = ds.data.map { it[KEY_CHAT_MODEL] ?: "gemini-2.5-flash" }
+    val chatModel: Flow<String> = ds.data.map { it[KEY_CHAT_MODEL] ?: DEFAULT_GEMINI_CHAT_MODEL }
     val screenOpModel: Flow<String> = ds.data.map { it[KEY_SCREEN_MODEL] ?: "gemini-2.5-flash" }
     val visionModel: Flow<String> = ds.data.map { it[KEY_VISION_MODEL] ?: "gemini-2.5-flash" }
     val liveVoiceModel: Flow<String> = ds.data.map {
@@ -99,8 +105,10 @@ class AppPreferences @Inject constructor(
             val keys = listOf(KEY_CHAT_MODEL, KEY_SCREEN_MODEL, KEY_VISION_MODEL)
             val roles = listOf("chat", "screen", "vision")
             roles.zip(keys).forEach { (role, key) ->
-                settings[providerModelKey(previous, role)] = settings[key] ?: previous.defaultTextModel
-                settings[key] = settings[providerModelKey(provider, role)] ?: provider.defaultTextModel
+                val previousFallback = if (role == "chat") previous.defaultChatModel else previous.defaultTextModel
+                val nextFallback = if (role == "chat") provider.defaultChatModel else provider.defaultTextModel
+                settings[providerModelKey(previous, role)] = settings[key] ?: previousFallback
+                settings[key] = settings[providerModelKey(provider, role)] ?: nextFallback
             }
             settings[KEY_PRIMARY_PROVIDER] = provider.name
         }
@@ -134,6 +142,8 @@ class AppPreferences @Inject constructor(
     companion object {
         // Padrão histórico; disponibilidade e compatibilidade reais devem ser verificadas na conta.
         const val DEFAULT_GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
+        /** Text chat model for new installs (owner-approved 24/11/2026). Not used for Live voice. */
+        const val DEFAULT_GEMINI_CHAT_MODEL = "gemini-3.5-flash-lite"
 
         private fun providerModelKey(provider: ProviderId, role: String) =
             stringPreferencesKey("provider_model_${provider.id}_$role")

@@ -99,7 +99,7 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProviderId.GEMINI)
 
     val chatModel: StateFlow<String> = prefs.chatModel
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "gemini-2.5-flash")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_GEMINI_CHAT_MODEL)
 
     val screenOpModel: StateFlow<String> = prefs.screenOpModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "gemini-2.5-flash")

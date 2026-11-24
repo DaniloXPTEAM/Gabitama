@@ -166,7 +166,11 @@ class ModelRouter @Inject constructor(
 
     suspend fun resolveModelForRole(provider: ProviderId, role: ModelRole): String {
         if (role == ModelRole.MEDIA_GEN) return "UNAVAILABLE_IN_CATALOGUE"
-        val fallback = provider.defaultTextModel
+        val fallback = if (role == ModelRole.CHAT || role == ModelRole.TASK_SYNTHESIS) {
+            provider.defaultChatModel
+        } else {
+            provider.defaultTextModel
+        }
         // Explicitly requesting a different provider must not reuse a model ID saved for the active provider.
         if (provider != prefs.primaryProvider.first()) return fallback
         return when (role) {
