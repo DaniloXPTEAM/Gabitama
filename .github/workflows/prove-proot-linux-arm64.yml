@@ -1,0 +1,38 @@
+name: Nível C/D — PRoot original em Linux ARM64
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/1dba9faf-gabitama]
+    paths:
+      - third_party/tama-runtime/android/deps/proot/**
+      - scripts/linux-arm64/**
+      - scripts/android/alpine-provenance/**
+      - .github/workflows/prove-proot-linux-arm64.yml
+permissions:
+  contents: read
+jobs:
+  proot-arm64:
+    # Public repository: hosted ARM64 runner. Not an Android device and not a PTY/terminal test.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependências de build (talloc do sistema; ver docs/LICENSE_MATRIX_COMPUTER_RUNTIME.md)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libtalloc-dev
+      - name: Compilar PRoot original (fonte preservada)
+        run: make -C third_party/tama-runtime/android/deps/proot/src -j2 proot
+      - name: Obter Alpine verificado (fora do repositório)
+        env:
+          KEEP_TARBALL_TO: ${{ runner.temp }}/alpine-minirootfs-3.21.3-aarch64.tar.gz
+          OUT_DIR: ${{ runner.temp }}/alpine-provenance
+        run: bash scripts/android/alpine-provenance/verify.sh
+      - name: Extrair Alpine em diretório temporário
+        run: |
+          mkdir -p "$RUNNER_TEMP/alpine-root"
+          tar --no-same-owner -xzf "$RUNNER_TEMP/alpine-minirootfs-3.21.3-aarch64.tar.gz" -C "$RUNNER_TEMP/alpine-root"
+      - name: Nível C e D
+        env:
+          ROOTFS: ${{ runner.temp }}/alpine-root
+        run: bash scripts/linux-arm64/proot/run-level-c-d.sh
