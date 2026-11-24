@@ -107,6 +107,11 @@ if (len(started) != expected or set(completed) != started or
         'instrumentation_failed_line': bool(re.search(r'^INSTRUMENTATION_FAILED:', raw, re.M)),
     }
     print('::notice title=Instrumentation termination::' + ' '.join(f'{k}={v}' for k, v in markers.items()))
+    # Sanitized: only the known termination phrase and class-like exception tokens; never the message text.
+    for phrase in ('Process crashed', 'has died', 'Instrumentation run failed'):
+        if phrase in raw:
+            tokens = sorted(set(re.findall(r'\b(?:[a-zA-Z_$][\w$]*\.)+[A-Za-z_$][\w$]*(?:Exception|Error)\b', raw)))[:3]
+            print(f'::error title=Instrumentation termination phrase::{phrase} classes={",".join(tokens) or "none"}')
     sys.exit(1)
 failures = sum(code in (-1, -2) for code in completed.values())
 skipped = sum(code in (-3, -4) for code in completed.values())

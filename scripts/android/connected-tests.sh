@@ -37,6 +37,29 @@ kill "$collector_pid" 2>/dev/null || :
 wait "$collector_pid" 2>/dev/null || :
 trap - EXIT
 adb logcat -d -b crash -v brief > /tmp/gabitama-test-crash-private.txt 2>/dev/null || echo '::warning title=Test crash log::Indisponível; diagnóstico de crash limitado.'
+# Process lifecycle events (am_proc_died / am_crash / am_kill), reduced to pid, process name and exception class.
+# Messages, reasons and paths are dropped. Only the test and app processes are reported.
+adb logcat -d -b events 2>/dev/null | grep -E 'am_proc_died|am_crash|am_kill' | tail -60 > /tmp/gabitama-events-private.txt || :
+python3 - <<'PY' || :
+import re
+for line in open('/tmp/gabitama-events-private.txt', encoding='utf-8', errors='replace'):
+    if 'novoagentehb' not in line:
+        continue
+    tag = re.search(r'\b(am_proc_died|am_crash|am_kill)\b', line)
+    fields = re.search(r'\[([^\]]*)\]', line)
+    if not tag or not fields:
+        continue
+    parts = [p.strip() for p in fields.group(1).split(',')]
+    if tag.group(1) == 'am_crash':
+        proc = parts[2] if len(parts) > 2 else '?'
+        exc = parts[4] if len(parts) > 4 else '?'
+        exc = re.sub(r'[^A-Za-z0-9_.$]', '', exc)[:120]
+        print(f'::error title=Process crash event::pid={parts[1] if len(parts) > 1 else "?"} process={proc} exception={exc}')
+    elif tag.group(1) == 'am_proc_died':
+        print(f'::notice title=Process died event::pid={parts[1] if len(parts) > 1 else "?"} process={parts[2] if len(parts) > 2 else "?"}')
+    else:
+        print(f'::notice title=Process kill event::process={parts[2] if len(parts) > 2 else "?"}')
+PY
 # Public diagnostics contain only app test evidence messages (path, dimensions, UID, size).
 adb logcat -d -s GabiTestEvidence:I '*:S' > /tmp/gabitama-screenshot-log-private.txt 2>/dev/null || :
 python3 scripts/android/validate-screenshots.py || status=1
