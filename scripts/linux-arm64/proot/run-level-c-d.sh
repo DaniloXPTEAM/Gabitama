@@ -39,17 +39,19 @@ export PROOT_LOADER="$(cd "$(dirname "$LOADER")" && pwd)/$(basename "$LOADER")"
 echo "proot version: $("$PROOT" --version 2>&1 || true)"
 # Diagnostic matrix (informational, does not gate): isolates the tracee SIGSEGV seen on the first run.
 probe() {
-  local name="$1"; shift
+  # probe NAME ROOT CMD... (env assignments first, passed via env)
+  local name="$1" root="$2"; shift 2
   local log rc=0
   log=$(mktemp)
-  env "$@" "$PROOT" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'echo ok-from-alpine' >"$log" 2>&1 || rc=$?
+  env "$@" "$PROOT" -r "$root" -0 -w / /bin/sh -c 'echo ok-from-root' >"$log" 2>&1 || rc=$?
   echo "::notice title=Diag $name::exit=$rc tail=$(tail -c 300 "$log" | tr '\n' ' ')" >&2
   rm -f "$log"
 }
-probe "default" PROOT_LOADER="$PROOT_LOADER"
-probe "no-loader-env" PROOT_LOADER=
-probe "no-seccomp" PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOMP=1
-probe "verbose3" PROOT_LOADER="$PROOT_LOADER" PROOT_VERBOSE=3
+probe "alpine-default" "$ROOTFS" PROOT_LOADER="$PROOT_LOADER"
+probe "alpine-no-seccomp" "$ROOTFS" PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOMP=1
+probe "alpine-verbose3" "$ROOTFS" PROOT_LOADER="$PROOT_LOADER" PROOT_VERBOSE=3
+probe "host-root-default" / PROOT_LOADER="$PROOT_LOADER"
+probe "host-root-no-seccomp" / PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOMP=1
 out=$(run_proot "Level C" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
 echo "$out"
 echo "$out" | grep -qx "aarch64" || { echo "::error title=Level C::uname did not report aarch64"; exit 1; }

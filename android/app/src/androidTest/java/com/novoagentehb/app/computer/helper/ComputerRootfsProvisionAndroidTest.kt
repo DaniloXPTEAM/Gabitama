@@ -35,9 +35,7 @@ class ComputerRootfsProvisionAndroidTest {
     @Test
     fun a01_provisionInstallsVerifiedAlpineInHelperPrivateStorage(): Unit = runBlocking<Unit> {
         // Probe: the shell channel must answer before any file-level assertion can mean anything.
-        val probe = shell("echo probe").trim()
-        log("a01 probe out=$probe rc=$lastShellRc")
-        assertEquals("probe", probe)
+        assertEquals(files, shell("ls -d $files").trim())
         val client = ComputerHelperClient(instrumentation.targetContext)
         try {
             val reply = client.provisionStart()
@@ -52,7 +50,7 @@ class ComputerRootfsProvisionAndroidTest {
             assertTrue(final.text, final.text.contains("sha256=${HelperContract.ALPINE_SHA256}"))
             assertEquals(HelperContract.ALPINE_VERSION, shell("cat $rootfs/etc/alpine-release").trim())
             assertTrue(shell("ls -l $rootfs/bin/busybox").startsWith("-"))
-            log("a01 tree: ${shell("find $rootfs -maxdepth 1 -mindepth 1 | sort | tr '\\n' ' '").trim()}")
+            log("a01 tree: ${shell("ls $rootfs").trim().replace('\n', ' ')}")
         } finally {
             client.close()
         }
@@ -94,7 +92,9 @@ class ComputerRootfsProvisionAndroidTest {
     fun a04_staleStagingAndCorruptedInstallAreRecoveredWithoutPartialActivation(): Unit = runBlocking<Unit> {
         val client = ComputerHelperClient(instrumentation.targetContext)
         try {
-            shell("mkdir -p $files/alpine-staging-junk/bin && echo partial > $files/alpine-staging-junk/bin/busybox")
+            // Injected fault: stale staging dir with a zero-byte busybox (no redirection is possible via run-as).
+            shell("mkdir -p $files/alpine-staging-junk/bin")
+            shell("touch $files/alpine-staging-junk/bin/busybox")
             shell("rm -f $rootfs/etc/alpine-release")
             adb("am force-stop $helper")
             val beforeStart = client.provisionStatus()
@@ -106,8 +106,8 @@ class ComputerRootfsProvisionAndroidTest {
             log("a04 final=${final.text}")
             assertTrue(final.text, final.text.startsWith("state=INSTALLED"))
             assertEquals(HelperContract.ALPINE_VERSION, shell("cat $rootfs/etc/alpine-release").trim())
-            assertEquals("", shell("ls -d $files/alpine-staging-* 2>/dev/null").trim())
-            assertEquals("", shell("ls -d $files/alpine-trash-* 2>/dev/null").trim())
+            assertEquals(emptyList<String>(), names(files, "alpine-staging-"))
+            assertEquals(emptyList<String>(), names(files, "alpine-trash-"))
         } finally {
             client.close()
         }
@@ -124,8 +124,8 @@ class ComputerRootfsProvisionAndroidTest {
             val terminal = awaitTerminal(client)
             log("a05 terminal=${terminal.text}")
             if (terminal.text.startsWith("state=CANCELLED")) {
-                assertEquals("", shell("ls -d $rootfs 2>/dev/null").trim())
-                assertEquals("", shell("ls -d $files/alpine-staging-* 2>/dev/null").trim())
+                assertFalse(exists(rootfs))
+                assertEquals(emptyList<String>(), names(files, "alpine-staging-"))
             } else {
                 // Extraction finished before the cancel landed: the installation must then be complete.
                 assertTrue(terminal.text, terminal.text.startsWith("state=INSTALLED"))
@@ -156,7 +156,7 @@ class ComputerRootfsProvisionAndroidTest {
             }
             val final = awaitTerminal(client)
             assertTrue(final.text, final.text.startsWith("state=INSTALLED"))
-            assertEquals("", shell("ls -d $files/alpine-staging-* 2>/dev/null").trim())
+            assertEquals(emptyList<String>(), names(files, "alpine-staging-"))
         } finally {
             client.close()
         }
@@ -171,21 +171,21 @@ class ComputerRootfsProvisionAndroidTest {
         }
     }
 
-    /** Runs a shell command as the shell user (run-as for the helper), returning stdout. */
-    private var lastShellRc: String? = null
-
+    /**
+     * Runs a command as the helper UID via run-as. UiAutomation.executeShellCommand does NOT use a shell:
+     * quotes, redirections, pipes, globs and `;` become literal arguments, which made every earlier read
+     * come back empty. So only plain words are passed; stdout is the only channel (stderr is dropped),
+     * and "missing" is observed as empty output from `ls`.
+     */
     private fun shell(command: String): String {
-        // stderr is merged into stdout and the exit code is appended, so an empty body can be told apart
-        // from "run-as produced nothing at all".
-        val wrapped = "run-as $helper sh -c '${command.replace("'", "'\\''")}' 2>&1; echo __rc=\$?"
-        val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(wrapped)
-        val raw = ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
-        val rc = Regex("__rc=(\\d+)").find(raw)?.groupValues?.get(1)
-        val out = raw.replace(Regex("__rc=\\d+\\n?"), "")
-        if (out.isBlank()) log("shell empty for: ${command.take(120)} rc=$rc raw=${raw.take(200)}")
-        lastShellRc = rc
-        return out
+        val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand("run-as $helper $command")
+        return ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes().toString(Charsets.UTF_8) }
     }
+
+    private fun exists(path: String): Boolean = shell("ls -d $path").trim().isNotEmpty()
+
+    private fun names(dir: String, prefix: String): List<String> =
+        shell("ls $dir").lines().map { it.trim() }.filter { it.startsWith(prefix) }
 
     /** Runs a command with the shell user's privileges (needed for `am`), returning stdout. */
     private fun adb(command: String): String {
