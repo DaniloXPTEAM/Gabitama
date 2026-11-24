@@ -1,0 +1,27 @@
+name: Verificar proveniência do Alpine aarch64
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/1dba9faf-gabitama]
+    paths:
+      - scripts/android/alpine-provenance/**
+      - .github/workflows/verify-alpine-provenance.yml
+permissions:
+  contents: read
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar SHA-256, assinatura GPG e conteúdo do tar (sem extrair)
+        env:
+          OUT_DIR: ${{ runner.temp }}/alpine-provenance
+        run: bash scripts/android/alpine-provenance/verify.sh
+      - name: Publicar relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpine-provenance-report
+          path: ${{ runner.temp }}/alpine-provenance/alpine-minirootfs-provenance.txt
+          if-no-files-found: ignore
