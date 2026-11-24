@@ -11,11 +11,21 @@ import com.novoagentehb.app.agent.skills.McpRemoteTool
 import com.novoagentehb.app.agent.skills.SkillAndMcpRegistry
 import com.novoagentehb.app.agent.tools.CapabilityRegistry
 import com.novoagentehb.app.data.local.SkillRecordEntity
+import com.novoagentehb.app.computer.helper.ComputerHelperClient
+import com.novoagentehb.app.computer.helper.HelperPhase
+import com.novoagentehb.app.computer.helper.HelperStatusMapper
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeClient
 import com.novoagentehb.app.computer.runtime.IsolatedRuntimeHealth
 import com.novoagentehb.app.gabi.HBCharacterController
 import com.novoagentehb.app.gabi.HBState
+import android.content.Context
+import com.novoagentehb.computerhelper.contract.HelperContract
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,8 +41,78 @@ class ComputerViewModel @Inject constructor(
     private val orchestrator: TaskOrchestrator,
     private val hbController: HBCharacterController,
     private val isolatedRuntimeHealth: IsolatedRuntimeHealth,
-    private val isolatedRuntimeClient: IsolatedRuntimeClient
+    private val isolatedRuntimeClient: IsolatedRuntimeClient,
+    @ApplicationContext appContext: Context,
 ) : ViewModel() {
+
+    /** Experimental helper (Binder). Status comes from the helper's real replies only. */
+    private val helperClient = ComputerHelperClient(appContext)
+    private val helperCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _helperPhase = MutableStateFlow(HelperPhase.NOT_INSTALLED)
+    /** Current helper phase shown on the computer screen. */
+    val helperPhase: StateFlow<HelperPhase> = _helperPhase.asStateFlow()
+
+    private val _helperNotice = MutableStateFlow<List<String>>(emptyList())
+    val helperNotice: StateFlow<List<String>> = _helperNotice.asStateFlow()
+
+    init {
+        refreshHelperState()
+    }
+
+    /** Re-reads the helper: installation, responsiveness, rootfs states and the last PRoot run. */
+    fun refreshHelperState() {
+        viewModelScope.launch {
+            val snapshot = collectHelperSnapshot()
+            _helperPhase.value = snapshot.phase
+            _helperNotice.value = snapshot.lines
+        }
+    }
+
+    private suspend fun collectHelperSnapshot(): com.novoagentehb.app.computer.helper.HelperSnapshot {
+        if (!helperClient.isInstalled()) return HelperStatusMapper.map(false, false, null, null, null)
+        val status = helperClient.status()
+        if (status.code != HelperContract.CODE_OK) return HelperStatusMapper.map(true, false, null, null, null)
+        return HelperStatusMapper.map(
+            installed = true,
+            helperResponding = true,
+            productRootfs = helperClient.provisionStatus().text,
+            testRootfs = helperClient.testX86ProvisionStatus().text,
+            proot = helperClient.prootStatus().text,
+        )
+    }
+
+    /**
+     * Runs the FIXED Alpine x86_64 probe in the helper when its test rootfs is installed. Nothing from the
+     * user is sent. Bounded wait; the final state is read back from the helper.
+     */
+    fun runHelperDiagnostic() {
+        viewModelScope.launch {
+            if (!helperClient.isInstalled()) { refreshHelperState(); return@launch }
+            val test = helperClient.testX86ProvisionStatus().text
+            if (!test.contains("state=INSTALLED")) {
+                refreshHelperState()
+                return@launch
+            }
+            val start = helperClient.prootStart(HelperStatusMapper.DIAGNOSTIC_OP)
+            if (start.code == HelperContract.CODE_OK) {
+                val deadline = System.currentTimeMillis() + DIAGNOSTIC_WAIT_MS
+                _helperPhase.value = HelperPhase.DIAGNOSTIC_RUNNING
+                while (System.currentTimeMillis() < deadline) {
+                    val text = helperClient.prootStatus().text
+                    if (!text.contains("state=RUNNING")) break
+                    delay(POLL_MS)
+                }
+            }
+            refreshHelperState()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // viewModelScope is already cancelled here, so the close runs on its own scope.
+        helperCleanupScope.launch { helperClient.close() }
+    }
 
     val skills: StateFlow<List<SkillRecordEntity>> = skillRegistry.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -173,6 +253,7 @@ class ComputerViewModel @Inject constructor(
     }
 
     fun runDiagnosticsCommand() {
+        runHelperDiagnostic()
         orchestrator.submitUserMessage("/diagnostico")
         _statusNotice.value = "Comando /diagnostico enviado para a fila do orquestrador."
         viewModelScope.launch {
@@ -188,5 +269,10 @@ class ComputerViewModel @Inject constructor(
     fun clearNotice() {
         _runtimeNotice.value = null
         _statusNotice.value = null
+    }
+
+    companion object {
+        private const val DIAGNOSTIC_WAIT_MS = 30_000L
+        private const val POLL_MS = 500L
     }
 }
