@@ -13,23 +13,35 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Host
         run: |
-          uname -a
-          nproc
-          grep -m1 'model name\|CPU part' /proc/cpuinfo || true
-          if [ -e /dev/kvm ]; then ls -l /dev/kvm; echo "::notice title=KVM::/dev/kvm present"; else echo "::notice title=KVM::/dev/kvm absent"; fi
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-      - name: SDK packages (emulator and arm64-v8a images)
+          uname -m
+          if [ -e /dev/kvm ]; then echo "::notice title=KVM::/dev/kvm present"; else echo "::notice title=KVM::/dev/kvm absent"; fi
+      - name: Catálogo oficial do SDK Android (emulator e imagens arm64-v8a)
         run: |
-          SDK="${ANDROID_HOME:-$HOME/android-sdk}"
-          ls "$SDK" || true
-          TOOL="$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1 || true)"
-          if [ -z "$TOOL" ]; then
-            echo "::notice title=SDK::cmdline-tools not found under $SDK"
-          else
-            yes | "$TOOL" --licenses >/dev/null 2>&1 || true
-            "$TOOL" --list 2>/dev/null | grep -E "emulator|system-images;android-(26|29|34);.*arm64" | sed 's/  */ /g' | head -30 | while read -r l; do echo "::notice title=sdk::$l"; done
-          fi
+          curl -fsSL --retry 3 https://dl.google.com/android/repository/repository2-3.xml -o "$RUNNER_TEMP/repo.xml"
+          python3 - "$RUNNER_TEMP/repo.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          ns = ''
+          hits = []
+          for pkg in root.iter():
+              if not pkg.tag.endswith('remotePackage'):
+                  continue
+              path = pkg.get('path', '')
+              if path == 'emulator' or path.startswith('system-images;android-') and ('arm64' in path):
+                  archives = []
+                  for a in pkg.iter():
+                      if a.tag.endswith('archive'):
+                          host_os = None; host_arch = None
+                          for c in a:
+                              if c.tag.endswith('host-os'): host_os = c.text
+                              if c.tag.endswith('host-arch'): host_arch = c.text
+                          archives.append(f"{host_os or 'any'}/{host_arch or 'any'}")
+                  hits.append(f"{path} archives={sorted(set(archives))}")
+          for h in hits[:60]:
+              print(f"::notice title=catalog::{h}")
+          print(f"::notice title=catalog::total matching packages={len(hits)}")
+          PY
