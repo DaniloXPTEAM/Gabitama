@@ -91,6 +91,24 @@ Registro de falhas que levaram a correções (não ocultadas):
 
 Build JVM e APKs do mesmo commit: ver run `45294872548` (`Build Android Debug APK`).
 
+Suíte compartilhada (`Build Android Debug APK`), correção registrada:
+
+- `45294872548` e `45300861864` falharam em 26/29/34 com 9 testes com falha cada. Os 9 são da
+  `ComputerHelperPocAndroidTest`: a suíte compartilhada não instala `computer-helper-debug.apk`,
+  então o cliente não consegue se vincular. O validador também estava com contagem fixa (29), o que
+  mascarava a falha como "Incomplete run" ao contar os 39 `@Test` (correção em `226ae8a`).
+- Correção em `5439f0d`: a classe do helper é excluída de `connected-tests.sh` (`notClass`) e do
+  validador (contagem derivada das fontes, 29), e o validador falha se essa classe executar.
+- Run `45302512564` (`5439f0d`): sucesso em 26, 29 e 34, `tests=29 failures=0 errors=0 skipped=0`.
+  A prova do helper continua coberta pelo seu próprio workflow (`e912d37`, `OK (10 tests)`).
+
+Proveniência do Alpine (CI apenas, sem extrair nem executar): `.github/workflows/verify-alpine-provenance.yml`
+(`5915b02`, run `45301152901`, sucesso). Verifica SHA-256 do `alpine-minirootfs-3.21.3-aarch64.tar.gz`
+(`ead8a4b3…261ea`), assinatura GPG com a chave fixada por impressão digital
+(`0482 D840 22F5 2DF1 C4E7 CD43 293A CD09 07D9 495A`) e inspeciona as entradas do tar. O relatório
+não pôde ser baixado do sandbox (artefato com `EOF`), então só o sucesso dos passos é registrado aqui.
+Isso não licencia distribuição do runtime (seção 8).
+
 ## 7. Computador original (PRootKernel, PersistentShell, TerminalSession, ExecutionCoordinator, ShellExecutor, RootfsManager, PtyBridge)
 
 Estado: **presentes no repositório** em `android/app/src/main/kotlin/com/openminis/app/sandbox/`
