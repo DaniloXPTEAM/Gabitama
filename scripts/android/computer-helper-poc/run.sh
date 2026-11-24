@@ -29,6 +29,14 @@ set -e
 mkdir -p /tmp/poc-artifacts
 adb shell run-as com.novoagentehb.computerhelper cat cache/proot-fork-trace.log > /tmp/poc-artifacts/proot-fork-trace.log 2>/dev/null || echo '::warning title=Helper PoC::fork trace not copied (run-as unavailable)'
 adb logcat -d -s TamaIsolationFixture:V > /tmp/helper-poc-log.txt || true
+# Readable summary for the job annotations (artefact download is not reachable from the sandbox).
+TRACE=/tmp/poc-artifacts/proot-fork-trace.log
+if [ -s "$TRACE" ]; then
+  echo "::notice title=fork trace::bytes=$(wc -c < "$TRACE") lines=$(wc -l < "$TRACE")"
+  grep -E 'SIGSYS|seccomp|GABITAMA_FORK|ENOSYS|clone|vfork|fork' "$TRACE" | head -10 | cut -c1-240 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=fork trace::$l"; done
+else
+  echo "::notice title=fork trace::absent"
+fi
 export POC_STATUS ROOTFS_STATUS PROOT_STATUS
 python3 - <<'PY'
 import os, re
