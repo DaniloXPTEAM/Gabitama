@@ -33,7 +33,7 @@ from pathlib import Path
 checks = [
     ('Helper PoC', '/tmp/helper-poc.txt', int(os.environ['POC_STATUS']), 10),
     ('Helper rootfs', '/tmp/helper-rootfs.txt', int(os.environ['ROOTFS_STATUS']), 6),
-    ('Helper PRoot run', '/tmp/helper-proot.txt', int(os.environ['PROOT_STATUS']), 4),
+    ('Helper PRoot run', '/tmp/helper-proot.txt', int(os.environ['PROOT_STATUS']), 5),
 ]
 for line in Path('/tmp/helper-poc-log.txt').read_text(errors='replace').splitlines():
     if 'pocHelper:' in line:
