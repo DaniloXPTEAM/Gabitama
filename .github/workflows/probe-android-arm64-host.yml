@@ -1,0 +1,35 @@
+name: Sonda — host ARM64 para emulador Android arm64
+# Diagnostic only: checks whether a hosted Linux ARM64 runner can run an Android arm64 emulator
+# (KVM, emulator package for linux aarch64, arm64-v8a system image). Installs nothing into the repo,
+# executes no app code and publishes no binary.
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/1dba9faf-gabitama]
+    paths:
+      - .github/workflows/probe-android-arm64-host.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - name: Host
+        run: |
+          uname -a
+          nproc
+          grep -m1 'model name\|CPU part' /proc/cpuinfo || true
+          if [ -e /dev/kvm ]; then ls -l /dev/kvm; echo "::notice title=KVM::/dev/kvm present"; else echo "::notice title=KVM::/dev/kvm absent"; fi
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+      - name: SDK packages (emulator and arm64-v8a images)
+        run: |
+          SDK="${ANDROID_HOME:-$HOME/android-sdk}"
+          ls "$SDK" || true
+          TOOL="$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1 || true)"
+          if [ -z "$TOOL" ]; then
+            echo "::notice title=SDK::cmdline-tools not found under $SDK"
+          else
+            yes | "$TOOL" --licenses >/dev/null 2>&1 || true
+            "$TOOL" --list 2>/dev/null | grep -E "emulator|system-images;android-(26|29|34);.*arm64" | sed 's/  */ /g' | head -30 | while read -r l; do echo "::notice title=sdk::$l"; done
+          fi
