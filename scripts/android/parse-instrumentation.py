@@ -7,6 +7,10 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+# Classes run by their own workflow with extra APKs; excluded from this shared suite (see connected-tests.sh).
+EXCLUDED_CLASSES = {'com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest'}
+EXCLUDED_FILES = {os.path.basename(c.replace('.', '/')) + '.kt' for c in EXCLUDED_CLASSES}
+
 raw = open('/tmp/gabitama-instrumentation-ci.log', encoding='utf-8', errors='replace').read().replace('\r', '')
 status, started, completed, details = {}, set(), {}, {}
 last_key = None
@@ -21,6 +25,8 @@ for line in raw.splitlines():
         cls, name = status.get('class', ''), status.get('test', '')
         if not re.fullmatch(r'com\.novoagentehb\.app\.[A-Za-z0-9_.$]+', cls) or not re.fullmatch(r'[A-Za-z0-9_$]+', name):
             raise SystemExit('::error title=Instrumentation protocol::Missing or invalid test identity')
+        if cls in EXCLUDED_CLASSES:
+            raise SystemExit('::error title=Instrumentation protocol::Excluded class ran in shared suite')
         key = (cls, name)
         if code == 1:
             if key in started: raise SystemExit('::error title=Instrumentation protocol::Duplicate start')
@@ -45,6 +51,8 @@ def source_test_count(root='android/app/src/androidTest'):
     total = 0
     for directory, _, files in os.walk(root):
         for name in files:
+            if name in EXCLUDED_FILES:
+                continue
             if name.endswith(('.kt', '.java')):
                 with open(os.path.join(directory, name), encoding='utf-8', errors='replace') as handle:
                     total += len(re.findall(r'^\s*@Test\b', handle.read(), re.M))
