@@ -177,8 +177,8 @@ def live_session():
                 "mimeType": "audio/pcm;rate=16000",
             }}}))
             sent += 1
-            time.sleep(0.02)
-        log("audio_input", ok=True, chunks_sent=sent)
+            time.sleep(0.04)  # each 1280-byte PCM16 chunk at 16 kHz is 40 ms of audio: real-time pacing
+        log("audio_input", ok=True, chunks_sent=sent, paced_realtime=True)
         # Check the socket is still alive after streaming input.
         try:
             msg = json.loads(decode(ws.recv(timeout=3)))
@@ -189,11 +189,13 @@ def live_session():
     finally:
         # (h) Stop: client closes the socket
         t_close = time.monotonic()
+        closed_ok = True
         try:
             ws.close(1000, "smoke_done")
-        except Exception:  # noqa: BLE001
-            pass
-        log("stop", socket_closed=True, ms=int((time.monotonic() - t_close) * 1000))
+        except Exception as err:  # noqa: BLE001
+            closed_ok = False
+            log("stop_error", error=scrub(type(err).__name__))
+        log("stop", socket_closed=closed_ok, ms=int((time.monotonic() - t_close) * 1000))
     return ok
 
 

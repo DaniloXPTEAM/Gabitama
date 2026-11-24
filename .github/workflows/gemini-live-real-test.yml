@@ -1,12 +1,10 @@
 name: Gemini Live real smoke (free models)
 
-# Real network test against the Gemini Live API. Uses only free-tier models (see the script).
+# Real network test against the Gemini Live API. Free-tier models only (see the script). Manual trigger.
 # The key comes from the repository secret GEMINI_LIVE_TEST_KEY; it is never written to files or logs.
 on:
-  push:
-    paths:
-      - scripts/gemini-live/live_smoke.py
-      - .github/workflows/gemini-live-real-test.yml
+  # Manual only: the key must not be used by automatic pushes. Run it on purpose, then remove the secret.
+  workflow_dispatch:
 
 permissions:
   contents: read
