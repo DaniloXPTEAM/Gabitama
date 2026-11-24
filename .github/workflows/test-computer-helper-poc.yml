@@ -68,6 +68,9 @@ jobs:
           print('::notice title=Alpine x86_64 provenance::' + ' | '.join(l.strip() for l in lines if not l.startswith('  package')))
           PYX
       - name: Compilar PRoot original para Android x86_64 (cópia descartável; só para o emulador)
+        env:
+          # Diagnóstico do seccomp (BPF + SIGSYS) só nesta cópia de teste; nunca em build de produto.
+          PROOT_DIAG_BPF: "1"
         run: |
           set -euo pipefail
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"

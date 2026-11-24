@@ -98,6 +98,10 @@ class ComputerProotRunAndroidTest {
             assertTrue(text, text.contains("3.21.3"))
             // Only the Alpine tree has these files; /system/bin on Android does not.
             assertTrue(text, text.contains("NAME=\"Alpine Linux\""))
+            // The environment built by the shared PRootEnvironment reached the guest: LD_LIBRARY_PATH
+            // points at the helper's own native library directory, not at any GabiTama path.
+            assertTrue(text, text.contains("GABITAMA_ENV_LD="))
+            assertTrue(text, Regex("GABITAMA_ENV_LD=\\S*computerhelper").containsMatchIn(text))
             assertTrue(text, text.contains("leftover=0"))
         } finally {
             client.close()

@@ -48,6 +48,13 @@ rep('        make \\\n            CC="$CC"', '        make \\\n            ${MAK
 open(path, 'w', encoding='utf-8').write(s)
 PY
 
+# Diagnostic copy only (CI emulator): seccomp BPF and SIGSYS dump. Off by default; never a product build.
+DIAG_NOTE="none"
+if [ "${PROOT_DIAG_BPF:-0}" = "1" ]; then
+  python3 "$REPO/scripts/android/proot-original/diag-seccomp-patch.py" "$WORK/deps/proot/src"
+  DIAG_NOTE="bpf-seccomp-dump (disposable copy, CI diagnostic only)"
+fi
+export DIAG_NOTE
 export MAKE_EXTRA ANDROID_NDK_HOME
 export GIT_CEILING_DIRECTORIES="$(dirname "$WORK")"
 (cd "$WORK" && bash deps/build_proot.sh)
@@ -82,6 +89,7 @@ NDK_REV="$(awk -F' = ' '/Pkg.Revision/ {print $2}' "$ANDROID_NDK_HOME/source.pro
   echo "abi=$ABI triple=$TRIPLE ndk=$NDK_REV"
   echo "source=third_party/tama-runtime/android/deps/proot (upstream nano-muse/proot 4002f4bd3dfc38eb17ab6070d4154b2843eed452)"
   echo "makeExtra=${MAKE_EXTRA:-none}"
+  echo "diag=$DIAG_NOTE"
   echo "libproot.so machine=$(machine_of "$OUT/libproot.so") sha256=$(sha256sum "$OUT/libproot.so" | awk '{print $1}') bytes=$(stat -c %s "$OUT/libproot.so")"
   echo "libproot-loader.so machine=$(machine_of "$OUT/libproot-loader.so") sha256=$(sha256sum "$OUT/libproot-loader.so" | awk '{print $1}') bytes=$(stat -c %s "$OUT/libproot-loader.so")"
   echo "libproot.so NEEDED=$NEEDED"

@@ -4,6 +4,7 @@ import android.content.Context
 import android.system.Os
 import android.system.OsConstants
 import com.novoagentehb.computerhelper.contract.HelperContract
+import com.openminis.app.sandbox.PRootEnvironment
 import com.openminis.app.sandbox.ProotCommandLine
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -71,11 +72,18 @@ class ProotRunner(
         val builder = ProcessBuilder(argv).redirectErrorStream(true)
         val env = builder.environment()
         env.clear()
-        env["PATH"] = if (guestRoot != null) GUEST_PATH else "/system/bin"
-        val loader = File(context.applicationInfo.nativeLibraryDir, LOADER)
-        if (loader.isFile) env["PROOT_LOADER"] = loader.absolutePath
+        // Environment built by the shared PRootEnvironment (original Tama V2 variable block).
+        val nativeLibDir = context.applicationInfo.nativeLibraryDir
         val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
-        env["PROOT_TMP_DIR"] = tmp.absolutePath
+        env.putAll(
+            PRootEnvironment.processEnv(
+                path = if (guestRoot != null) GUEST_PATH else "/system/bin",
+                tmpDir = tmp.absolutePath,
+                nativeLibDir = nativeLibDir,
+                loader = File(nativeLibDir, LOADER).takeIf { it.isFile }?.absolutePath,
+                loader32 = null,
+            ),
+        )
         val traceFile = File(context.cacheDir, TRACE_FILE)
         if (op == HelperContract.PROOT_OP_ALPINE_X86_FORK_TRACE) {
             // Diagnostic: verbose PRoot output goes to a private file, never into the reply.
@@ -368,6 +376,8 @@ class ProotRunner(
 
         private val GUEST_SCRIPT = listOf(
             "echo ${HelperContract.GUEST_PROBE_BEGIN}",
+            // LD_LIBRARY_PATH is set by PRootEnvironment; echoing it proves the value reached the guest.
+            "echo GABITAMA_ENV_LD=\$LD_LIBRARY_PATH",
             "exec /bin/busybox cat /etc/alpine-release /etc/os-release",
         ).joinToString("; ")
     }
