@@ -29,8 +29,9 @@ run_proot() {
   log=$(mktemp)
   "$PROOT" "$@" >"$log" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
-    echo "::group::PRoot output ($title, exit $rc)"; cat "$log"; echo "::endgroup::"
-    echo "::error title=$title::PRoot exited $rc: $(tail -c 700 "$log" | tr '\n' ' ')"
+    # run_proot runs inside $(...): its stdout is captured, so diagnostics must go to stderr.
+    { echo "::group::PRoot output ($title, exit $rc)"; cat "$log"; echo "::endgroup::"; } >&2
+    echo "::error title=$title::PRoot exited $rc: $(tail -c 700 "$log" | tr '\n' ' ')" >&2
     rm -f "$log"; exit 1
   fi
   cat "$log"; rm -f "$log"
