@@ -138,3 +138,19 @@ criada. A integração depende das etapas abaixo, nesta ordem:
   diante de `third_party/tama-runtime` e de `PtyBridge` do Tama V2 e precisa de revisão do proprietário
   antes de qualquer distribuição.
 - Não há evidência de ARM64 real neste ciclo. A prova atual roda em emulador x86_64.
+
+## 9. Resultados desta fase (Alpine 3.21.3 aarch64, CI privado)
+
+| Evidência | Onde | Resultado |
+|---|---|---|
+| Provisionamento no pacote auxiliar (API 26, 29, 34; x86_64) | PoC `511f973` | sucesso: `state=INSTALLED release=3.21.3 arch=aarch64 files=522 sha256=ead8a4b3…ff261ea` em `filesDir` privado do auxiliar |
+| Idempotência (a02) | PoC `511f973` | inode do marcador igual antes e depois da segunda chamada (sem reextração) |
+| Recuperação após morte do processo (a03) | PoC `511f973` | após `am force-stop`, `state=INSTALLED` |
+| Leitura do filesDir pelo teste (`run-as`) | PoC `511f973` | funciona só sem metacaracteres de shell (`UiAutomation` não usa shell); antes, todas as leituras voltavam vazias |
+| PRoot original executa Alpine aarch64 (Nível C) | Nível C/D `73001d1` | sucesso em `ubuntu-24.04-arm` (Linux ARM64 real, não Android) |
+| Bootstrap diagnóstico fixo (Nível D) | Nível C/D `73001d1` | sucesso (busybox, release, `/bin/sh`) |
+
+Desvios de host do Nível C/D (somente CI privado, documentados em `docs/LICENSE_MATRIX_COMPUTER_RUNTIME.md` §5):
+o loader ligado com gold e `--rosegment` sai com SIGSEGV ao rodar diretamente; a mesma fonte ligada pelo `ld` padrão, sem `--rosegment`, executa o Alpine. Esses desvios não provam o loader upstream nem o PRoot no Android.
+
+O que continua NÃO comprovado: execução ARM64 no Android (bionic, loaders Termux), PTY, shell persistente, isolamento do rootfs dentro do app, distribuição de runtime e conformidade de licença. A integração com o computador original segue bloqueada pela seção 7.
