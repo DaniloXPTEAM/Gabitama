@@ -35,14 +35,15 @@ if [ -s "$TRACE" ]; then
   echo "::notice title=fork trace::bytes=$(wc -c < "$TRACE") lines=$(wc -l < "$TRACE")"
   BPF_COUNT=$(grep -c 'GABITAMA_BPF ' "$TRACE" || true)
   echo "::notice title=fork trace::bpf dump lines=$BPF_COUNT diag=${PROOT_DIAG_BPF:-0}"
-  # Verdict first (the job shows only a few annotations per step): the installed filter evaluated per syscall.
+  # Annotations are capped per step (about 10), so the decisive text goes to the private artefact and only
+  # the verdict and the dump count are announced. The verdict line is newline-terminated for `while read`.
   if [ "${BPF_COUNT:-0}" -gt 0 ]; then
     python3 scripts/android/computer-helper-poc/seccomp-filter-verdict.py "$TRACE" > /tmp/poc-artifacts/seccomp-filter-verdict.txt 2>&1 || true
-    tr '\n' ' ' < /tmp/poc-artifacts/seccomp-filter-verdict.txt | sed 's/%/%25/g' | fold -w 900 | while IFS= read -r l; do echo "::notice title=seccomp verdict::$l"; done
+    { tr '\n' ' ' < /tmp/poc-artifacts/seccomp-filter-verdict.txt; echo; } | sed 's/%/%25/g' | fold -w 900 | while IFS= read -r l; do echo "::notice title=seccomp verdict::$l"; done
   fi
-  # Raw RET/JEQ lines of the first program (partial view; the artefact has the whole dump).
-  grep -E 'GABITAMA_BPF [0-9]+ code=0x(6|15) ' "$TRACE" | head -60 | sed -E 's/GABITAMA_BPF ([0-9]+) code=0x([0-9a-f]+) jt=([0-9]+) jf=([0-9]+) k=0x([0-9a-f]+)/\1 op=\2 jt=\3 jf=\4 k=\5/' | cut -c1-120 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=fork trace bpf::$l"; done
-  grep -E 'SIGSYS|seccomp|GABITAMA_FORK|ENOSYS|clone|vfork|fork' "$TRACE" | head -10 | cut -c1-240 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=fork trace::$l"; done
+  grep -E 'GABITAMA_BPF [0-9]+ code=0x(6|15) ' "$TRACE" | head -200 > /tmp/poc-artifacts/bpf-ret-jeq-lines.txt || true
+  grep -E 'SIGSYS|seccomp|GABITAMA_FORK|ENOSYS|clone|vfork|fork' "$TRACE" | head -20 | cut -c1-240 > /tmp/poc-artifacts/fork-trace-summary.txt || true
+  head -3 /tmp/poc-artifacts/fork-trace-summary.txt | sed 's/%/%25/g' | while IFS= read -r l; do echo "::notice title=fork trace::$l"; done
   if [ "${PROOT_DIAG_BPF:-0}" = "1" ] && [ "${BPF_COUNT:-0}" -eq 0 ]; then
     echo '::error title=fork trace::BPF dump absent in a diagnostic build (PROOT_DIAG_BPF=1 not reached PRoot)'
     BPF_STATUS=1
