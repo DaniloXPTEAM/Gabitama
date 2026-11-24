@@ -11,6 +11,11 @@ import subprocess
 names = ['01_permissions_onboarding', '02_home', '03_feed', '04_chat', '05_quarto',
          '06_computer', '07_settings', '08_goals', '09_memory', '10_library',
          '11_permissions', '05b_quarto_stage_dialog']
+# Fail with the missing names listed (not a bare FileNotFoundError): the evidence set is required, not optional.
+missing = [n for n in names if not os.path.isfile(f'evidence-android/test-screenshots/{n}.png')]
+if missing:
+    print('::error title=Review image blobs::missing screenshots: ' + ', '.join(missing))
+    raise SystemExit(1)
 result = []
 for name in names:
     path = f'evidence-android/test-screenshots/{name}.png'

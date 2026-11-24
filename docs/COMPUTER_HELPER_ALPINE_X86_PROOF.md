@@ -27,6 +27,13 @@ Status: **Android x86_64 comprovado em CI (emulador); Android ARM64 NÃO comprov
 | `—` | `f2dd770` | Commit sem alteração de código; o job API 26 passou nessa reexecução. |
 | `45388725054` | `1ee1ad4` | Build APK **success** em JVM, IME e APIs 26, 29 e 34. A falha de IME não permanece no último build aprovado. |
 | `45409567326` | `2964af8` | PoC **success** nas APIs 26, 29 e 34 (p01–p05). Diagnóstico BPF ativo nesta cópia de teste; trace do `fork` reproduzido. |
+| `45418401120` | `7633b68` | PoC **success** (3 APIs). Dump BPF presente: `bpf dump lines=663`. APK `45418401673` **success**. |
+| `45418991266` | `897f083` | PoC **success** (3 APIs). p04 exige `components=PRootRuntimeSpec>ProotCommandLine>PRootEnvironment` e `rootfs=INSTALLED`. APK `45418991411` (API 29 ainda sem conclusão no registro). |
+| `45419015179` | `508a3ab` | APK: **failure** só no passo `Disponibilizar PNGs` da API 26; os testes instrumentados da API 26 passaram. Não reproduzido em `45425258844`. |
+| `45419983493` | `c4bdd92` | PoC **success** (3 APIs). APK `45419983542` **success**. |
+| `45421736893` | `793841f` | PoC **success** (3 APIs). APK `45421736899` **success**. |
+| `45423657610` | `6a43eef` | PoC **success** (3 APIs). APK `45423657502` **failure** no passo `Testes JVM` (Gradle; sem alteração de Kotlin desde `897f083`). Não reproduzido em `45425258844`. |
+| `45425258840` | `4d7b3ea` | PoC **success** (3 APIs). Veredito do filtro e evidência de dois filtros (ver abaixo). APK `45425258844` **success** em JVM, IME e APIs 26, 29 e 34. |
 | `45409567582` | `2964af8` | Build APK **failure** só em `Testes IME isolados API 34`: `chatImeInputDiagnosticsPersistsAcrossRestartAndClears` (mesmo teste instável de `4271db0`). Não relacionado a PRoot/ambiente; não reexecutado. |
 
 Hipótese testada e não suficiente: `PROOT_NO_SECCOMP=1` (`f27bfae`) não removeu o `ENOSYS`. Isso mostra que a flag,
@@ -72,6 +79,34 @@ e leitura do programa) no mesmo emulador, sem alterar flags.
 
 Nenhuma correção foi incorporada ao PRoot. `third_party/` não foi alterado.
 
+### Evidência do filtro seccomp (run `45425258840`, `4d7b3ea`)
+
+Medido na cópia descartável de CI, com a sonda de status antes e depois do `prctl` do PRoot:
+
+| Item | API 34 | API 26 |
+|---|---|---|
+| Filtros anexados **antes** do `prctl` do PRoot | `Seccomp: 2`, `Seccomp_filters: 1` | `Seccomp: 2` (campo `Seccomp_filters` ausente) |
+| Filtros **depois** do `prctl` | `Seccomp: 2`, `Seccomp_filters: 2` | `Seccomp: 2` |
+| SIGSYS de `fork` (57) | `si_code=1` (`SYS_SECCOMP`), arch `x86_64`, 1 ocorrência | idem, 1 ocorrência |
+| SIGSYS de `open`/`stat` | não aparece no agregado | `si_code=1`, 2 ocorrências cada |
+
+Programa do filtro instalado pelo PRoot: 663 instruções (dump completo, `GABITAMA_BPF`). Interpretado em Python
+(`seccomp-filter-verdict.py`, com autoteste): `fork(57)=ALLOW`, `vfork(58)=ALLOW`, `clone(56)=ALLOW`, `clone3(435)=ALLOW`;
+`open(2)`, `stat(4)` e `openat` = `TRACE`. Nenhum `RET TRAP` entre os números 0 e 461.
+
+**Comprovado por CI:** o SIGSYS de `fork` é gerado por um filtro seccomp que já estava anexado ao processo **antes**
+de o PRoot instalar o seu, e esse filtro não é o do PRoot (o do PRoot deixa `fork` em `ALLOW`). Isso explica o `ENOSYS`:
+o tratamento de SIGSYS do PRoot não tem caso para `fork` e devolve `-ENOSYS`.
+
+**Não comprovado:** a origem do filtro herdado. A política de texto `/system/etc/seccomp_policy/app_seccomp.policy`
+não existe nas imagens de emulador usadas (`policy file absent`). Hipótese de trabalho, não verificada: o filtro que
+o Android aplica a processos de aplicativo. A simulação do filtro do PRoot depende do interpretador de `seccomp-filter-verdict.py`
+(validado só por autoteste sintético).
+
+**Implicação:** a causa não está no código do PRoot. Corrigi-la exige tratar `fork` antes do filtro herdado (por exemplo,
+reescrever o syscall no tratamento de SIGSYS), o que é uma mudança no PRoot com prova própria. **Não implementada.** Desabilitar
+o filtro do PRoot (`PROOT_NO_SECCOMP=1`) não basta, porque o filtro herdado continua ativo (já medido em `f27bfae`).
+
 ## Limites conhecidos (não resolvidos)
 
 - `fork()` no guest falha no emulador x86_64 (acima). Qualquer programa que faça fork (pipelines, `sh -c` com comandos externos)
@@ -96,7 +131,7 @@ Classificação: **x86_64 (CI emulador)** e **ARM64 (dispositivo/emulador ARM64)
 
 | # | Item | Classe | Estado |
 |---|---|---|---|
-| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Localizado: SIGSYS `SYS_SECCOMP` em `fork` → `default: -ENOSYS` (`tracee/seccomp.c`). Falta explicar por que o filtro entrega SIGSYS; o dump BPF está ativo em `2964af8`, leitura pendente do artefato. |
+| 1 | Causa do `ENOSYS` em `fork` do guest | x86_64 | Comprovado: o SIGSYS vem de um filtro seccomp herdado (anterior ao do PRoot), não do filtro do PRoot (ver evidência). Falta identificar a origem desse filtro e uma correção com prova própria. Não corrigido. |
 | 2 | Integração do `PRootKernel` original | x86_64 | Em andamento: argv em `ProotCommandLine` e ambiente em `PRootEnvironment` (`sandbox-proot-core`), usados pelo app e pelo auxiliar. `p04` prova que `LD_LIBRARY_PATH` chega ao guest. |
 | 3 | `RootfsManager`, `PersistentShell`, `TerminalSession`, `ExecutionCoordinator`, `ShellExecutor`, `PtyBridge`, `NativeOffload` | x86_64 | Pendente por etapa; ver `docs/AUDIT_TAMA_ORIGINAL_SANDBOX_MATRIX.md`. |
 | 4 | Execução de Alpine **aarch64** em Android ARM64 | ARM64 | Não comprovada (sem KVM e sem emulador Linux aarch64 no runner). Não repetir sondagem sem condição nova. |
