@@ -20,14 +20,28 @@ test "$(uname -m)" = "aarch64" || { echo "::error title=Level C::host is not aar
 
 echo "== Level C: run Alpine userland under PRoot"
 export PROOT_LOADER="$(cd "$(dirname "$LOADER")" && pwd)/$(basename "$LOADER")"
-out=$("$PROOT" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
+run_proot() {
+  # Capture stdout AND stderr; on failure publish the PRoot diagnostics (set -e would otherwise hide them).
+  local title="$1"; shift
+  local log rc=0
+  log=$(mktemp)
+  "$PROOT" "$@" >"$log" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "::group::PRoot output ($title, exit $rc)"; cat "$log"; echo "::endgroup::"
+    echo "::error title=$title::PRoot exited $rc: $(tail -n 3 "$log" | tr '\n' ' ' | cut -c1-400)"
+    rm -f "$log"; exit 1
+  fi
+  cat "$log"; rm -f "$log"
+}
+echo "proot version: $("$PROOT" --version 2>&1 || true)"
+out=$(run_proot "Level C" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
 echo "$out"
 echo "$out" | grep -qx "aarch64" || { echo "::error title=Level C::uname did not report aarch64"; exit 1; }
 echo "$out" | grep -qx "3.21.3" || { echo "::error title=Level C::release is not 3.21.3"; exit 1; }
 echo "::notice title=Level C::PRoot ran Alpine 3.21.3 aarch64 userland on a real aarch64 host"
 
 echo "== Level D: fixed bootstrap diagnostic (no caller input)"
-diag=$("$PROOT" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'echo "busybox=$(busybox echo ok)"; echo "musl=$(ls /lib | grep -c ld-musl)"; echo "bin_sh=$(readlink /bin/sh)"')
+diag=$(run_proot "Level D" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'echo "busybox=$(busybox echo ok)"; echo "musl=$(ls /lib | grep -c ld-musl)"; echo "bin_sh=$(readlink /bin/sh)"')
 echo "$diag"
 echo "$diag" | grep -qx "busybox=ok" || { echo "::error title=Level D::busybox applet failed"; exit 1; }
 echo "::notice title=Level D::fixed diagnostic bootstrap OK"
