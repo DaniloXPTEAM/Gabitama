@@ -49,7 +49,10 @@ class GeminiLiveLifecycleAndroidTest {
     private lateinit var live: GeminiLiveVoiceClient
     private lateinit var coordinator: VoiceEngineCoordinator
 
-    private val connections = AtomicInteger()
+    /** Responses registered in MockWebServer (test bookkeeping, not sockets). */
+    private val enqueued = AtomicInteger()
+    /** WebSocket upgrades actually accepted by the server (real connections). */
+    private val socketsOpened = AtomicInteger()
     private val lastServerSocket = AtomicReference<WebSocket?>()
     private val setupReceived = AtomicReference(CountDownLatch(1))
     private val serverClosedCount = AtomicInteger()
@@ -122,10 +125,11 @@ class GeminiLiveLifecycleAndroidTest {
     }
 
     private fun enqueueConnection(autoSetupComplete: Boolean) {
-        connections.incrementAndGet()
+        enqueued.incrementAndGet()
         setupReceived.set(CountDownLatch(1))
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                socketsOpened.incrementAndGet()
                 lastServerSocket.set(webSocket)
                 lastApiKeyHeader.set(response.request.header("x-goog-api-key"))
             }
@@ -188,11 +192,10 @@ class GeminiLiveLifecycleAndroidTest {
         assertTrue(awaitState(LiveSessionState.BLOCKED))
         assertNotNull(coordinator.status.value.liveConnectionError)
         waitMs(500)
-        // connections counts enqueued responses (set above), so the socket check is the server-side request count.
+        // enqueued counts registered responses; the socket check is the server-side request count.
         assertEquals("no WebSocket upgrade reached the server", 0, server.requestCount)
     }
 
-    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun handshakeIsConnectingUntilSetupCompleteArrives() {
         holdSetupComplete = true
@@ -225,7 +228,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertTrue("server must observe the client close", awaitUntil(5_000) { serverClosedCount.get() >= 1 })
         assertFalse(live.connected.value)
         waitMs(1_500)
-        assertEquals("no reconnect after Stop", 1, connections.get())
+        assertEquals("no reconnect after Stop", 1, socketsOpened.get())
         assertEquals(1, server.requestCount)
     }
 
@@ -242,7 +245,7 @@ class GeminiLiveLifecycleAndroidTest {
         assertTrue(awaitUntil(5_000) { serverClosedCount.get() >= 1 })
         assertFalse(live.connected.value)
         waitMs(1_500)
-        assertEquals(1, connections.get())
+        assertEquals(1, socketsOpened.get())
         assertFalse(coordinator.status.value.isListening)
         assertFalse(coordinator.status.value.isSpeaking)
     }
@@ -258,14 +261,14 @@ class GeminiLiveLifecycleAndroidTest {
 
         // First network drop: one bounded reconnect is allowed (policy MAX_RECONNECT_ATTEMPTS = 1).
         lastServerSocket.get()!!.cancel()
-        assertTrue("reconnect should start", awaitUntil(5_000) { connections.get() == 2 })
+        assertTrue("reconnect should start", awaitUntil(5_000) { socketsOpened.get() == 2 })
         assertTrue("second session ACTIVE after reconnect", awaitState(LiveSessionState.ACTIVE))
 
         // Second drop: the budget is exhausted, so the session must block instead of looping.
         lastServerSocket.get()!!.cancel()
         assertTrue(awaitState(LiveSessionState.BLOCKED))
         waitMs(2_000)
-        assertEquals("no third connection", 2, connections.get())
+        assertEquals("no third connection", 2, socketsOpened.get())
         assertNotNull(coordinator.status.value.liveConnectionError)
     }
 
@@ -282,7 +285,7 @@ class GeminiLiveLifecycleAndroidTest {
         onMain { coordinator.stopGeminiLiveSession() }
 
         waitMs(1_500)
-        assertEquals("stop must cancel the pending reconnect", 1, connections.get())
+        assertEquals("stop must cancel the pending reconnect", 1, socketsOpened.get())
         assertEquals(LiveSessionState.DISCONNECTED, coordinator.status.value.liveSessionState)
     }
 
