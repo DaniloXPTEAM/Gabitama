@@ -21,7 +21,6 @@ echo "proot e_machine=$machine (aarch64) host=$(uname -m)"
 test "$(uname -m)" = "aarch64" || { echo "::error title=Level C::host is not aarch64"; exit 1; }
 
 echo "== Level C: run Alpine userland under PRoot"
-export PROOT_LOADER="$(cd "$(dirname "$LOADER")" && pwd)/$(basename "$LOADER")"
 run_proot() {
   # Capture stdout AND stderr; on failure publish the PRoot diagnostics (set -e would otherwise hide them).
   local title="$1"; shift
@@ -36,7 +35,21 @@ run_proot() {
   fi
   cat "$log"; rm -f "$log"
 }
+export PROOT_LOADER="$(cd "$(dirname "$LOADER")" && pwd)/$(basename "$LOADER")"
 echo "proot version: $("$PROOT" --version 2>&1 || true)"
+# Diagnostic matrix (informational, does not gate): isolates the tracee SIGSEGV seen on the first run.
+probe() {
+  local name="$1"; shift
+  local log rc=0
+  log=$(mktemp)
+  env "$@" "$PROOT" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'echo ok-from-alpine' >"$log" 2>&1 || rc=$?
+  echo "::notice title=Diag $name::exit=$rc tail=$(tail -c 300 "$log" | tr '\n' ' ')" >&2
+  rm -f "$log"
+}
+probe "default" PROOT_LOADER="$PROOT_LOADER"
+probe "no-loader-env" PROOT_LOADER=
+probe "no-seccomp" PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOMP=1
+probe "verbose3" PROOT_LOADER="$PROOT_LOADER" PROOT_VERBOSE=3
 out=$(run_proot "Level C" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
 echo "$out"
 echo "$out" | grep -qx "aarch64" || { echo "::error title=Level C::uname did not report aarch64"; exit 1; }
