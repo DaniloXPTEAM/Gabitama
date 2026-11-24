@@ -29,9 +29,7 @@ jobs:
           set -e
           # Only the tail is published (diagnostic); the full log stays on the runner.
           if [ "$status" -ne 0 ]; then
-            tail -n 40 "$RUNNER_TEMP/proot-build.log" | python3 -c "import sys
-for line in sys.stdin:
-    print('::error title=PRoot build::' + line.rstrip()[:300].replace('%','%25'))"
+            tail -n 40 "$RUNNER_TEMP/proot-build.log" | cut -c1-300 | sed -e 's/%/%25/g' -e 's/^/::error title=PRoot build::/'
           fi
           exit $status
       - name: Obter Alpine verificado (fora do repositório)
