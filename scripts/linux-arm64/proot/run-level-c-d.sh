@@ -52,6 +52,17 @@ probe "alpine-no-seccomp" "$ROOTFS" PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOM
 probe "alpine-verbose3" "$ROOTFS" PROOT_LOADER="$PROOT_LOADER" PROOT_VERBOSE=3
 probe "host-root-default" / PROOT_LOADER="$PROOT_LOADER"
 probe "host-root-no-seccomp" / PROOT_LOADER="$PROOT_LOADER" PROOT_NO_SECCOMP=1
+# Loader itself: headers and a direct run (no PRoot). Loader B = same loader without --rosegment, default ld.
+echo "::notice title=Loader A headers::$(readelf -lW "$LOADER" 2>/dev/null | grep -E 'LOAD|GNU_STACK' | tr -s ' ' | tr '\n' ' ' | cut -c1-500)" >&2
+direct_rc=0; "$LOADER" /bin/true >/dev/null 2>&1 || direct_rc=$?
+echo "::notice title=Diag loader-A-direct::exit=$direct_rc" >&2
+if [ -n "${LOADER_B:-}" ] && [ -x "$LOADER_B" ]; then
+  echo "::notice title=Loader B headers::$(readelf -lW "$LOADER_B" 2>/dev/null | grep -E 'LOAD|GNU_STACK' | tr -s ' ' | tr '\n' ' ' | cut -c1-500)" >&2
+  probe "alpine-loaderB" "$ROOTFS" PROOT_LOADER="$LOADER_B"
+  probe "host-root-loaderB" / PROOT_LOADER="$LOADER_B"
+else
+  echo "::notice title=Loader B::not built" >&2
+fi
 out=$(run_proot "Level C" -r "$ROOTFS" -0 -w / /bin/busybox sh -c 'uname -m; cat /etc/alpine-release')
 echo "$out"
 echo "$out" | grep -qx "aarch64" || { echo "::error title=Level C::uname did not report aarch64"; exit 1; }

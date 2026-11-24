@@ -50,6 +50,15 @@ jobs:
             { grep -iE 'error|\*\*\*|undefined|no such|cannot|killed' "$RUNNER_TEMP/proot-build.log" | tail -n 8; echo '--- last lines ---'; tail -n 6 "$RUNNER_TEMP/proot-build.log"; } | cut -c1-300 | sed -e 's/%/%25/g' -e 's/^/::error title=PRoot build::/'
           fi
           exit $status
+      - name: Variante de diagnóstico do loader (ld padrão, sem --rosegment; cópia temporária)
+        # Diagnostic only: the PRoot segfaults even on the host rootfs (-r /), so the suspect is the loader.
+        # This builds the same loader with the default GNU ld and without --rosegment, to test that hypothesis.
+        run: |
+          set -u
+          cp -a "$RUNNER_TEMP/proot-src" "$RUNNER_TEMP/proot-src-b"
+          sed -i 's/,--rosegment//' "$RUNNER_TEMP/proot-src-b/src/GNUmakefile"
+          make -C "$RUNNER_TEMP/proot-src-b/src" -j2 HAS_LOADER_32BIT= LD=cc loader/loader > "$RUNNER_TEMP/loader-b.log" 2>&1 || { echo "::notice title=Loader B build::failed: $(tail -c 300 "$RUNNER_TEMP/loader-b.log" | tr '\n' ' ')"; }
+          test -x "$RUNNER_TEMP/proot-src-b/src/loader/loader" && echo "::notice title=Loader B build::built" || true
       - name: Obter Alpine verificado (fora do repositório)
         env:
           KEEP_TARBALL_TO: ${{ runner.temp }}/alpine-minirootfs-3.21.3-aarch64.tar.gz
@@ -63,4 +72,5 @@ jobs:
         env:
           ROOTFS: ${{ runner.temp }}/alpine-root
           PROOT_SRC: ${{ runner.temp }}/proot-src/src
+          LOADER_B: ${{ runner.temp }}/proot-src-b/src/loader/loader
         run: bash scripts/linux-arm64/proot/run-level-c-d.sh
