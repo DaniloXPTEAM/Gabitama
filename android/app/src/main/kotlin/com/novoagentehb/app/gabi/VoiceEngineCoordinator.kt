@@ -445,7 +445,6 @@ class VoiceEngineCoordinator @Inject constructor(
     private var recognizer: SpeechRecognizer? = null
     private var activeCall: Call? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var pcmTrack: PcmPlayback? = null
     private var audioRecord: PcmCapture? = null
     private var systemTts: TextToSpeech? = null
     private var systemTtsReady = false
@@ -455,11 +454,10 @@ class VoiceEngineCoordinator @Inject constructor(
     private var liveReconnectJob: Job? = null
     private var liveConnectJob: Job? = null
     private var livePlaybackJob: Job? = null
-    private val pcmLock = Any()
     private val micLock = Any()
     private val micGeneration = java.util.concurrent.atomic.AtomicLong()
     private data class PcmChunk(val generation: Long, val bytes: ByteArray)
-    private val pcmGeneration = java.util.concurrent.atomic.AtomicLong()
+    private val pcmEngine = PcmPlaybackEngine(GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE) { pcmAudioFactory }
     private val pcmOutChannel = Channel<PcmChunk>(capacity = Channel.UNLIMITED)
 
     private var liveReducerState = LiveReducerInput()
@@ -539,7 +537,7 @@ class VoiceEngineCoordinator @Inject constructor(
                 }
 
                 decision.enqueuePcm24k?.let { pcm ->
-                    pcmOutChannel.trySend(PcmChunk(pcmGeneration.get(), pcm))
+                    pcmOutChannel.trySend(PcmChunk(pcmEngine.generation, pcm))
                 }
 
                 emitTurnCommits(turnFlush)
@@ -783,58 +781,25 @@ class VoiceEngineCoordinator @Inject constructor(
     }
 
     private fun writePcm24kBlocking(chunk: PcmChunk) {
-        val pcmBytes = chunk.bytes
-        if (pcmBytes.isEmpty() || chunk.generation != pcmGeneration.get()) return
         try {
-            val minBuf = PcmIoContracts.requireBufferSize(pcmAudioFactory.minPlaybackBufferSize(
-                GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE
-            )).coerceAtLeast(4800)
-            synchronized(pcmLock) {
-                if (chunk.generation != pcmGeneration.get()) return
-                if (pcmTrack == null) {
-                    pcmTrack = pcmAudioFactory.createPlayback(
-                        GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE, maxOf(minBuf * 2, pcmBytes.size)
-                    )
-                }
-                val current = checkNotNull(pcmTrack)
-                check(current.isInitialized) { "Reprodução não inicializada." }
-                if (!current.isPlaying) current.play()
-            }
-            PcmIoContracts.writeFully(pcmBytes.size) { offset, remaining ->
-                synchronized(pcmLock) {
-                    if (chunk.generation != pcmGeneration.get()) return
-                    checkNotNull(pcmTrack).write(pcmBytes, offset, minOf(remaining, 1920))
-                }
-            }
+            pcmEngine.write(chunk.generation, chunk.bytes)
         } catch (_: Exception) {
             scope.launch {
-                if (chunk.generation == pcmGeneration.get()) failLiveAudio("Falha na reprodução de áudio Live. Verifique a saída de áudio e tente novamente.")
+                if (chunk.generation == pcmEngine.generation) failLiveAudio("Falha na reprodução de áudio Live. Verifique a saída de áudio e tente novamente.")
             }
         }
     }
 
     private fun drainPcmOutQueueAndFlushTrack() {
-        synchronized(pcmLock) { pcmGeneration.incrementAndGet() }
+        pcmEngine.invalidate()
         while (pcmOutChannel.tryReceive().isSuccess) {
             // descarta áudio pendente imediatamente em barge-in/encerramento
         }
-        synchronized(pcmLock) {
-            runCatching {
-                pcmTrack?.pause()
-                pcmTrack?.flush()
-            }
-        }
+        pcmEngine.silence()
     }
 
     private fun releasePcmTrack() {
-        synchronized(pcmLock) {
-            runCatching {
-                pcmTrack?.pause()
-                pcmTrack?.flush()
-                pcmTrack?.release()
-            }
-            pcmTrack = null
-        }
+        pcmEngine.release()
     }
 
     fun startListening() {
@@ -962,7 +927,7 @@ class VoiceEngineCoordinator @Inject constructor(
     fun playPcm24kAudio(pcmBytes: ByteArray) {
         if (pcmBytes.isEmpty()) return
         ensurePcmPlayerConsumer()
-        pcmOutChannel.trySend(PcmChunk(pcmGeneration.get(), pcmBytes))
+        pcmOutChannel.trySend(PcmChunk(pcmEngine.generation, pcmBytes))
     }
 
     fun stopSpeaking() {
