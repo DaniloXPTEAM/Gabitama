@@ -302,6 +302,8 @@ class GeminiLiveLifecycleAndroidTest {
         enqueueConnection(autoSetupComplete = true)
         onMain { coordinator.startGeminiLiveSession() }
         assertTrue(awaitState(LiveSessionState.ACTIVE))
+        // ACTIVE is only reachable after the server received setup and answered; make that precondition explicit.
+        assertNotNull("ACTIVE observed before the server recorded an open socket", lastServerSocket.get())
 
         lastServerSocket.get()!!.cancel()
         assertTrue(awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
