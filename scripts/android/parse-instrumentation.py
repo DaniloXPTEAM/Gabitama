@@ -118,7 +118,7 @@ failures = sum(code in (-1, -2) for code in completed.values())
 for (cls, name), code in sorted(completed.items()):
     if code in (-1, -2):
         summary = details.get((cls, name), 'where=unknown')
-        print(f'::error title=Failed instrumentation test::{cls.rsplit(".", 1)[-1]}.{name} :: ' + ' | '.join(summary.splitlines()[:4]))
+        print(f'::error title=Failed instrumentation test::{cls.rsplit(".", 1)[-1]}.{name} :: ' + ' | '.join(summary.splitlines()[:7]))
 skipped = sum(code in (-3, -4) for code in completed.values())
 suite = ET.Element('testsuite', tests=str(len(completed)), failures=str(failures), errors='0', skipped=str(skipped))
 for (cls, name), code in sorted(completed.items()):

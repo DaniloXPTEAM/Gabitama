@@ -16,6 +16,8 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +27,7 @@ import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -45,6 +48,8 @@ class GeminiLiveLifecycleAndroidTest {
     private lateinit var server: MockWebServer
     /** Computed on the test thread in setUp: MockWebServer.url() may resolve the host, which is not allowed on main. */
     private lateinit var liveUrl: okhttp3.HttpUrl
+    private lateinit var serverCertificates: HandshakeCertificates
+    private lateinit var clientCertificates: HandshakeCertificates
     private lateinit var http: OkHttpClient
     private lateinit var prefs: AppPreferences
     private lateinit var vault: SecureKeyVault
@@ -77,9 +82,26 @@ class GeminiLiveLifecycleAndroidTest {
     @Before
     fun setUp() {
         // No runtime-permission changes here: granting/revoking RECORD_AUDIO on a running app can restart the test process.
-        phase("mockwebserver.start") { server = MockWebServer().apply { start() } }
+        // TLS with a synthetic certificate: Android 28+ blocks cleartext ws:// for this app (targetSdk 34),
+        // so a plain MockWebServer fails on API 29/34 only. The trust anchor exists only in this test client.
+        phase("tls.certificate") {
+            val certificate = HeldCertificate.Builder()
+                .addSubjectAlternativeName("127.0.0.1").addSubjectAlternativeName("localhost").build()
+            serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
+            clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()
+        }
+        phase("mockwebserver.start") {
+            server = MockWebServer().apply {
+                useHttps(serverCertificates.sslSocketFactory(), false)
+                start(InetAddress.getByName("127.0.0.1"), 0)
+            }
+        }
         phase("mockwebserver.url") { liveUrl = server.url("/live") }
-        phase("okhttp.build") { http = OkHttpClient.Builder().build() }
+        phase("okhttp.build") {
+            http = OkHttpClient.Builder()
+                .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
+                .build()
+        }
         phase("appPreferences.construct") { prefs = AppPreferences(context) }
         phase("keyVault.construct") { vault = SecureKeyVault(context) }
         // The real key is never read here: the store is overridden with a synthetic value and restored in tearDown.
