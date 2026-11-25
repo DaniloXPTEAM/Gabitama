@@ -159,21 +159,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write # Cria ou atualiza um pre-release PRIVADO com um único asset APK. Nunca público.
+      contents: write # Cria ou atualiza um pre-release com um único asset APK (visibilidade = a do repositório).
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: shared-apks-${{ github.sha }}
           path: candidate/
-      - name: Garantir que o repositório é privado
+      - name: Registrar visibilidade do repositório
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)
-          if [ "$private" != "true" ]; then
-            echo "::error title=Publicação bloqueada::repositório não é privado; nenhum release criado"
-            exit 1
+          if [ "$private" = "true" ]; then
+            echo "::notice title=Visibilidade::repositório privado; release visível só a quem tem acesso"
+          else
+            echo "::warning title=Visibilidade::repositório PÚBLICO; release e APK ficam acessíveis a qualquer pessoa com o link"
           fi
+          echo "VISIBILITY=$([ "$private" = "true" ] && echo privado || echo público)" >> "$GITHUB_ENV"
       - name: Verificar SHA-256 e preparar nome, notas e asset
         env:
           GH_TOKEN: ${{ github.token }}
@@ -209,7 +211,7 @@ jobs:
           | minSdk / targetSdk | ${minsdk} / ${target} |
           | ABIs nativas | ${abis:-nenhuma} |
           | Certificado (SHA-256) | ${signer:-não lido} |
-          | Repositório | privado |
+          | Repositório | ${VISIBILITY} |
 
           A assinatura é a chave debug da máquina de CI e pode mudar entre runs. Não instale por cima de uma instalação com assinatura diferente.
           EOF
@@ -225,7 +227,7 @@ jobs:
           {
             echo "### Prévia privada do APK (NÃO HOMOLOGADO)"
             echo
-            echo "Link direto (exige login com acesso ao repositório privado): $url"
+            echo "Link direto (repositório $VISIBILITY): $url"
             echo
             echo "SHA-256 do APK: $apk_sha"
           } >> "$GITHUB_STEP_SUMMARY"
