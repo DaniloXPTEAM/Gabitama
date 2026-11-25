@@ -15,6 +15,9 @@ internal class PcmCaptureSession(private val capture: PcmCapture) {
     private var stopped = false
     private var closed = false
 
+    /** Platform audio session id, used only to attach the echo canceler. */
+    val audioSessionId: Int get() = capture.audioSessionId
+
     /** Fails when the platform did not initialize the recorder. */
     fun checkInitialized() {
         check(capture.isInitialized) { "Microfone não inicializado." }
