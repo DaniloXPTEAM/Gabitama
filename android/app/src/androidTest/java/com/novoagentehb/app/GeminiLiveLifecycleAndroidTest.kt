@@ -61,6 +61,8 @@ class GeminiLiveLifecycleAndroidTest {
     /** WebSocket upgrades actually accepted by the server (real connections). */
     private val socketsOpened = AtomicInteger()
     private val lastServerSocket = AtomicReference<WebSocket?>()
+    /** Client-side socket of the latest connection: the object a network drop is simulated on. */
+    private val lastClientSocket = AtomicReference<WebSocket?>()
     private val setupReceived = AtomicReference(CountDownLatch(1))
     private val serverClosedCount = AtomicInteger()
     private val lastApiKeyHeader = AtomicReference<String?>()
@@ -113,7 +115,7 @@ class GeminiLiveLifecycleAndroidTest {
             live.webSocketFactory = WebSocket.Factory { request, listener ->
                 // Keep headers (x-goog-api-key) and redirect only the endpoint to the local server.
                 // Runs on main inside connect(): only a precomputed URL, no host resolution here.
-                http.newWebSocket(request.newBuilder().url(liveUrl).build(), listener)
+                http.newWebSocket(request.newBuilder().url(liveUrl).build(), listener).also { lastClientSocket.set(it) }
             }
         }
         // The coordinator is main-thread confined in production (TextToSpeech, Handler, Dispatchers.Main).
@@ -284,12 +286,12 @@ class GeminiLiveLifecycleAndroidTest {
         assertTrue(awaitState(LiveSessionState.ACTIVE))
 
         // First network drop: one bounded reconnect is allowed (policy MAX_RECONNECT_ATTEMPTS = 1).
-        lastServerSocket.get()!!.cancel()
+        lastClientSocket.get()!!.cancel()
         assertTrue("reconnect should start", awaitUntil(5_000) { socketsOpened.get() == 2 })
         assertTrue("second session ACTIVE after reconnect", awaitState(LiveSessionState.ACTIVE))
 
         // Second drop: the budget is exhausted, so the session must block instead of looping.
-        lastServerSocket.get()!!.cancel()
+        lastClientSocket.get()!!.cancel()
         assertTrue(awaitState(LiveSessionState.BLOCKED))
         waitMs(2_000)
         assertEquals("no third connection", 2, socketsOpened.get())
@@ -305,7 +307,7 @@ class GeminiLiveLifecycleAndroidTest {
         // ACTIVE is only reachable after the server received setup and answered; make that precondition explicit.
         assertNotNull("ACTIVE observed before the server recorded an open socket", lastServerSocket.get())
 
-        lastServerSocket.get()!!.cancel()
+        lastClientSocket.get()!!.cancel()
         assertTrue(awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
         onMain { coordinator.stopGeminiLiveSession() }
 
