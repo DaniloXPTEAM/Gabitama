@@ -334,6 +334,7 @@ class GeminiLiveLifecycleAndroidTest {
 
         onMain { coordinator.startGeminiLiveSession() }
 
+        // Budget: production watchdog is 15 s; 25 s leaves margin for slow emulators. Not a timing assertion beyond that.
         assertTrue("watchdog should block after ~15 s", awaitState(LiveSessionState.BLOCKED, timeoutMs = 25_000))
         assertTrue(coordinator.status.value.liveConnectionError.orEmpty().contains("Tempo limite"))
         assertFalse(live.connected.value)
