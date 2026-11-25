@@ -73,7 +73,8 @@ class PcmPlaybackEngineUnitTest {
 
         engine.write(engine.generation, input)
 
-        assertEquals(listOf(6400), factory.bufferRequests) // max(minBuf*2, chunk)
+        // minBuf = max(platform 3200, 4800 floor) = 4800; buffer = max(minBuf*2, chunk) = 9600
+        assertEquals(listOf(9600), factory.bufferRequests)
         assertEquals(1, factory.tracks.size)
         assertEquals(listOf("play1"), factory.log.toList())
         assertArrayEquals(input, factory.tracks[0].received.toByteArray())
@@ -124,14 +125,15 @@ class PcmPlaybackEngineUnitTest {
         engine.write(engine.generation, pcm(500))
         assertEquals("silence must not create a second track", 1, factory.tracks.size)
 
+        val beforeRelease = factory.log.size
         engine.release()
         val releasedBytes = factory.tracks[0].received.size()
         engine.write(engine.generation, pcm(500))
 
         assertEquals("after release a new track is created", 2, factory.tracks.size)
         assertEquals("the released track receives nothing more", releasedBytes, factory.tracks[0].received.size())
-        // release() is pause -> flush -> release on the track; the last three events must be exactly that.
-        assertEquals(listOf("pause1", "flush1", "release1"), factory.log.toList().takeLast(3))
+        // release() is pause -> flush -> release on the track; those three events come first after beforeRelease.
+        assertEquals(listOf("pause1", "flush1", "release1"), factory.log.subList(beforeRelease, beforeRelease + 3).toList())
     }
 
     /**
