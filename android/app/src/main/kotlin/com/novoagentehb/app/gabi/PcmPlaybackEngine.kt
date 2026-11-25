@@ -3,15 +3,20 @@ package com.novoagentehb.app.gabi
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Owns the PCM24k playback track used by Gemini Live. It keeps the exact order and locking of the
- * previous inline code in VoiceEngineCoordinator (the queue of chunks stays in the coordinator):
- *  - chunks carry the generation they were queued in; invalidate() makes older chunks inert;
- *  - the track is created lazily, written in 1920-byte slices under [lock] and kept until release();
- *  - each blocking write is performed while holding [lock] (known behaviour, covered by a test).
- * It only wraps the Android playback mechanism. The voice is still produced by Gemini Live.
+ * Owns the PCM24k playback track used by Gemini Live. The chunk queue stays in the coordinator.
+ *
+ * Synchronization contract:
+ *  - [lock] is held only for a single non-blocking write call, a flag check, or a pause/flush/release.
+ *    It is never held while waiting for buffer space, so Stop/invalidate/release never wait for playback.
+ *  - When the track has no room, the writer backs off outside the lock ([WAIT_MILLIS]), and gives up
+ *    with an explicit error after [stallTimeoutNanos] without progress. No busy-wait.
+ *  - Every write re-checks the chunk generation and the track under the lock. A released track is
+ *    never written again, and chunks queued before [invalidate] stop mid-write.
+ * It wraps only the Android playback mechanism. Gemini Live still produces the voice.
  */
 internal class PcmPlaybackEngine(
     private val sampleRate: Int,
+    private val stallTimeoutNanos: Long = 2_000_000_000L,
     private val factory: () -> PcmAudioFactory,
 ) {
     private val lock = Any()
@@ -21,7 +26,7 @@ internal class PcmPlaybackEngine(
     /** Current generation. Chunks queued with an older value are discarded. */
     val generation: Long get() = gen.get()
 
-    /** Writes one chunk. Throws on initialization or write failure; the caller reports it. */
+    /** Writes one chunk. Throws on initialization failure, platform error or a stalled track. */
     fun write(chunkGeneration: Long, bytes: ByteArray) {
         if (bytes.isEmpty() || chunkGeneration != gen.get()) return
         val minBuf = PcmIoContracts.requireBufferSize(factory().minPlaybackBufferSize(sampleRate)).coerceAtLeast(4800)
@@ -34,15 +39,28 @@ internal class PcmPlaybackEngine(
             check(current.isInitialized) { "Reprodução não inicializada." }
             if (!current.isPlaying) current.play()
         }
-        PcmIoContracts.writeFully(bytes.size) { offset, remaining ->
-            synchronized(lock) {
+        var offset = 0
+        var stalledSince = -1L
+        while (offset < bytes.size) {
+            val accepted = synchronized(lock) {
                 if (chunkGeneration != gen.get()) return
-                checkNotNull(track).write(bytes, offset, minOf(remaining, 1920))
+                val current = track ?: return
+                current.writeNonBlocking(bytes, offset, minOf(bytes.size - offset, WRITE_SLICE))
             }
+            check(accepted >= 0) { "Falha de reprodução de áudio (código $accepted)." }
+            if (accepted > 0) {
+                offset += accepted
+                stalledSince = -1L
+                continue
+            }
+            val now = System.nanoTime()
+            if (stalledSince < 0) stalledSince = now
+            check(now - stalledSince < stallTimeoutNanos) { "Reprodução de áudio sem progresso." }
+            Thread.sleep(WAIT_MILLIS)
         }
     }
 
-    /** Makes every chunk queued before this call inert. Call before draining the queue. */
+    /** Makes every chunk queued before this call inert, including a write already in progress. */
     fun invalidate() {
         synchronized(lock) { gen.incrementAndGet() }
     }
@@ -57,7 +75,7 @@ internal class PcmPlaybackEngine(
         }
     }
 
-    /** Pauses, flushes and releases the track. The next write creates a new one. */
+    /** Pauses, flushes and releases the track. Nothing is written to it afterwards. */
     fun release() {
         synchronized(lock) {
             runCatching {
@@ -67,5 +85,10 @@ internal class PcmPlaybackEngine(
             }
             track = null
         }
+    }
+
+    internal companion object {
+        const val WRITE_SLICE = 1920
+        const val WAIT_MILLIS = 5L
     }
 }

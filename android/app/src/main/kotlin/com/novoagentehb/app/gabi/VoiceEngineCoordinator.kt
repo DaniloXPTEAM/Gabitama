@@ -445,7 +445,7 @@ class VoiceEngineCoordinator @Inject constructor(
     private var recognizer: SpeechRecognizer? = null
     private var activeCall: Call? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var audioRecord: PcmCapture? = null
+    private var audioRecord: PcmCaptureSession? = null
     private var systemTts: TextToSpeech? = null
     private var systemTtsReady = false
     private var speechJob: Job? = null
@@ -467,6 +467,10 @@ class VoiceEngineCoordinator @Inject constructor(
     internal var microphoneEnabled: Boolean = true
     /** Test seam for AudioRecord/AudioTrack; production always uses AndroidPcmAudioFactory. */
     internal var pcmAudioFactory: PcmAudioFactory = AndroidPcmAudioFactory
+    /** Test seam for the RECORD_AUDIO decision. Production asks the platform; tests never change real permissions. */
+    internal var micPermissionCheck: () -> Boolean = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    }
 
     private val _status = MutableStateFlow(VoiceStatusSnapshot())
     val status: StateFlow<VoiceStatusSnapshot> = _status.asStateFlow()
@@ -614,7 +618,7 @@ class VoiceEngineCoordinator @Inject constructor(
     fun startGeminiLiveSession() {
         if (liveReducerState.keepAlive) return
         // The microphone gate is part of the microphone path; the test seam (microphoneEnabled = false) skips both.
-        if (microphoneEnabled && ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (microphoneEnabled && !micPermissionCheck()) {
             val msg = "Permissão de microfone necessária para Gemini Live."
             updateStatus { it.copy(liveSessionState = LiveSessionState.BLOCKED, liveConnectionError = msg) }
             _events.tryEmit(VoiceTranscriptEvent.VoiceError(msg))
@@ -724,25 +728,26 @@ class VoiceEngineCoordinator @Inject constructor(
         if (!microphoneEnabled) return
         stopPcmMicCapture()
         val generation = micGeneration.get()
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!micPermissionCheck()) {
             scope.launch { if (generation == micGeneration.get()) failLiveAudio("Permissão de microfone necessária para Gemini Live.") }
             return
         }
         micStreamJob = scope.launch(Dispatchers.IO) {
-            var recorder: PcmCapture? = null
+            var session: PcmCaptureSession? = null
             var echo: AcousticEchoCanceler? = null
             try {
                 val minBuf = PcmIoContracts.requireBufferSize(pcmAudioFactory.minCaptureBufferSize(
                     GeminiLiveVoiceClient.INPUT_SAMPLE_RATE
                 )).coerceAtLeast(3200)
-                val created = pcmAudioFactory.createCapture(GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, minBuf * 2)
-                recorder = created
-                check(created.isInitialized) { "Microfone não inicializado." }
+                val created = PcmCaptureSession(
+                    pcmAudioFactory.createCapture(GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, minBuf * 2)
+                )
+                session = created
+                created.checkInitialized()
                 synchronized(micLock) {
                     if (generation != micGeneration.get()) return@launch
                     audioRecord = created
                     created.startRecording()
-                    check(created.isRecording) { "Microfone não iniciou gravação." }
                 }
                 if (AcousticEchoCanceler.isAvailable()) {
                     echo = runCatching { AcousticEchoCanceler.create(created.audioSessionId)?.apply { enabled = true } }.getOrNull()
@@ -752,22 +757,19 @@ class VoiceEngineCoordinator @Inject constructor(
                         updateStatus { it.copy(isListening = true) }
                     }
                 }
-                val buffer = ByteArray(1280)
-                while (isActive && generation == micGeneration.get() && geminiLive.connected.value) {
-                    val count = PcmIoContracts.requireReadResult(created.read(buffer, 0, buffer.size))
-                    if (count > 0 && generation == micGeneration.get() && !geminiLive.sendPcm16AudioChunk(buffer.copyOf(count))) {
-                        error("Falha ao enviar áudio do microfone.")
-                    }
-                }
+                created.pump(
+                    buffer = ByteArray(1280),
+                    active = { isActive && generation == micGeneration.get() && geminiLive.connected.value },
+                    sink = { bytes -> geminiLive.sendPcm16AudioChunk(bytes) },
+                )
             } catch (_: Exception) {
                 if (generation == micGeneration.get() && isActive) scope.launch {
                     if (generation == micGeneration.get()) failLiveAudio("Falha no microfone ou no envio de áudio Live. Verifique a permissão e tente novamente.")
                 }
             } finally {
                 runCatching { echo?.release() }
-                synchronized(micLock) { if (audioRecord === recorder) audioRecord = null }
-                runCatching { recorder?.stop() }
-                runCatching { recorder?.release() }
+                synchronized(micLock) { if (audioRecord === session) audioRecord = null }
+                session?.close()
             }
         }
     }
@@ -776,8 +778,8 @@ class VoiceEngineCoordinator @Inject constructor(
         micGeneration.incrementAndGet()
         micStreamJob?.cancel()
         micStreamJob = null
-        // stop() unblocks read(); the capture job owns release(), including cancellation races.
-        synchronized(micLock) { runCatching { audioRecord?.stop() } }
+        // interrupt() unblocks read(); the capture job owns close(), so release never races with a read.
+        synchronized(micLock) { audioRecord?.interrupt() }
     }
 
     private fun writePcm24kBlocking(chunk: PcmChunk) {

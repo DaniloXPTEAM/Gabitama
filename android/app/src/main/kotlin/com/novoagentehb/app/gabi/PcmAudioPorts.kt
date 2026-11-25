@@ -26,7 +26,8 @@ internal interface PcmPlayback {
     val isInitialized: Boolean
     val isPlaying: Boolean
     fun play()
-    fun write(bytes: ByteArray, offset: Int, size: Int): Int
+    /** Non-blocking write: returns bytes accepted (0 when the buffer is full) or a negative platform error. */
+    fun writeNonBlocking(bytes: ByteArray, offset: Int, size: Int): Int
     fun pause()
     fun flush()
     fun release()
@@ -87,7 +88,8 @@ private class AndroidPcmPlayback(private val track: AudioTrack) : PcmPlayback {
     override val isInitialized: Boolean get() = track.state == AudioTrack.STATE_INITIALIZED
     override val isPlaying: Boolean get() = track.playState == AudioTrack.PLAYSTATE_PLAYING
     override fun play() = track.play()
-    override fun write(bytes: ByteArray, offset: Int, size: Int): Int = track.write(bytes, offset, size)
+    override fun writeNonBlocking(bytes: ByteArray, offset: Int, size: Int): Int =
+        track.write(bytes, offset, size, AudioTrack.WRITE_NON_BLOCKING)
     override fun pause() = track.pause()
     override fun flush() = track.flush()
     override fun release() = track.release()
