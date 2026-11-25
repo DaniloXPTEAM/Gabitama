@@ -180,6 +180,17 @@ class GeminiLiveVoiceClient @Inject constructor(
         const val INPUT_SAMPLE_RATE = 16_000
         const val OUTPUT_SAMPLE_RATE = 24_000
 
+        /**
+         * Dica exibida quando a sessão não fecha o handshake com o modelo salvo. O modelo anterior pode
+         * estar salvo explicitamente no aparelho; o app nunca o troca sozinho, então orientamos a troca manual.
+         */
+        fun liveModelHint(model: String): String? =
+            if (model == AppPreferences.LEGACY_GEMINI_LIVE_MODEL) {
+                "O modelo salvo é o anterior ($model). Abra Ajustes e toque em \"Aplicar padrão gemini-3.8-live\" antes de tentar de novo."
+            } else {
+                null
+            }
+
         fun buildSetupJson(
             model: String,
             systemInstruction: String,

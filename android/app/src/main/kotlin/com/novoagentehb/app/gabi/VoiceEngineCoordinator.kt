@@ -694,7 +694,8 @@ class VoiceEngineCoordinator @Inject constructor(
             if (liveReducerState.state == LiveSessionState.CONNECTING ||
                 liveReducerState.state == LiveSessionState.RECONNECTING
             ) {
-                val msg = "Tempo limite ao aguardar handshake Gemini Live (modelo: $model)."
+                val hint = GeminiLiveVoiceClient.liveModelHint(model)?.let { " $it" } ?: ""
+                val msg = "Tempo limite ao aguardar handshake Gemini Live (modelo: $model).$hint"
                 liveReducerState = LiveReducerInput(state = LiveSessionState.BLOCKED, keepAlive = false)
                 geminiLive.disconnect()
                 updateStatus { it.copy(liveSessionState = LiveSessionState.BLOCKED, liveConnectionError = msg) }

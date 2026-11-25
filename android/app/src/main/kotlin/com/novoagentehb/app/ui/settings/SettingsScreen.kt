@@ -43,6 +43,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.novoagentehb.app.BuildConfig
 import com.novoagentehb.app.app.navigation.Screen
 import com.novoagentehb.app.data.prefs.ProviderId
 import com.novoagentehb.app.data.prefs.VoiceModeId
@@ -330,6 +331,12 @@ fun SettingsScreen(
                                 Text(
                                     text = "Nota de transparência: Gemini Live usa voz pré-construída Kore do modelo selecionado; o runtime local Pocket TTS (gabi_24l) não está embarcado no APK (fallback explícito para TTS Android).",
                                     color = GabiTokens.AmberAccent,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    text = "Build ${BuildConfig.VERSION_NAME} (código ${BuildConfig.VERSION_CODE})" +
+                                        if (BuildConfig.DEBUG) " · prévia debug, não homologada" else "",
+                                    color = GabiTokens.TealAccent,
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 Spacer(Modifier.height(6.dp))

@@ -165,6 +165,11 @@ jobs:
         with:
           name: shared-apks-${{ github.sha }}
           path: candidate/
+      - name: Obter changelog da versão (somente a pasta de prévia)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/previa
+          sparse-checkout-cone-mode: false
       - name: Registrar visibilidade do repositório
         env:
           GH_TOKEN: ${{ github.token }}
@@ -216,6 +221,12 @@ jobs:
 
           A assinatura é a chave debug da máquina de CI e pode mudar entre runs. Não instale por cima de uma instalação com assinatura diferente.
           EOF
+          if [ -f "docs/previa/CHANGELOG-${vn}.md" ]; then
+            printf '\n' >> notes.md
+            cat "docs/previa/CHANGELOG-${vn}.md" >> notes.md
+          else
+            echo "::warning title=Changelog::docs/previa/CHANGELOG-${vn}.md ausente; notas sem changelog"
+          fi
           tag="preview-${short}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$name" --clobber
