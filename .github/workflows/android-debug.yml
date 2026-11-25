@@ -179,6 +179,7 @@ jobs:
       - name: Verificar SHA-256 e preparar nome, notas e asset
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }} # sem checkout neste job: o gh não consegue inferir o repositório
         run: |
           set -euo pipefail
           sha256sum -c candidate/SHA256SUMS
