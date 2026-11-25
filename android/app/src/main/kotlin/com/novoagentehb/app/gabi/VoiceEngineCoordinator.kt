@@ -5,12 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.AudioTrack
 import android.media.MediaPlayer
-import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.os.Bundle
 import android.os.Handler
@@ -450,8 +445,8 @@ class VoiceEngineCoordinator @Inject constructor(
     private var recognizer: SpeechRecognizer? = null
     private var activeCall: Call? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var pcmTrack: AudioTrack? = null
-    private var audioRecord: AudioRecord? = null
+    private var pcmTrack: PcmPlayback? = null
+    private var audioRecord: PcmCapture? = null
     private var systemTts: TextToSpeech? = null
     private var systemTtsReady = false
     private var speechJob: Job? = null
@@ -472,6 +467,8 @@ class VoiceEngineCoordinator @Inject constructor(
     private var liveToolCallHandler: (suspend (callId: String, name: String, args: Map<String, String>) -> String)? = null
     /** Test seam: when false the Live session never opens AudioRecord (CI emulators run without audio). Production keeps true. */
     internal var microphoneEnabled: Boolean = true
+    /** Test seam for AudioRecord/AudioTrack; production always uses AndroidPcmAudioFactory. */
+    internal var pcmAudioFactory: PcmAudioFactory = AndroidPcmAudioFactory
 
     private val _status = MutableStateFlow(VoiceStatusSnapshot())
     val status: StateFlow<VoiceStatusSnapshot> = _status.asStateFlow()
@@ -734,22 +731,20 @@ class VoiceEngineCoordinator @Inject constructor(
             return
         }
         micStreamJob = scope.launch(Dispatchers.IO) {
-            var recorder: AudioRecord? = null
+            var recorder: PcmCapture? = null
             var echo: AcousticEchoCanceler? = null
             try {
-                val minBuf = PcmIoContracts.requireBufferSize(AudioRecord.getMinBufferSize(
-                    GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+                val minBuf = PcmIoContracts.requireBufferSize(pcmAudioFactory.minCaptureBufferSize(
+                    GeminiLiveVoiceClient.INPUT_SAMPLE_RATE
                 )).coerceAtLeast(3200)
-                val created = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                    GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT, minBuf * 2)
+                val created = pcmAudioFactory.createCapture(GeminiLiveVoiceClient.INPUT_SAMPLE_RATE, minBuf * 2)
                 recorder = created
-                check(created.state == AudioRecord.STATE_INITIALIZED) { "Microfone não inicializado." }
+                check(created.isInitialized) { "Microfone não inicializado." }
                 synchronized(micLock) {
                     if (generation != micGeneration.get()) return@launch
                     audioRecord = created
                     created.startRecording()
-                    check(created.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microfone não iniciou gravação." }
+                    check(created.isRecording) { "Microfone não iniciou gravação." }
                 }
                 if (AcousticEchoCanceler.isAvailable()) {
                     echo = runCatching { AcousticEchoCanceler.create(created.audioSessionId)?.apply { enabled = true } }.getOrNull()
@@ -791,22 +786,19 @@ class VoiceEngineCoordinator @Inject constructor(
         val pcmBytes = chunk.bytes
         if (pcmBytes.isEmpty() || chunk.generation != pcmGeneration.get()) return
         try {
-            val minBuf = PcmIoContracts.requireBufferSize(AudioTrack.getMinBufferSize(
-                GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+            val minBuf = PcmIoContracts.requireBufferSize(pcmAudioFactory.minPlaybackBufferSize(
+                GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE
             )).coerceAtLeast(4800)
             synchronized(pcmLock) {
                 if (chunk.generation != pcmGeneration.get()) return
                 if (pcmTrack == null) {
-                    pcmTrack = AudioTrack.Builder()
-                        .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-                        .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                        .setBufferSizeInBytes(maxOf(minBuf * 2, pcmBytes.size)).setTransferMode(AudioTrack.MODE_STREAM).build()
+                    pcmTrack = pcmAudioFactory.createPlayback(
+                        GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE, maxOf(minBuf * 2, pcmBytes.size)
+                    )
                 }
                 val current = checkNotNull(pcmTrack)
-                check(current.state == AudioTrack.STATE_INITIALIZED) { "Reprodução não inicializada." }
-                if (current.playState != AudioTrack.PLAYSTATE_PLAYING) current.play()
+                check(current.isInitialized) { "Reprodução não inicializada." }
+                if (!current.isPlaying) current.play()
             }
             PcmIoContracts.writeFully(pcmBytes.size) { offset, remaining ->
                 synchronized(pcmLock) {
