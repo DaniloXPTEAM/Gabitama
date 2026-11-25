@@ -542,6 +542,12 @@ class VoiceEngineCoordinator @Inject constructor(
                 if (decision.clearAudioQueue) {
                     drainPcmOutQueueAndFlushTrack()
                 }
+                // A terminal state owns no playback resource: release the track, not only pause it. Nothing is
+                // written afterwards (generation was invalidated above); the next session creates a fresh track.
+                // RECONNECTING is not terminal and keeps the track.
+                if (decision.nextState == LiveSessionState.BLOCKED || decision.nextState == LiveSessionState.DISCONNECTED) {
+                    releasePcmTrack()
+                }
                 if (decision.stopMicStream) {
                     stopPcmMicCapture()
                 }
