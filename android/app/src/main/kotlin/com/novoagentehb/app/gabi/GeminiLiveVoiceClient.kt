@@ -2,6 +2,7 @@ package com.novoagentehb.app.gabi
 
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.novoagentehb.app.agent.orchestrator.ToolDescriptor
 import com.novoagentehb.app.data.prefs.AppPreferences
@@ -19,6 +20,9 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import java.util.Base64
+import java.io.IOException
+import java.io.InterruptedIOException
+import javax.net.ssl.SSLException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -96,8 +100,7 @@ class GeminiLiveVoiceClient @Inject constructor(
                 val wasReady = _connected.value
                 activeSocket = null
                 _connected.value = false
-                val codePart = response?.code?.let { "HTTP $it · " }.orEmpty()
-                val msg = SecureKeyVault.redactSecrets("$codePart${t.message ?: "Falha WebSocket Gemini Live"}")
+                val msg = LiveErrorText.mask(LiveErrorText.failure(t, response?.code), cleanKey)
                 _events.tryEmit(GeminiLiveEvent.ConnectionFailed(msg, retryable = wasReady && response == null && t is java.io.IOException))
                 Unit
             }
@@ -105,9 +108,8 @@ class GeminiLiveVoiceClient @Inject constructor(
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = synchronized(this@GeminiLiveVoiceClient) {
                 if (activeSocket !== webSocket) return@synchronized
                 _connected.value = false
-                val sanitized = SecureKeyVault.redactSecrets(reason)
                 if (code != 1000) {
-                    _events.tryEmit(GeminiLiveEvent.ConnectionFailed("Conexão encerrada ($code): $sanitized"))
+                    _events.tryEmit(GeminiLiveEvent.ConnectionFailed(LiveErrorText.closedByServer(code)))
                 }
                 webSocket.close(code, null)
                 Unit
@@ -117,7 +119,7 @@ class GeminiLiveVoiceClient @Inject constructor(
                 if (activeSocket !== webSocket) return@synchronized
                 activeSocket = null
                 _connected.value = false
-                _events.tryEmit(GeminiLiveEvent.Closed(code, SecureKeyVault.redactSecrets(reason)))
+                _events.tryEmit(GeminiLiveEvent.Closed(code, LiveErrorText.closedByServer(code)))
                 Unit
             }
         })
@@ -279,55 +281,150 @@ class GeminiLiveVoiceClient @Inject constructor(
                 ?: return emptyList()
             val out = mutableListOf<GeminiLiveEvent>()
 
-            obj.getAsJsonObject("error")?.let { err ->
-                val msg = err.get("message")?.asString ?: "Erro do servidor Gemini Live"
-                out.add(GeminiLiveEvent.ConnectionFailed(SecureKeyVault.redactSecrets(msg)))
+            // The server message text is untrusted and is never shown: only a category, the status token and the code.
+            obj.get("error")?.let { errElem ->
+                val err = errElem.takeIf { it.isJsonObject }?.asJsonObject
+                out.add(
+                    GeminiLiveEvent.ConnectionFailed(
+                        LiveErrorText.serverError(
+                            code = err?.get("code")?.let { LiveErrorText.intOrNull(it) },
+                            status = err?.get("status")?.let { LiveErrorText.tokenOrNull(it) }
+                        )
+                    )
+                )
             }
 
-            if (obj.has("setupComplete")) out.add(GeminiLiveEvent.Ready)
-            if (obj.has("goAway")) out.add(GeminiLiveEvent.GoingAway)
+            // A malformed optional section (unexpected JSON type) only drops that section; events already
+            // collected, such as setupComplete, are kept and the frame is never allowed to crash the socket reader.
+            runCatching {
+                if (obj.has("setupComplete")) out.add(GeminiLiveEvent.Ready)
+                if (obj.has("goAway")) out.add(GeminiLiveEvent.GoingAway)
 
-            obj.getAsJsonObject("serverContent")?.let { sc ->
-                if (sc.get("interrupted")?.asBoolean == true) out.add(GeminiLiveEvent.Interrupted)
+                obj.getAsJsonObject("serverContent")?.let { sc ->
+                    if (sc.get("interrupted")?.asBoolean == true) out.add(GeminiLiveEvent.Interrupted)
 
-                sc.getAsJsonObject("inputTranscription")?.get("text")?.asString
-                    ?.takeIf { it.isNotBlank() }?.let { out.add(GeminiLiveEvent.InputTranscript(it)) }
+                    sc.getAsJsonObject("inputTranscription")?.get("text")?.asString
+                        ?.takeIf { it.isNotBlank() }?.let { out.add(GeminiLiveEvent.InputTranscript(it)) }
 
-                sc.getAsJsonObject("outputTranscription")?.get("text")?.asString
-                    ?.takeIf { it.isNotBlank() }?.let { out.add(GeminiLiveEvent.OutputTranscript(it)) }
+                    sc.getAsJsonObject("outputTranscription")?.get("text")?.asString
+                        ?.takeIf { it.isNotBlank() }?.let { out.add(GeminiLiveEvent.OutputTranscript(it)) }
 
-                sc.getAsJsonObject("modelTurn")?.getAsJsonArray("parts")?.forEach { elem ->
-                    val inline = elem.asJsonObject.getAsJsonObject("inlineData") ?: return@forEach
-                    val mime = inline.get("mimeType")?.asString.orEmpty()
-                    val b64 = inline.get("data")?.asString.orEmpty()
-                    if (mime.startsWith("audio/pcm") && b64.isNotBlank()) {
-                        runCatching { Base64.getDecoder().decode(b64) }.getOrNull()?.let {
-                            out.add(GeminiLiveEvent.AudioOutput(it))
+                    sc.getAsJsonObject("modelTurn")?.getAsJsonArray("parts")?.forEach { elem ->
+                        val inline = elem.asJsonObject.getAsJsonObject("inlineData") ?: return@forEach
+                        val mime = inline.get("mimeType")?.asString.orEmpty()
+                        val b64 = inline.get("data")?.asString.orEmpty()
+                        if (mime.startsWith("audio/pcm") && b64.isNotBlank()) {
+                            runCatching { Base64.getDecoder().decode(b64) }.getOrNull()?.let {
+                                out.add(GeminiLiveEvent.AudioOutput(it))
+                            }
                         }
                     }
+
+                    if (sc.get("turnComplete")?.asBoolean == true) out.add(GeminiLiveEvent.TurnComplete)
                 }
 
-                if (sc.get("turnComplete")?.asBoolean == true) out.add(GeminiLiveEvent.TurnComplete)
-            }
-
-            obj.getAsJsonObject("toolCall")?.getAsJsonArray("functionCalls")?.forEach { callElem ->
-                val callObj = callElem.asJsonObject
-                val id = callObj.get("id")?.asString ?: return@forEach
-                val name = callObj.get("name")?.asString ?: return@forEach
-                val argsMap = mutableMapOf<String, String>()
-                callObj.getAsJsonObject("args")?.entrySet()?.forEach { (k, v) ->
-                    argsMap[k] = if (v.isJsonPrimitive) v.asString else v.toString()
+                obj.getAsJsonObject("toolCall")?.getAsJsonArray("functionCalls")?.forEach { callElem ->
+                    val callObj = callElem.asJsonObject
+                    val id = callObj.get("id")?.asString ?: return@forEach
+                    val name = callObj.get("name")?.asString ?: return@forEach
+                    val argsMap = mutableMapOf<String, String>()
+                    callObj.getAsJsonObject("args")?.entrySet()?.forEach { (k, v) ->
+                        argsMap[k] = if (v.isJsonPrimitive) v.asString else v.toString()
+                    }
+                    out.add(GeminiLiveEvent.ToolInvocation(id, name, argsMap))
                 }
-                out.add(GeminiLiveEvent.ToolInvocation(id, name, argsMap))
-            }
 
-            obj.getAsJsonObject("usageMetadata")?.let { u ->
-                val inTok = u.get("promptTokenCount")?.asInt ?: 0
-                val outTok = u.get("responseTokenCount")?.asInt ?: u.get("candidatesTokenCount")?.asInt ?: 0
-                if (inTok > 0 || outTok > 0) out.add(GeminiLiveEvent.Usage(inTok, outTok))
+                obj.getAsJsonObject("usageMetadata")?.let { u ->
+                    val inTok = u.get("promptTokenCount")?.asInt ?: 0
+                    val outTok = u.get("responseTokenCount")?.asInt ?: u.get("candidatesTokenCount")?.asInt ?: 0
+                    if (inTok > 0 || outTok > 0) out.add(GeminiLiveEvent.Usage(inTok, outTok))
+                }
             }
-
             return out
+        }
+    }
+}
+
+/**
+ * Public, user-facing texts for Gemini Live failures.
+ *
+ * Policy: server and transport texts are untrusted and are never shown verbatim. The UI receives a fixed
+ * category (authentication, quota, timeout, unavailable, network, TLS, ...), the HTTP code or the server
+ * status token when they are well formed, and the exception class name. Any configured key value is masked
+ * exactly, and the known key formats are masked as before. Exact masking cannot cover every fragment of a key,
+ * which is why raw text is not shown at all.
+ */
+internal object LiveErrorText {
+    const val MASK = "[REDACTED]"
+    private const val MIN_EXACT_KEY_LENGTH = 8
+    private val STATUS_TOKEN = Regex("^[A-Z_]{1,40}$")
+
+    private const val AUTH = "Autenticação recusada pelo Gemini Live. Verifique a chave configurada."
+    private const val QUOTA = "Cota ou limite do Gemini Live excedido. Tente novamente mais tarde."
+    private const val TIMEOUT = "Tempo esgotado ao falar com o Gemini Live."
+    private const val UNAVAILABLE = "Serviço Gemini Live indisponível no momento."
+    private const val REQUEST = "Requisição recusada pelo Gemini Live."
+    private const val NOT_FOUND = "Modelo ou recurso do Gemini Live não encontrado."
+    private const val NETWORK = "Falha de rede ao conectar ao Gemini Live."
+    private const val TLS = "Falha de segurança (TLS) ao conectar ao Gemini Live."
+    private const val CONNECT = "Falha ao conectar ao Gemini Live."
+    private const val GENERIC = "Erro do servidor Gemini Live."
+
+    /** Masks the exact configured key (when long enough to be meaningful) and the known key formats. */
+    fun mask(text: String, secret: String?): String {
+        var out = text
+        if (!secret.isNullOrBlank() && secret.length >= MIN_EXACT_KEY_LENGTH) out = out.replace(secret, MASK)
+        return SecureKeyVault.redactSecrets(out)
+    }
+
+    fun intOrNull(e: JsonElement): Int? =
+        if (e.isJsonPrimitive && e.asJsonPrimitive.isNumber) runCatching { e.asInt }.getOrNull() else null
+
+    /** Accepts only a plain upper-case status token such as RESOURCE_EXHAUSTED; anything else is dropped. */
+    fun tokenOrNull(e: JsonElement): String? =
+        if (e.isJsonPrimitive && e.asJsonPrimitive.isString) e.asString.takeIf { STATUS_TOKEN.matches(it) } else null
+
+    /** Message for an `error` object received from the server. The server text is not used. */
+    fun serverError(code: Int?, status: String?): String {
+        val category = categoryFor(status, code) ?: GENERIC
+        val diagnostic = listOfNotNull(status?.let { "status $it" }, code?.let { "código $it" })
+        return if (diagnostic.isEmpty()) category else "$category (${diagnostic.joinToString(", ")})"
+    }
+
+    /** Message for a failed handshake or socket failure, with the HTTP code when there was a response. */
+    fun failure(t: Throwable?, httpCode: Int?): String {
+        if (httpCode != null) return "HTTP $httpCode · ${categoryFor(null, httpCode) ?: GENERIC}"
+        val category = when (t) {
+            is InterruptedIOException -> TIMEOUT
+            is SSLException -> TLS
+            is IOException -> NETWORK
+            else -> CONNECT
+        }
+        val name = t?.javaClass?.simpleName?.takeIf { it.isNotBlank() }
+        return if (name == null) category else "$category ($name)"
+    }
+
+    /** Message for a close frame from the server. The server's close reason is not shown. */
+    fun closedByServer(code: Int): String = "Conexão encerrada pelo serviço (código $code)."
+
+    private fun categoryFor(status: String?, code: Int?): String? {
+        when (status) {
+            "UNAUTHENTICATED", "PERMISSION_DENIED" -> return AUTH
+            "RESOURCE_EXHAUSTED" -> return QUOTA
+            "DEADLINE_EXCEEDED" -> return TIMEOUT
+            "UNAVAILABLE" -> return UNAVAILABLE
+            "NOT_FOUND" -> return NOT_FOUND
+            "INVALID_ARGUMENT" -> return REQUEST
+        }
+        return when (code) {
+            null -> null
+            400 -> REQUEST
+            401, 403 -> AUTH
+            404 -> NOT_FOUND
+            408, 504 -> TIMEOUT
+            429 -> QUOTA
+            in 500..599 -> UNAVAILABLE
+            else -> null
         }
     }
 }

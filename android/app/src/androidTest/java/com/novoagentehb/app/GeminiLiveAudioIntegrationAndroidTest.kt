@@ -373,6 +373,30 @@ class GeminiLiveAudioIntegrationAndroidTest {
         assertEquals("the new session starts its own track", 1, factory.playbacks.size)
     }
 
+    /**
+     * Server error frame that echoes the configured key: the coordinator state must not show it, the session
+     * must block, the microphone must be released, and a new session must work afterwards.
+     */
+    @Test
+    fun serverErrorEchoingTheKeyIsSanitizedInCoordinatorStateAndSessionRecovers() {
+        startAndWaitActive()
+        assertTrue(awaitUntil(5_000) { factory.captures.any { it.isRecording } })
+        lastServerSocket.get()!!.send(
+            "{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"quota for key synthetic-test-key\"}}"
+        )
+
+        assertTrue("server error must block the session", awaitState(LiveSessionState.BLOCKED))
+        val message = coordinator.status.value.liveConnectionError.orEmpty()
+        assertTrue("category and code are kept", message.contains("429") && message.contains("Cota"))
+        assertFalse("configured key must never reach the UI state", message.contains("synthetic-test-key"))
+        assertTrue("microphone released after the error", awaitUntil(3_000) { factory.captures[0].releases.get() == 1 })
+        assertFalse(coordinator.status.value.isListening)
+
+        onMain { coordinator.stopGeminiLiveSession() }
+        startAndWaitActive()
+        assertEquals("recovery opens a fresh session", 2, socketsOpened.get())
+    }
+
     private companion object {
         const val SETUP_COMPLETE = "{\"setupComplete\":{}}"
     }
