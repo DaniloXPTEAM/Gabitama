@@ -240,7 +240,6 @@ class GeminiLiveLifecycleAndroidTest {
         assertFalse(coordinator.status.value.activeVoiceDisclosure.orEmpty().startsWith("gabi_24l"))
     }
 
-    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopDuringConnectingClosesSocketAndNeverReconnects() {
         holdSetupComplete = true
