@@ -257,7 +257,6 @@ class GeminiLiveLifecycleAndroidTest {
         assertEquals(1, server.requestCount)
     }
 
-    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopWhileActiveClosesSocketAndKeepsDisconnected() {
         enqueueConnection(autoSetupComplete = true)
