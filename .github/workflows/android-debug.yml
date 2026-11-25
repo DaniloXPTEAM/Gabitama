@@ -153,3 +153,79 @@ jobs:
           name: android-api${{ matrix.api }}-evidence-${{ github.sha }}
           path: evidence-android/
           if-no-files-found: warn
+  publish-preview:
+    name: Publicar prévia privada do APK (NÃO HOMOLOGADO)
+    needs: build-debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # Cria ou atualiza um pre-release PRIVADO com um único asset APK. Nunca público.
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-apks-${{ github.sha }}
+          path: candidate/
+      - name: Garantir que o repositório é privado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)
+          if [ "$private" != "true" ]; then
+            echo "::error title=Publicação bloqueada::repositório não é privado; nenhum release criado"
+            exit 1
+          fi
+      - name: Verificar SHA-256 e preparar nome, notas e asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha256sum -c candidate/SHA256SUMS
+          short="${GITHUB_SHA:0:7}"
+          meta=candidate/package-metadata.txt
+          field() { grep -o "$1='[^']*'" "$meta" | head -1 | cut -d"'" -f2; }
+          pkg=$(field name)
+          vc=$(field versionCode)
+          vn=$(field versionName)
+          minsdk=$(grep -o "sdkVersion:'[^']*'" "$meta" | head -1 | cut -d"'" -f2)
+          target=$(grep -o "targetSdkVersion:'[^']*'" "$meta" | head -1 | cut -d"'" -f2)
+          abis=$(grep "^native-code:" "$meta" | sed "s/^native-code: //" || true)
+          apk_sha=$(sha256sum candidate/app-debug.apk | cut -d' ' -f1)
+          signer=$(grep -i "SHA-256 digest" candidate/signature.txt | head -1 | sed 's/^.*: *//' || true)
+          name="GabiTama-${vn}-vc${vc}-${short}-NAO-HOMOLOGADO.apk"
+          cp candidate/app-debug.apk "$name"
+          cat > notes.md <<EOF
+          # Prévia do APK — NÃO HOMOLOGADO
+
+          Candidato gerado pela CI. Não homologado em aparelho físico. Não instalado por esta CI. API 34 pendente (perda de comunicação do runner).
+
+          | Campo | Valor |
+          |---|---|
+          | Commit | ${GITHUB_SHA} |
+          | Run de CI | ${GITHUB_RUN_ID} |
+          | Arquivo | ${name} |
+          | SHA-256 do APK | ${apk_sha} |
+          | applicationId | ${pkg} |
+          | versionCode / versionName | ${vc} / ${vn} |
+          | minSdk / targetSdk | ${minsdk} / ${target} |
+          | ABIs nativas | ${abis:-nenhuma} |
+          | Certificado (SHA-256) | ${signer:-não lido} |
+          | Repositório | privado |
+
+          A assinatura é a chave debug da máquina de CI e pode mudar entre runs. Não instale por cima de uma instalação com assinatura diferente.
+          EOF
+          tag="preview-${short}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$name" --clobber
+            gh release edit "$tag" --notes-file notes.md
+          else
+            gh release create "$tag" "$name" --target "$GITHUB_SHA" --prerelease --title "Prévia NÃO HOMOLOGADA ${vn} (${short})" --notes-file notes.md
+          fi
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$name"
+          echo "::notice title=APK privado (NÃO HOMOLOGADO)::$url"
+          {
+            echo "### Prévia privada do APK (NÃO HOMOLOGADO)"
+            echo
+            echo "Link direto (exige login com acesso ao repositório privado): $url"
+            echo
+            echo "SHA-256 do APK: $apk_sha"
+          } >> "$GITHUB_STEP_SUMMARY"
