@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Sanitized ADB diagnostic (text only, CI private artifact via /tmp/*.log). Only phase, state words and times:
+# never serials, package data, user text, keys or raw adb output. Defined first so that early failures are recorded.
+ADB_DIAG=/tmp/gabitama-ime-adb-recovery.log
+adb_diag() { printf '%s phase=%s event=%s\n' "$(date -u +%H:%M:%S)" "$1" "$2" >> "$ADB_DIAG"; }
+# On any failure, record only the line number and exit status of the script (no command text, no output).
+trap 'adb_diag script-error "line-$LINENO-exit-$?"' ERR
+adb_diag script start
 [ "${CI:-}" = true ]
+adb_diag script ci-flag-ok
 [[ "$(adb get-serialno)" =~ ^emulator-[0-9]+$ ]]
+adb_diag script serial-ok
 uid=$(id -u)
 sudo iptables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT
 sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT
+adb_diag script firewall-ok
 trap 'sudo iptables -D OUTPUT -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT; sudo ip6tables -D OUTPUT -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT' EXIT
-
-# Sanitized ADB diagnostic (text only, CI private artifact via /tmp/*.log). Only phase, state words and times:
-# never serials, package data, user text, keys or raw adb output.
-ADB_DIAG=/tmp/gabitama-ime-adb-recovery.log
-adb_diag() { printf '%s phase=%s event=%s\n' "$(date -u +%H:%M:%S)" "$1" "$2" >> "$ADB_DIAG"; }
 
 # Limited recovery when the emulator drops to "offline" between steps. It waits for reconnection and
 # boot completion, then requires both packages to be present. It never clears data, never reinstalls,
@@ -37,6 +42,7 @@ ensure_device_ready() {
 }
 
 sha256sum -c candidate/SHA256SUMS
+adb_diag script checksums-ok
 ensure_device_ready after-boot
 adb install -r candidate/app-debug.apk
 adb_diag after-install-app ok
