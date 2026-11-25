@@ -113,6 +113,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           test -e /dev/kvm
           sudo chmod a+rw /dev/kvm
+      - name: Iniciar diagnóstico sanitizado do runner (heartbeat, texto)
+        run: bash scripts/android/api-heartbeat.sh start
       - name: Executar smoke e AndroidJUnitRunner
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -124,6 +126,17 @@ jobs:
           disable-animations: true
           script: |
             scripts/android/offline-emulator-tests.sh
+      - name: Parar diagnóstico do runner
+        if: always()
+        run: bash scripts/android/api-heartbeat.sh stop
+      - name: Guardar heartbeat do runner (texto, artefato privado, 3 dias)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-runner-heartbeat-${{ matrix.api }}-${{ github.run_id }}
+          path: /tmp/gabitama-api-heartbeat.log
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Disponibilizar PNGs sintéticos para inspeção
         if: success()
         env:

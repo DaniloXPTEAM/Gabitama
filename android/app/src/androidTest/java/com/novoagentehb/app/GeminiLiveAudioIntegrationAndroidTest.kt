@@ -337,6 +337,73 @@ class GeminiLiveAudioIntegrationAndroidTest {
         assertEquals("old audio must not reach playback", 0, factory.playbacks.sumOf { it.receivedBytes().size })
     }
 
+    /**
+     * Reproduces the AudioTrack retained by a terminal block: after a server error the session is BLOCKED, and
+     * the paused track must be released once, with nothing written after the release. Stop must be idempotent,
+     * and a new session must play only its own audio on a fresh track.
+     */
+    @Test
+    fun terminalBlockReleasesAudioTrackWritesNothingAfterAndNewSessionGetsFreshTrack() {
+        startAndWaitActive()
+        assertTrue(awaitUntil(5_000) { factory.captures.any { it.isRecording } })
+        val old = pattern(4_800, 10)
+        sendModelAudio(old)
+        assertTrue("old turn reaches the first track", awaitUntil(5_000) {
+            factory.playbacks.isNotEmpty() && factory.playbacks[0].receivedBytes().size == old.size
+        })
+
+        lastServerSocket.get()!!.send("{\"error\":{\"code\":403,\"status\":\"PERMISSION_DENIED\"}}")
+        assertTrue("server error must block the session", awaitState(LiveSessionState.BLOCKED))
+        assertTrue(
+            "terminal block must release the AudioTrack",
+            awaitUntil(3_000) { factory.playbacks[0].releases.get() == 1 }
+        )
+
+        onMain { coordinator.stopGeminiLiveSession() }
+        onMain { coordinator.stopGeminiLiveSession() }
+        Thread.sleep(300)
+        assertEquals("Stop after a block must not release again", 1, factory.playbacks[0].releases.get())
+        assertEquals("nothing written to the released track", 0, factory.playbacks[0].writesAfterRelease.get())
+
+        startAndWaitActive()
+        val fresh = pattern(2_400, 11)
+        sendModelAudio(fresh)
+        assertTrue("new session plays on a fresh track", awaitUntil(8_000) {
+            factory.playbacks.size == 2 && factory.playbacks[1].receivedBytes().size == fresh.size
+        })
+        assertArrayEquals("no audio from the blocked session", fresh, factory.playbacks[1].receivedBytes())
+        assertEquals("old track stays released once", 1, factory.playbacks[0].releases.get())
+        assertEquals("old track receives nothing after the block", 0, factory.playbacks[0].writesAfterRelease.get())
+    }
+
+    /** RECONNECTING keeps the same track: the new socket's audio plays, the track is not released. */
+    @Test
+    fun goingAwayReconnectKeepsTrackAndPlaysAudioOfTheNewSocket() {
+        enqueueConnection()
+        enqueueConnection()
+        onMain { coordinator.startGeminiLiveSession() }
+        assertTrue(awaitState(LiveSessionState.ACTIVE))
+        assertTrue(awaitUntil(5_000) { factory.captures.any { it.isRecording } })
+        val before = pattern(2_400, 12)
+        sendModelAudio(before)
+        assertTrue("first turn plays", awaitUntil(5_000) {
+            factory.playbacks.isNotEmpty() && factory.playbacks[0].receivedBytes().size == before.size
+        })
+
+        lastServerSocket.get()!!.send("{\"goAway\":{}}")
+        assertTrue("GoingAway starts the reconnect", awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
+        assertTrue("reconnect reaches ACTIVE again", awaitState(LiveSessionState.ACTIVE, timeoutMs = 8_000))
+        val after = pattern(1_200, 13)
+        sendModelAudio(after)
+
+        assertTrue("audio after reconnect plays", awaitUntil(5_000) {
+            factory.playbacks[0].receivedBytes().size == before.size + after.size
+        })
+        assertEquals("same track across the reconnect", 1, factory.playbacks.size)
+        assertEquals("reconnect must not release the track", 0, factory.playbacks[0].releases.get())
+        assertArrayEquals(before + after, factory.playbacks[0].receivedBytes())
+    }
+
     @Test
     fun captureInitializationFailureBlocksWithoutListening() {
         factory.failCaptureInit = true

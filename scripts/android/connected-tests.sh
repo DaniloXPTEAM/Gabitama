@@ -16,7 +16,9 @@ collector & collector_pid=$!
 trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null || :' EXIT
 # No Gradle invocation here: install and run the exact shared test APK.
 status=0
+bash scripts/android/api-heartbeat.sh phase test-apk-install
 adb install -r candidate/app-debug-androidTest.apk || status=1
+bash scripts/android/api-heartbeat.sh phase test-apk-installed
 test_installed=$(adb shell pm path com.novoagentehb.app.debug.test | tr -d '\r' | sed -n 's/^package://p')
 if [ -z "$test_installed" ] || ! adb exec-out cat "$test_installed" > /tmp/gabitama-installed-test.apk || ! cmp candidate/app-debug-androidTest.apk /tmp/gabitama-installed-test.apk; then
   echo '::error title=Test APK::Installed test APK does not match shared binary.'
@@ -28,7 +30,19 @@ adb shell pm list instrumentation | grep -F 'com.novoagentehb.app.debug.test/and
 if [ "$status" -eq 0 ]; then
   # The computer-helper PoC needs its separate helper APK, installed only by its own workflow
   # (test-computer-helper-poc.yml). This shared suite does not install it, so exclude that class here.
-  adb shell am instrument -w -r -e notClass com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest,com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest,com.novoagentehb.app.computer.helper.ComputerProotRunAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1 || status=1
+  # Explicit budget: a silent hang ends as a sanitized failure (exit 124) instead of an unexplained runner loss.
+  bash scripts/android/api-heartbeat.sh phase instrumentation-start
+  timeout -k 60 1500 adb shell am instrument -w -r -e notClass com.novoagentehb.app.computer.helper.ComputerHelperPocAndroidTest,com.novoagentehb.app.computer.helper.ComputerRootfsProvisionAndroidTest,com.novoagentehb.app.computer.helper.ComputerProotRunAndroidTest com.novoagentehb.app.debug.test/androidx.test.runner.AndroidJUnitRunner > /tmp/gabitama-instrumentation-ci.log 2>&1
+  instr_rc=$?
+  bash scripts/android/api-heartbeat.sh phase "instrumentation-exit-$instr_rc"
+  if [ "$instr_rc" -ne 0 ]; then
+    status=1
+    if [ "$instr_rc" -eq 124 ] || [ "$instr_rc" -eq 137 ]; then
+      echo '::error title=Instrumentação com limite::Tempo limite de 25 min atingido; processo de teste encerrado. Ver heartbeat sanitizado.'
+      adb shell am force-stop com.novoagentehb.app.debug.test >/dev/null 2>&1 || true
+    fi
+  fi
+  bash scripts/android/api-heartbeat.sh phase parse-results
   python3 scripts/android/parse-instrumentation.py || status=1
 fi
 # Capture files once more before stopping the collector.
