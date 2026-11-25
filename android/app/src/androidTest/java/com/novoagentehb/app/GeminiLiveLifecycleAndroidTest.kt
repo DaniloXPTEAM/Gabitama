@@ -276,26 +276,38 @@ class GeminiLiveLifecycleAndroidTest {
         assertFalse(coordinator.status.value.isSpeaking)
     }
 
-    @Ignore("diagnóstico: isolar missingKey antes de reativar")
+    /** Queues a WebSocket upgrade that the server rejects with HTTP 500 (no socket is ever opened). */
+    private fun enqueueRejectedUpgrade() {
+        enqueued.incrementAndGet()
+        server.enqueue(MockResponse().setResponseCode(500))
+    }
+
+    /**
+     * Reconnect policy as implemented: one bounded retry per outage (MAX_RECONNECT_ATTEMPTS = 1),
+     * and a successful Ready restores the budget. So drop -> reconnect -> ACTIVE -> drop -> reconnect -> ACTIVE
+     * is allowed, but a reconnect that fails to open must block without any further attempt.
+     */
     @Test
     fun networkDropReconnectsOnceThenBlocksWithoutLooping() {
-        enqueueConnection(autoSetupComplete = true)
-        enqueueConnection(autoSetupComplete = true)
-        enqueueConnection(autoSetupComplete = true) // must never be used
+        enqueueConnection(autoSetupComplete = true)   // 1: initial session
+        enqueueConnection(autoSetupComplete = true)   // 2: reconnect after drop #1 (Ready restores budget)
+        enqueueRejectedUpgrade()                      // 3: reconnect after drop #2 fails to open
+        enqueueConnection(autoSetupComplete = true)   // 4: must never be requested
         onMain { coordinator.startGeminiLiveSession() }
         assertTrue(awaitState(LiveSessionState.ACTIVE))
 
-        // First network drop: one bounded reconnect is allowed (policy MAX_RECONNECT_ATTEMPTS = 1).
-        lastClientSocket.get()!!.cancel()
-        assertTrue("reconnect should start", awaitUntil(5_000) { socketsOpened.get() == 2 })
-        assertTrue("second session ACTIVE after reconnect", awaitState(LiveSessionState.ACTIVE))
+        lastClientSocket.get()!!.cancel()             // drop #1 on the client side
+        assertTrue("drop #1 must enter RECONNECTING", awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
+        assertTrue("reconnect #1 must return to ACTIVE", awaitState(LiveSessionState.ACTIVE))
+        assertEquals(2, socketsOpened.get())
 
-        // Second drop: the budget is exhausted, so the session must block instead of looping.
-        lastClientSocket.get()!!.cancel()
-        assertTrue(awaitState(LiveSessionState.BLOCKED))
-        waitMs(2_000)
-        assertEquals("no third connection", 2, socketsOpened.get())
+        lastClientSocket.get()!!.cancel()             // drop #2: budget was restored by Ready, one retry allowed
+        assertTrue("drop #2 must enter RECONNECTING", awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
+        assertTrue("failed reconnect must block", awaitState(LiveSessionState.BLOCKED, timeoutMs = 8_000))
         assertNotNull(coordinator.status.value.liveConnectionError)
+        waitMs(2_000)
+        assertEquals("no attempt after a failed reconnect", 3, server.requestCount)
+        assertEquals("only the two successful sessions opened a socket", 2, socketsOpened.get())
     }
 
     @Test
