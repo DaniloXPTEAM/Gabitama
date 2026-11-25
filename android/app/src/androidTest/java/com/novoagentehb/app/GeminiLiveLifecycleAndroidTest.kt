@@ -43,6 +43,8 @@ class GeminiLiveLifecycleAndroidTest {
     private val context = instrumentation.targetContext
 
     private lateinit var server: MockWebServer
+    /** Computed on the test thread in setUp: MockWebServer.url() may resolve the host, which is not allowed on main. */
+    private lateinit var liveUrl: okhttp3.HttpUrl
     private lateinit var http: OkHttpClient
     private lateinit var prefs: AppPreferences
     private lateinit var vault: SecureKeyVault
@@ -76,6 +78,7 @@ class GeminiLiveLifecycleAndroidTest {
     fun setUp() {
         // No runtime-permission changes here: granting/revoking RECORD_AUDIO on a running app can restart the test process.
         phase("mockwebserver.start") { server = MockWebServer().apply { start() } }
+        phase("mockwebserver.url") { liveUrl = server.url("/live") }
         phase("okhttp.build") { http = OkHttpClient.Builder().build() }
         phase("appPreferences.construct") { prefs = AppPreferences(context) }
         phase("keyVault.construct") { vault = SecureKeyVault(context) }
@@ -87,7 +90,8 @@ class GeminiLiveLifecycleAndroidTest {
             live = GeminiLiveVoiceClient(http, Gson())
             live.webSocketFactory = WebSocket.Factory { request, listener ->
                 // Keep headers (x-goog-api-key) and redirect only the endpoint to the local server.
-                http.newWebSocket(request.newBuilder().url(server.url("/live")).build(), listener)
+                // Runs on main inside connect(): only a precomputed URL, no host resolution here.
+                http.newWebSocket(request.newBuilder().url(liveUrl).build(), listener)
             }
         }
         // The coordinator is main-thread confined in production (TextToSpeech, Handler, Dispatchers.Main).
