@@ -315,6 +315,28 @@ class GeminiLiveAudioIntegrationAndroidTest {
         assertEquals(LiveSessionState.DISCONNECTED, coordinator.status.value.liveSessionState)
     }
 
+    /**
+     * Audio from the old socket after GoingAway, before the reconnect call (600 ms), must neither play nor
+     * revive ACTIVE. The second connection is queued so the reconnect itself can complete afterwards.
+     */
+    @Test
+    fun oldSocketAudioAfterGoingAwayIsNotPlayedAndDoesNotReviveActive() {
+        enqueueConnection()
+        enqueueConnection()
+        onMain { coordinator.startGeminiLiveSession() }
+        assertTrue(awaitState(LiveSessionState.ACTIVE))
+        assertTrue(awaitUntil(5_000) { factory.captures.any { it.isRecording } })
+
+        lastServerSocket.get()!!.send("{\"goAway\":{}}")
+        assertTrue("GoingAway starts the reconnect", awaitState(LiveSessionState.RECONNECTING, timeoutMs = 3_000))
+        sendModelAudio(pattern(4_800, 9))
+        Thread.sleep(300) // still inside the reconnect window
+
+        assertTrue("old audio must not revive ACTIVE", coordinator.status.value.liveSessionState != LiveSessionState.ACTIVE)
+        assertFalse("old audio must not mark speaking", coordinator.status.value.isSpeaking)
+        assertEquals("old audio must not reach playback", 0, factory.playbacks.sumOf { it.receivedBytes().size })
+    }
+
     @Test
     fun captureInitializationFailureBlocksWithoutListening() {
         factory.failCaptureInit = true

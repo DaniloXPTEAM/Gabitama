@@ -183,6 +183,37 @@ class GeminiLiveErrorSanitizationUnitTest {
         }
     }
 
+    /** 401, 429 and 500 handshake rejections echoing the key in the body: code kept, key and body never shown. */
+    @Test fun otherHandshakeRejectionStatusesAreSanitizedAndKeepTheirCode() = runBlocking {
+        for (code in listOf(401, 429, 500)) {
+            MockWebServer().use { server ->
+                server.enqueue(MockResponse().setResponseCode(code).setBody("rejected for key $customKey"))
+                server.start()
+                val http = OkHttpClient.Builder().addInterceptor { chain ->
+                    chain.proceed(chain.request().newBuilder().url(server.url("/")).build())
+                }.build()
+                val client = GeminiLiveVoiceClient(http, Gson())
+                val failure = async(start = CoroutineStart.UNDISPATCHED) {
+                    withTimeout(10_000) { client.events.first { it is GeminiLiveEvent.ConnectionFailed } }
+                }
+                assertTrue(client.connect(customKey, systemInstruction = "test"))
+                val reason = (failure.await() as GeminiLiveEvent.ConnectionFailed).reason
+                assertTrue("HTTP $code must keep its code: $reason", reason.contains(code.toString()))
+                assertFalse("key leaked for HTTP $code: $reason", reason.contains(customKey))
+                assertFalse("body leaked for HTTP $code: $reason", reason.contains("rejected for"))
+            }
+        }
+    }
+
+    /** Frames that are not a JSON object produce no events, never throw, and never echo their text. */
+    @Test fun invalidTopLevelFramesProduceNoEventsAndNeverThrow() {
+        val frames = listOf("not json $customKey", "[1,2]", "null", "42", "\"$customKey\"", "")
+        for (frame in frames) {
+            val events = GeminiLiveVoiceClient.parseServerMessage(frame)
+            assertTrue("frame must produce no events: $frame", events.isEmpty())
+        }
+    }
+
     @Test fun socketFailureAfterSetupKeepsRetryabilityAndMasksExactKey() {
         val factory = Factory()
         val client = GeminiLiveVoiceClient(OkHttpClient(), Gson()).apply { webSocketFactory = factory }

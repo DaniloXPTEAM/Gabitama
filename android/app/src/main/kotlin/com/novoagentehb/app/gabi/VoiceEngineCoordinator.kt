@@ -161,12 +161,21 @@ object GeminiLiveSessionReducer {
                 isListening = false,
                 startMicStream = true
             )
-            is GeminiLiveEvent.AudioOutput -> LiveReducerDecision(
-                nextState = LiveSessionState.ACTIVE,
-                nextReconnectAttempts = current.reconnectAttempts,
-                isSpeaking = true,
-                enqueuePcm24k = event.pcm24k
-            )
+            // During RECONNECTING the socket that produced this audio has been superseded: drop it and keep the state.
+            is GeminiLiveEvent.AudioOutput -> if (current.state == LiveSessionState.RECONNECTING) {
+                LiveReducerDecision(
+                    nextState = LiveSessionState.RECONNECTING,
+                    nextReconnectAttempts = current.reconnectAttempts,
+                    isSpeaking = false
+                )
+            } else {
+                LiveReducerDecision(
+                    nextState = LiveSessionState.ACTIVE,
+                    nextReconnectAttempts = current.reconnectAttempts,
+                    isSpeaking = true,
+                    enqueuePcm24k = event.pcm24k
+                )
+            }
             is GeminiLiveEvent.InputTranscript -> LiveReducerDecision(
                 nextState = current.state,
                 nextReconnectAttempts = current.reconnectAttempts,
@@ -178,7 +187,7 @@ object GeminiLiveSessionReducer {
                 assistantTranscript = event.text
             )
             is GeminiLiveEvent.Interrupted -> LiveReducerDecision(
-                nextState = LiveSessionState.ACTIVE,
+                nextState = if (current.state == LiveSessionState.RECONNECTING) LiveSessionState.RECONNECTING else LiveSessionState.ACTIVE,
                 nextReconnectAttempts = current.reconnectAttempts,
                 isSpeaking = false,
                 clearAudioQueue = true
