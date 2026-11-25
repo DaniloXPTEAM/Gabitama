@@ -17,7 +17,7 @@ trap 'kill "$collector_pid" 2>/dev/null || :; wait "$collector_pid" 2>/dev/null 
 # No Gradle invocation here: install and run the exact shared test APK.
 status=0
 bash scripts/android/api-heartbeat.sh phase test-apk-install
-adb install -r candidate/app-debug-androidTest.apk || status=1
+timeout 600 adb install -r candidate/app-debug-androidTest.apk || status=1
 bash scripts/android/api-heartbeat.sh phase test-apk-installed
 test_installed=$(adb shell pm path com.novoagentehb.app.debug.test | tr -d '\r' | sed -n 's/^package://p')
 if [ -z "$test_installed" ] || ! adb exec-out cat "$test_installed" > /tmp/gabitama-installed-test.apk || ! cmp candidate/app-debug-androidTest.apk /tmp/gabitama-installed-test.apk; then

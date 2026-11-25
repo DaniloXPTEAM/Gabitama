@@ -48,7 +48,7 @@ adb shell getprop ro.build.version.sdk
 stage=check_candidate_hashes
 sha256sum -c candidate/SHA256SUMS
 stage=adb_install_app
-adb install -r candidate/app-debug.apk
+timeout 600 adb install -r candidate/app-debug.apk
 stage=locate_installed_app
 # Compare the actual installed base APK, not merely a file adjacent to the test.
 installed=$(adb shell pm path "$pkg" | tr -d '\r' | sed -n 's/^package://p')

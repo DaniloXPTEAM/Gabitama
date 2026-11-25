@@ -116,6 +116,7 @@ jobs:
       - name: Iniciar diagnóstico sanitizado do runner (heartbeat, texto)
         run: bash scripts/android/api-heartbeat.sh start
       - name: Executar smoke e AndroidJUnitRunner
+        timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -128,7 +129,10 @@ jobs:
             scripts/android/offline-emulator-tests.sh
       - name: Parar diagnóstico do runner
         if: always()
-        run: bash scripts/android/api-heartbeat.sh stop
+        run: |
+          bash scripts/android/api-heartbeat.sh stop
+          # Sanitized heartbeat lines as job annotations (already free of serials, package data and output).
+          tail -n 40 /tmp/gabitama-api-heartbeat.log 2>/dev/null | sed 's/^/::notice title=Runner heartbeat::/' || true
       - name: Guardar heartbeat do runner (texto, artefato privado, 3 dias)
         if: always()
         uses: actions/upload-artifact@v4
