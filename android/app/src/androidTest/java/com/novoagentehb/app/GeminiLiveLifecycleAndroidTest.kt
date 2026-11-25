@@ -296,7 +296,6 @@ class GeminiLiveLifecycleAndroidTest {
         assertNotNull(coordinator.status.value.liveConnectionError)
     }
 
-    @Ignore("diagnóstico: isolar missingKey antes de reativar")
     @Test
     fun stopDuringPendingReconnectCancelsIt() {
         enqueueConnection(autoSetupComplete = true)
