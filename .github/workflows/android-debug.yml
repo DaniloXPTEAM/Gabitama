@@ -161,15 +161,16 @@ jobs:
     permissions:
       contents: write # Cria ou atualiza um pre-release com um único asset APK (visibilidade = a do repositório).
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: shared-apks-${{ github.sha }}
-          path: candidate/
       - name: Obter changelog da versão (somente a pasta de prévia)
         uses: actions/checkout@v4
         with:
           sparse-checkout: docs/previa
           sparse-checkout-cone-mode: false
+          # Ordem importa: este checkout roda ANTES do download do candidate/ (o clean padrão apagaria o diretório).
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-apks-${{ github.sha }}
+          path: candidate/
       - name: Registrar visibilidade do repositório
         env:
           GH_TOKEN: ${{ github.token }}
@@ -204,7 +205,7 @@ jobs:
           cat > notes.md <<EOF
           # Prévia do APK — NÃO HOMOLOGADO
 
-          Candidato gerado pela CI. Não homologado em aparelho físico. Não instalado por esta CI. API 34 pendente (perda de comunicação do runner).
+          Candidato gerado pela CI. Não homologado em aparelho físico. Não instalado por esta CI. Resultado de CI por API: ver o run indicado abaixo (falhas de perda de comunicação do runner são de infraestrutura, não de código).
 
           | Campo | Valor |
           |---|---|

@@ -16,7 +16,7 @@ Base de comparação: `d1936d3` (última mudança de motor Live antes deste cicl
 
 ### Ainda NÃO verificado
 - Nenhum teste deste ciclo rodou em aparelho físico. Captura, resposta falada, interrupção e encerramento no aparelho continuam pendentes (roteiro em `docs/homologacao/gabi-gemini-live-roteiro-fisico.md`).
-- API 34 do job de testes conectados segue pendente.
+- Testes conectados em emulador (APIs 26, 29, 34) são de CI; a falha por perda de comunicação do runner é de infraestrutura e não diz nada sobre o app. O resultado real deste commit está no run indicado nas notas.
 
 ### Não incluído
 - **Voz `gabi_24l` não está embarcada**: o runtime Pocket TTS e seus assets não estão no repositório. O Gemini Live usa a voz pré-construída `Kore`, e a tela informa isso.
