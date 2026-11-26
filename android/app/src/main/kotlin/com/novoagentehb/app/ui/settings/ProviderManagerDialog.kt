@@ -19,6 +19,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Documented OpenAI-compatible base for NVIDIA NIM (docs.api.nvidia.com, POST /v1/chat/completions). */
+internal const val NVIDIA_NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
+/** Example chat model listed in the NVIDIA LLM API reference; availability and cost must be checked by the user. */
+internal const val NVIDIA_NIM_EXAMPLE_MODEL = "meta/llama-3.3-70b-instruct"
+
 @Composable
 fun ProviderManagerDialog(viewModel: SettingsViewModel, onClose: () -> Unit) {
     val providers by viewModel.customProviderList.collectAsState()
@@ -86,6 +91,14 @@ fun ProviderManagerDialog(viewModel: SettingsViewModel, onClose: () -> Unit) {
             Text(if (editing == null) "Adicionar provedor" else "Editar provedor", style = MaterialTheme.typography.titleSmall)
             Text("Formato JSON GabiTama v1: format, name, base_url, chat_model, screen_model, vision_model. Credenciais não são aceitas no arquivo.", style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = { picker.launch(arrayOf("application/json", "text/plain")) }) { Text("Importar JSON de arquivo") }
+            OutlinedButton(onClick = {
+                // Preset only fills the form. No key, no activation: the user still pastes a credential and authorizes use.
+                edit(null)
+                name = "NVIDIA NIM"
+                url = NVIDIA_NIM_BASE_URL
+                chat = NVIDIA_NIM_EXAMPLE_MODEL; screen = NVIDIA_NIM_EXAMPLE_MODEL; vision = NVIDIA_NIM_EXAMPLE_MODEL
+                viewModel.customImportError("Preenchido com NVIDIA NIM (formato OpenAI). Informe sua chave da conta NVIDIA. Modelo de exemplo; função de visão não verificada; crédito e custo dependem da sua conta.")
+            }) { Text("Preencher NVIDIA NIM") }
             OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(url, { url = it }, label = { Text("URL base HTTPS (ex.: https://api.exemplo.com/v1)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(credential, { credential = it }, label = { Text(if (editing == null) "Credencial" else "Nova credencial (vazio mantém)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())

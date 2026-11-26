@@ -52,6 +52,10 @@ class SettingsViewModel @Inject constructor(
     }
     val customProviderList = customProviders.providers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val activeCustomId = customProviders.activeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    /** Provedores personalizados cadastrados sem credencial no cofre (exibidos na lista como "sem credencial"). */
+    val customMissingKeyIds = customProviders.providers
+        .map { list -> list.filter { customProviders.key(it.id).isBlank() }.map { it.id }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     private val _customModels = MutableStateFlow<List<String>>(emptyList())
     val customModels = _customModels.asStateFlow()
     private val _customNotice = MutableStateFlow<String?>(null)
@@ -160,6 +164,8 @@ class SettingsViewModel @Inject constructor(
 
     fun selectProvider(provider: ProviderId) {
         viewModelScope.launch {
+            // The router sends chat to an active custom provider first; without this the built-in choice is ignored.
+            customProviders.deactivate()
             prefs.setPrimaryProvider(provider)
             val selectedModel = prefs.chatModel.first()
             _statusBanner.value = "Provedor ativo: ${provider.displayName} ($selectedModel)."

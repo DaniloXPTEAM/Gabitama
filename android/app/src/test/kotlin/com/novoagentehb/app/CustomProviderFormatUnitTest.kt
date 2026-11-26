@@ -22,4 +22,10 @@ class CustomProviderFormatUnitTest {
         }
         assertTrue(CustomProviderFormat.isPublicAddress(InetAddress.getByName("8.8.8.8")))
     }
+
+    @Test fun nvidiaPresetIsAValidOpenAiCompatibleProviderWithChatRoute() {
+        val p = CustomProviderFormat.validate("NVIDIA NIM", "https://integrate.api.nvidia.com/v1", "meta/llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct")
+        assertEquals("https://integrate.api.nvidia.com/v1", p.baseUrl)
+        assertEquals("https://integrate.api.nvidia.com/v1/chat/completions", "${p.baseUrl}/chat/completions")
+    }
 }

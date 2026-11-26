@@ -47,11 +47,18 @@ class CustomProviderRepository @Inject constructor(private val prefs: AppPrefere
     suspend fun remove(id: String) = mutex.withLock {
         val list = providers.first()
         require(list.any { it.id == id }) { "Provedor não encontrado." }
-        if (activeId.first() == id) prefs.activateCustomProvider("__needs_selection__")
+        // Removing the active provider must fall back to the built-in provider. A sentinel id here would make
+        // every chat fail with "provedor inativo" until the user reselects something.
+        if (activeId.first() == id) prefs.activateCustomProvider("")
         prefs.saveCustomProvidersJson(gson.toJson(list.filterNot { it.id == id }))
         vault.set("custom_provider_$id", "")
     }
     fun key(id: String) = vault.get("custom_provider_$id")
+    /** Returns routing to the built-in provider selected in Ajustes. */
+    suspend fun deactivate() {
+        prefs.activateCustomProvider("")
+    }
+
     suspend fun activate(id: String) {
         require(providers.first().any { it.id == id }) { "Provedor não encontrado." }
         prefs.activateCustomProvider(id)

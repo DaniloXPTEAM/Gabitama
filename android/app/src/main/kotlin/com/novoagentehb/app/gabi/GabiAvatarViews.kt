@@ -58,6 +58,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.Channel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -210,6 +213,52 @@ fun GabiUriImage(
  * Reproduz sequências WebP transparentes em assets/avatar/{idle,listening,thinking,talking}/ (~24 fps).
  * Pausa automaticamente em segundo plano e respeita `reduceMotion` exibindo apenas o 1º quadro.
  */
+/**
+ * Reproduz [files] em loop com decodificação antecipada limitada a [AvatarFramePlanner.PREFETCH_FRAMES]
+ * quadros (memória constante, sem carregar a sequência inteira). Retorna se algum quadro foi exibido.
+ * Um quadro que não decodifica é pulado; se nenhum decodificar em uma volta completa, retorna false.
+ */
+private suspend fun playLoop(
+    context: Context,
+    folder: String,
+    files: List<String>,
+    fps: Int,
+    show: (ImageBitmap) -> Unit
+): Boolean = coroutineScope {
+    val ready = Channel<ImageBitmap>(capacity = AvatarFramePlanner.PREFETCH_FRAMES)
+    val producer = launch(Dispatchers.IO) {
+        var idx = 0
+        var consecutiveFailures = 0
+        while (isActive) {
+            val bmp = decodeAssetBitmap(context, "avatar/$folder/${files[idx]}")
+            if (bmp != null) {
+                consecutiveFailures = 0
+                ready.send(bmp)
+            } else {
+                consecutiveFailures++
+                if (consecutiveFailures >= AvatarFramePlanner.maxConsecutiveFailures(files.size)) break
+            }
+            idx = AvatarFramePlanner.nextIndex(idx, files.size)
+        }
+        ready.close()
+    }
+    val frameDelayMs = AvatarFramePlanner.frameDelayMs(fps)
+    var shownAny = false
+    var lastShownAt = SystemClock.uptimeMillis()
+    try {
+        for (bmp in ready) {
+            show(bmp)
+            shownAny = true
+            val elapsed = SystemClock.uptimeMillis() - lastShownAt
+            delay((frameDelayMs - elapsed).coerceAtLeast(0L))
+            lastShownAt = SystemClock.uptimeMillis()
+        }
+    } finally {
+        producer.cancel()
+    }
+    shownAny
+}
+
 @Composable
 fun AvatarAnimation(
     state: AvatarState,
@@ -227,40 +276,20 @@ fun AvatarAnimation(
 
     LaunchedEffect(folder, fps, reduceMotion, lifecycleOwner) {
         useFallback = false
-        val files = withContext(Dispatchers.IO) {
-            runCatching {
-                context.assets.list("avatar/$folder")
-                    ?.filter { it.endsWith(".webp") || it.endsWith(".png") }
-                    ?.sorted()
-                    .orEmpty()
-            }.getOrDefault(emptyList())
+        val names = withContext(Dispatchers.IO) {
+            runCatching { context.assets.list("avatar/$folder")?.toList().orEmpty() }.getOrDefault(emptyList())
         }
-        if (files.isEmpty()) {
-            useFallback = true
-            return@LaunchedEffect
-        }
-        if (reduceMotion) {
-            val first = withContext(Dispatchers.IO) { decodeAssetBitmap(context, "avatar/$folder/${files.first()}") }
-            if (first != null) currentFrame = first else useFallback = true
-            return@LaunchedEffect
-        }
-
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            val frameDelayMs = (1000L / fps.coerceAtLeast(1)).coerceAtLeast(16L)
-            var idx = 0
-            while (isActive) {
-                val t0 = SystemClock.uptimeMillis()
-                val frameName = "avatar/$folder/${files[idx]}"
-                val bmp = withContext(Dispatchers.IO) { decodeAssetBitmap(context, frameName) }
-                if (bmp != null) {
-                    currentFrame = bmp
-                } else if (idx == 0 && currentFrame == null) {
-                    useFallback = true
-                    break
+        when (val plan = AvatarFramePlanner.plan(names, reduceMotion)) {
+            is AvatarFramePlanner.Plan.Fallback -> useFallback = true
+            is AvatarFramePlanner.Plan.Still -> {
+                val first = withContext(Dispatchers.IO) { decodeAssetBitmap(context, "avatar/$folder/${plan.file}") }
+                if (first != null) currentFrame = first else useFallback = true
+            }
+            is AvatarFramePlanner.Plan.Loop -> {
+                lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    playLoop(context, folder, plan.files, fps) { bmp -> currentFrame = bmp }
+                        .let { shownAny -> if (!shownAny && currentFrame == null) useFallback = true }
                 }
-                idx = (idx + 1) % files.size
-                val elapsed = SystemClock.uptimeMillis() - t0
-                delay((frameDelayMs - elapsed).coerceAtLeast(16L))
             }
         }
     }

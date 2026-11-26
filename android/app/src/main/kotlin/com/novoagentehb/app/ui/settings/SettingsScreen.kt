@@ -63,6 +63,9 @@ fun SettingsScreen(
 ) {
     val primaryProvider by viewModel.primaryProvider.collectAsState()
     val activeCustomId by viewModel.activeCustomId.collectAsState()
+    val customProviderList by viewModel.customProviderList.collectAsState()
+    val customMissingKeyIds by viewModel.customMissingKeyIds.collectAsState()
+    var confirmCustomActivation by remember { mutableStateOf<com.novoagentehb.app.data.providers.CustomProvider?>(null) }
     val chatModel by viewModel.chatModel.collectAsState()
     val liveModel by viewModel.liveVoiceModel.collectAsState()
     val liveModelIsLegacy by viewModel.liveModelIsLegacy.collectAsState()
@@ -95,6 +98,17 @@ fun SettingsScreen(
     var showBibleDialog by remember { mutableStateOf(false) }
 
     if (showProviderManager) ProviderManagerDialog(viewModel) { showProviderManager = false }
+    confirmCustomActivation?.let { p ->
+        AlertDialog(
+            onDismissRequest = { confirmCustomActivation = null },
+            title = { Text("Ativar ${p.name}?") },
+            text = { Text("As próximas conversas serão enviadas a ${p.baseUrl} usando o modelo ${p.chatModel}. O serviço pode cobrar pelo uso. Confira preços e capacidades do seu plano antes de autorizar.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.activateCustomProvider(p.id); confirmCustomActivation = null }) { Text("Autorizar e ativar") }
+            },
+            dismissButton = { TextButton(onClick = { confirmCustomActivation = null }) { Text("Cancelar") } }
+        )
+    }
 
     Scaffold(
         containerColor = GabiTokens.NightBg,
@@ -178,6 +192,25 @@ fun SettingsScreen(
                             GabiFeaturedSurface(borderColor = GabiTokens.GoldAccent.copy(alpha = 0.25f)) {
                                 Text("Provedor principal (Gemini padrão)", style = MaterialTheme.typography.titleMedium, color = GabiTokens.GoldAccent)
                                 Spacer(Modifier.height(6.dp))
+                                customProviderList.forEach { cp ->
+                                    val selected = cp.id == activeCustomId
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (selected) GabiTokens.GoldAccent.copy(alpha = 0.16f) else GabiTokens.NightBg,
+                                        border = BorderStroke(1.dp, if (selected) GabiTokens.GoldAccent else GabiTokens.Hairline),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 3.dp)
+                                            .clickable { if (!selected) confirmCustomActivation = cp }
+                                    ) {
+                                        Text(
+                                            text = "${if (selected) "✓ " else ""}${cp.name} (compatível OpenAI)" +
+                                                if (cp.id in customMissingKeyIds) " · sem credencial: cole a chave no gerenciador" else "",
+                                            color = if (selected) GabiTokens.GoldAccent else GabiTokens.TextPrimary,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
+                                }
                                 ProviderId.entries.forEach { p ->
                                     val selected = p == primaryProvider && activeCustomId.isBlank()
                                     Surface(
