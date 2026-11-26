@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -55,7 +56,7 @@ class SettingsViewModel @Inject constructor(
     /** Provedores personalizados cadastrados sem credencial no cofre (exibidos na lista como "sem credencial"). */
     val customMissingKeyIds = customProviders.providers
         .map { list -> list.filter { customProviders.key(it.id).isBlank() }.map { it.id }.toSet() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet<String>())
     private val _customModels = MutableStateFlow<List<String>>(emptyList())
     val customModels = _customModels.asStateFlow()
     private val _customNotice = MutableStateFlow<String?>(null)
