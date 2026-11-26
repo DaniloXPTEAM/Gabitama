@@ -325,6 +325,18 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Leitura direta de filesDir/agent_workspace"
         ),
         ToolDescriptor(
+            name = "run_local_skill",
+            description = "Executa uma Skill local aprovada pela pessoa (id listado em Habilidades). Só roda com confirmação. Não executa shell nem código externo; apenas o adaptador verificado da skill.",
+            riskLevel = RiskLevel.LOCAL_MUTATION,
+            params = listOf(
+                ToolParamSpec("skill_id", "Identificador da skill (campo id=... da lista de Habilidades)", required = true),
+                ToolParamSpec("input", "Contexto textual opcional para a skill")
+            ),
+            runtimeTier = RuntimeSupportTier.NATIVE_LOCAL_VERIFIED,
+            expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
+            postConditionNote = "Arquivo da skill gravado, relido e conferido por SHA-256 quando o escopo for de ação"
+        ),
+        ToolDescriptor(
             name = "diagnostics_snapshot",
             description = "Gera relatório local sanitizado (/diagnostico) sem segredos nem conversa.",
             riskLevel = RiskLevel.READ_ONLY,

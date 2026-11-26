@@ -68,7 +68,7 @@ class SkillAndMcpRegistry @Inject constructor(
         if (active.isEmpty()) return ""
         val sb = StringBuilder("Habilidades/MCP ativas (somente metadados aprovados):\n")
         for (s in active) {
-            val line = "- ${s.name} [${s.sourceType} v${s.version}] (${s.scope}): ${s.summary}\n"
+            val line = "- ${s.name} id=${s.skillId} [${s.sourceType} v${s.version}] (${s.scope}): ${s.summary}\n"
             if (sb.length + line.length > maxChars) break
             sb.append(line)
         }

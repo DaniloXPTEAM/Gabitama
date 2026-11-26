@@ -2,6 +2,8 @@ package com.novoagentehb.app.agent.executor
 
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
 import com.novoagentehb.app.agent.media.GeminiImageGeneration
+import com.novoagentehb.app.agent.skills.LocalSkillExecutor
+import com.novoagentehb.app.agent.skills.SkillAndMcpRegistry
 import okhttp3.OkHttpClient
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsEngine
 import com.novoagentehb.app.agent.diagnostics.DiagnosticsInput
@@ -45,7 +47,9 @@ class ToolExecutorAndVerifier @Inject constructor(
     private val prefs: AppPreferences,
     private val modelRouter: ModelRouter,
     private val diagnosticsEngine: DiagnosticsEngine,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val skillRegistry: SkillAndMcpRegistry,
+    private val localSkillExecutor: LocalSkillExecutor
 ) {
     var lastFailureSnapshot: ProviderFailure? = null
 
@@ -312,6 +316,15 @@ class ToolExecutorAndVerifier @Inject constructor(
                     ToolExecutionResult(true, true, text.take(1200), semantics = ToolExecutionSemantics.READ_VERIFIED)
                 } else {
                     ToolExecutionResult(false, false, "Arquivo não encontrado no workspace do agente.", errorCode = "FILE_NOT_FOUND", semantics = ToolExecutionSemantics.READ_VERIFIED)
+                }
+            }
+            "run_local_skill" -> {
+                val skillId = args["skill_id"].orEmpty().trim()
+                val skill = if (skillId.isBlank()) null else skillRegistry.getById(skillId)
+                if (skill == null) {
+                    ToolExecutionResult(false, false, "Skill não encontrada${if (skillId.isBlank()) "" else " ($skillId)"}. Veja a lista de Habilidades.", errorCode = "SKILL_NOT_FOUND", semantics = ToolExecutionSemantics.NOT_IMPLEMENTED)
+                } else {
+                    LocalSkillExecutor.toToolResult(localSkillExecutor.execute(skill, args["input"].orEmpty()))
                 }
             }
             "diagnostics_snapshot" -> {

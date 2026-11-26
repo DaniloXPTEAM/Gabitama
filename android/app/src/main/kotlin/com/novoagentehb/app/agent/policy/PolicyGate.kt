@@ -57,8 +57,10 @@ class PolicyGate @Inject constructor() {
         }
 
         // 4. Portão de efeito externo (WhatsApp, ligação, calendário)
-        if ((descriptor.riskLevel == RiskLevel.EXTERNAL_SIDE_EFFECT || descriptor.name == "execute_workspace_program") && !request.userConfirmed) {
+        if ((descriptor.riskLevel == RiskLevel.EXTERNAL_SIDE_EFFECT || descriptor.name == "execute_workspace_program" || descriptor.name == "run_local_skill") && !request.userConfirmed) {
             val detail = when (descriptor.name) {
+                "run_local_skill" ->
+                    "Executar a skill local \"${request.args["skill_id"].orEmpty().take(100)}\" no workspace privado? Ela só grava o arquivo verificado da própria skill; não executa shell."
                 "execute_workspace_program" ->
                     "Executar localmente a expressão aritmética \"${request.args["expression"].orEmpty().take(256)}\" nos números fornecidos e criar um novo CSV privado? Não é shell Linux."
                 "send_whatsapp_message" ->

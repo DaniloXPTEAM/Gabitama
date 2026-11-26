@@ -1,5 +1,6 @@
 package com.novoagentehb.app.agent.skills
 
+import com.novoagentehb.app.agent.orchestrator.ToolExecutionResult
 import com.novoagentehb.app.agent.orchestrator.ToolExecutionSemantics
 import com.novoagentehb.app.bridges.SafLibraryManager
 import com.novoagentehb.app.bridges.WorkspaceWriteOutcome
@@ -50,6 +51,39 @@ class LocalSkillExecutor @Inject constructor(
     companion object {
         const val SCOPE_WORKSPACE_ONLY = "workspace_only"
         const val SCOPE_WORKSPACE_WRITE_VERIFY = "workspace_action_write_verify"
+
+        /**
+         * Converte o desfecho da skill no resultado da ferramenta `run_local_skill`.
+         * `ARTIFACT_PREPARED` (manifesto) nunca vira "ação executada": `verified` segue
+         * o pós-condição real reportada pelo executor.
+         */
+        fun toToolResult(out: SkillExecutionOutcome): ToolExecutionResult = when (out.status) {
+            SkillExecutionStatus.TASK_EXECUTED,
+            SkillExecutionStatus.ARTIFACT_PREPARED -> ToolExecutionResult(
+                success = true,
+                verified = out.verifiedPostCondition,
+                summary = out.summary,
+                payload = out.artifactPath.orEmpty(),
+                errorCode = null,
+                semantics = out.semantics
+            )
+            SkillExecutionStatus.BLOCKED_OPT_IN,
+            SkillExecutionStatus.BLOCKED_QUARANTINE -> ToolExecutionResult(
+                success = false,
+                verified = false,
+                summary = out.summary,
+                errorCode = out.errorCode ?: "SKILL_BLOCKED",
+                semantics = out.semantics
+            )
+            SkillExecutionStatus.INVALID_TYPE,
+            SkillExecutionStatus.FAILED -> ToolExecutionResult(
+                success = false,
+                verified = false,
+                summary = out.summary,
+                errorCode = out.errorCode ?: "SKILL_FAILED",
+                semantics = out.semantics
+            )
+        }
 
         fun buildManifestRelativePath(skillId: String): String {
             val safe = sanitizeSlug(skillId)
