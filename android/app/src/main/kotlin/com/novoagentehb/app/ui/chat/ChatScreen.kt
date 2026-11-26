@@ -100,6 +100,7 @@ fun ChatScreen(
                 viewModel.toggleListening(true)
             }
         } else {
+            if (pendingLiveAfterPermission) viewModel.reportLiveMicrophoneDenied()
             pendingLiveAfterPermission = false
         }
     }

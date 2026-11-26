@@ -80,6 +80,11 @@ class ChatViewModel @Inject constructor(
         voiceCoordinator.toggleGeminiLiveSession()
     }
 
+    /** Usuário negou o microfone ao tocar em Gemini Live: sem isso a tela não mostrava motivo algum. */
+    fun reportLiveMicrophoneDenied() {
+        _voiceError.value = LIVE_MIC_DENIED_MESSAGE
+    }
+
     fun resolveConfirmation(approved: Boolean) {
         orchestrator.resolveConfirmation(approved) { reply ->
             voiceCoordinator.speak(reply)
@@ -95,3 +100,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatDao.clearAll() }
     }
 }
+
+internal const val LIVE_MIC_DENIED_MESSAGE =
+    "Microfone negado: o Gemini Live precisa do microfone. Conceda a permissão do microfone ao app nas configurações do aparelho e toque em Gemini Live de novo."

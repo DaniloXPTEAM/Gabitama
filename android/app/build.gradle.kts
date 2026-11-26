@@ -16,15 +16,15 @@ android {
         applicationId = "com.novoagentehb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "0.2.6-r1.4.2"
+        versionCode = 9
+        versionName = "0.2.6-r1.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Nenhuma chave de API ou segredo é embutido em BuildConfig, assets ou APK.
         // Todas as credenciais BYOK ficam exclusivamente no SecureKeyVault (AES256-GCM) no aparelho.
         buildConfigField("String", "PROVISIONAL_INTERNAL_ID", "\"NOVO_AGENTE_HB\"")
-        buildConfigField("String", "BUILD_TIME", "\"2026-11-26-r1.4.2\"")
+        buildConfigField("String", "BUILD_TIME", "\"2026-11-26-r1.4.3\"")
     }
 
     buildTypes {
