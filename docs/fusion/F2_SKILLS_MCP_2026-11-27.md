@@ -6,8 +6,8 @@ Branch: `arena/1dba9faf-gabitama`. Implementação própria do GabiTama (MIT). S
 
 | Capacidade | Ferramenta | Gate | Efeito real | Evidência JVM |
 |---|---|---|---|---|
-| Skill local com adaptador verificado | `run_local_skill` | confirmação explícita (LOCAL_MUTATION) | grava `skills/<id>-documento-verificado.md`, relê e confere SHA-256 | `SkillRunEvidenceUnitTest` (6 casos) |
-| Ferramenta de servidor MCP | `mcp_call_tool` (novo) | confirmação explícita (EXTERNAL_SIDE_EFFECT) | handshake JSON-RPC real + `tools/call` com `Mcp-Session-Id` | `McpChatToolRunnerUnitTest` (9 casos, HTTP real) |
+| Skill local com adaptador verificado | `run_local_skill` | confirmação explícita (LOCAL_MUTATION) | grava `skills/<id>-documento-verificado.md`, relê e confere SHA-256 | `SkillRunEvidenceUnitTest` (6 testes) |
+| Ferramenta de servidor MCP | `mcp_call_tool` (novo) | confirmação explícita (EXTERNAL_SIDE_EFFECT) | handshake JSON-RPC real + `tools/call` com `Mcp-Session-Id` | `McpChatToolRunnerUnitTest` (7 testes, HTTP real) |
 
 ## Limites honestos
 
