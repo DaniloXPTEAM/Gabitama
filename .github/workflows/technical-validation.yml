@@ -94,23 +94,37 @@ jobs:
           ./gradlew :app:kspDebugKotlin --no-daemon -q 2>&1 | tail -20
           ls app/schemas/*/ 2>/dev/null
 
-      - name: Publicar schemas Room como texto base64 (anotações, sem artefato)
+      - name: Publicar schema Room v2 (repositório) como texto base64 (anotações, sem artefato)
         if: success()
         run: |
           python3 - <<'PY'
-          import base64, glob, os, re
-          files = []
-          for path in sorted(glob.glob(os.environ['RUNNER_TEMP'] + '/v1/android/app/schemas/**/*.json', recursive=True)):
-              files.append(('v1', path))
-          for path in sorted(glob.glob('android/app/schemas/**/*.json', recursive=True)):
-              files.append(('v2', path))
-          for tag, path in files:
-              raw = open(path, 'rb').read()
-              enc = base64.b64encode(raw).decode()
-              chunks = [enc[i:i+3000] for i in range(0, len(enc), 3000)]
-              name = os.path.basename(path)
-              print(f"::notice title=SCHEMA {tag} {name} HEAD::parts={len(chunks)} sha256={__import__('hashlib').sha256(raw).hexdigest()} bytes={len(raw)}")
-              for n, c in enumerate(chunks, 1):
-                  print(f"::notice title=SCHEMA {tag} {name} {n}/{len(chunks)}::{c}")
-          print(f"::notice title=SCHEMAS FILES::{len(files)}")
+          import base64, glob, hashlib, os
+          # Um step por arquivo: o GitHub limita anotações por step (~10).
+          paths = sorted(glob.glob('android/app/schemas/**/2.json', recursive=True))
+          assert paths, 'schema v2 ausente'
+          path = paths[0]
+          raw = open(path, 'rb').read()
+          enc = base64.b64encode(raw).decode()
+          chunks = [enc[i:i+3000] for i in range(0, len(enc), 3000)]
+          name = os.path.basename(path)
+          print(f"::notice title=SCHEMA v2 {name} HEAD::parts={len(chunks)} sha256={hashlib.sha256(raw).hexdigest()} bytes={len(raw)}")
+          for n, c in enumerate(chunks, 1):
+              print(f"::notice title=SCHEMA v2 {name} {n}/{len(chunks)}::{c}")
+          PY
+
+      - name: Publicar schema Room v1 (cópia temporária) como texto base64 (anotações, sem artefato)
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import base64, glob, hashlib, os
+          paths = sorted(glob.glob(os.environ['RUNNER_TEMP'] + '/v1/android/app/schemas/**/1.json', recursive=True))
+          assert paths, 'schema v1 ausente'
+          path = paths[0]
+          raw = open(path, 'rb').read()
+          enc = base64.b64encode(raw).decode()
+          chunks = [enc[i:i+3000] for i in range(0, len(enc), 3000)]
+          name = os.path.basename(path)
+          print(f"::notice title=SCHEMA v1 {name} HEAD::parts={len(chunks)} sha256={hashlib.sha256(raw).hexdigest()} bytes={len(raw)}")
+          for n, c in enumerate(chunks, 1):
+              print(f"::notice title=SCHEMA v1 {name} {n}/{len(chunks)}::{c}")
           PY
