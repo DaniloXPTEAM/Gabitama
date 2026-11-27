@@ -1,0 +1,70 @@
+name: Validação técnica GabiTama (sem artefatos)
+
+# Validação interna de compilação e testes JVM do branch de trabalho.
+# - Não publica release nem pré-release.
+# - Não envia APK, capturas, logs de revisão ou qualquer binário como artefato.
+# - O APK de debug é gerado apenas dentro do runner temporário e descartado ao fim do job.
+# - O gate de licença bloqueia distribuição, não esta validação interna.
+# - Permissões mínimas: somente leitura do repositório.
+
+on:
+  push:
+    branches: [arena/1dba9faf-gabitama]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: technical-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm-and-compile:
+    name: Testes JVM e compilação (sem artefatos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (somente leitura, sem credenciais persistidas)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Testes JVM e compilação de debug (APK temporário, não exportado)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+
+      - name: Resumo dos testes JVM (contagem, sem logs de conteúdo)
+        if: always()
+        working-directory: android
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as E
+          files = glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")
+          if not files:
+              print("::error title=JVM::nenhum relatório de teste encontrado")
+              raise SystemExit(1)
+          roots = [E.parse(f).getroot() for f in files]
+          tot = {k: sum(int(r.get(k, 0)) for r in roots) for k in ("tests", "failures", "errors", "skipped")}
+          print("::notice title=Testes JVM::tests=%(tests)d failures=%(failures)d errors=%(errors)d skipped=%(skipped)d" % tot)
+          if tot["failures"] or tot["errors"]:
+              raise SystemExit(1)
+          PY
+
+      - name: Confirmar compilação sem publicar
+        if: success()
+        working-directory: android
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          echo "::notice title=APK debug compilado no runner (não exportado)::$(stat -c%s app/build/outputs/apk/debug/app-debug.apk) bytes"
+          rm -f app/build/outputs/apk/debug/app-debug.apk

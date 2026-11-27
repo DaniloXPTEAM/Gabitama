@@ -10,11 +10,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.compose.rememberNavController
+import com.novoagentehb.app.agent.browser.BrowserHistoryStore
+import com.novoagentehb.app.agent.browser.BrowserSessionController
 import com.novoagentehb.app.app.navigation.NovoAgenteNavGraph
 import com.novoagentehb.app.app.navigation.Screen
 import com.novoagentehb.app.design.LocalHBStage
 import com.novoagentehb.app.design.NovoAgenteTheme
 import com.novoagentehb.app.gabi.HBCharacterController
+import com.novoagentehb.app.ui.browser.InAppBrowserHost
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -23,6 +26,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var hbController: HBCharacterController
+
+    @Inject
+    lateinit var browserController: BrowserSessionController
+
+    @Inject
+    lateinit var browserHistoryStore: BrowserHistoryStore
 
     private val autoStartListening = mutableStateOf(false)
     private val pendingRoute = mutableStateOf<String?>(null)
@@ -42,6 +51,8 @@ class MainActivity : ComponentActivity() {
                         autoStartListening = autoStartListening,
                         pendingRoute = pendingRoute
                     )
+                    // Navegador embutido: só aparece quando o agente ou a pessoa abre uma página.
+                    InAppBrowserHost(controller = browserController, historyStore = browserHistoryStore)
                 }
             }
         }

@@ -58,7 +58,8 @@ sealed class BrowserCommand {
     /** Lê o texto visível da página com script fixo (nunca código enviado pelo agente). */
     data class ReadText(val result: CompletableDeferred<String>) : BrowserCommand()
 
-    object Stop : BrowserCommand()
+    /** [done] vira true somente após o WebView executar stopLoading(). */
+    data class Stop(val done: CompletableDeferred<Boolean>) : BrowserCommand()
 }
 
 /**
@@ -105,10 +106,22 @@ class BrowserSessionController @Inject constructor() {
         return commandChannel.trySend(BrowserCommand.ReadText(result)).isSuccess
     }
 
-    /** Interrompe o carregamento a pedido da pessoa. */
-    fun requestStop() {
+    /**
+     * Pede a parada do carregamento. Não marca Cancelled aqui: quem marca é o WebView,
+     * depois de executar stopLoading() (ver [onLoadCancelled]).
+     * Retorna false se não há sessão ou se nada está carregando.
+     */
+    fun requestStop(done: CompletableDeferred<Boolean>): Boolean {
+        if (mutableSession.value == null || mutableLoad.value !is BrowserLoadState.Loading) {
+            done.complete(false)
+            return false
+        }
+        return commandChannel.trySend(BrowserCommand.Stop(done)).isSuccess
+    }
+
+    /** Relato do WebView: a parada foi executada para o carregamento em curso. */
+    fun onLoadCancelled() {
         val current = mutableSession.value ?: return
-        commandChannel.trySend(BrowserCommand.Stop)
         mutableLoad.value = BrowserLoadState.Cancelled(current.url)
     }
 

@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         BrowserHistoryEntity::class
     ],
     version = 2,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatMessageDao(): ChatMessageDao

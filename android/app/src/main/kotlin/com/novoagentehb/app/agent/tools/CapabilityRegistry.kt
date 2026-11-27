@@ -337,6 +337,19 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Arquivo da skill gravado, relido e conferido por SHA-256 quando o escopo for de ação"
         ),
         ToolDescriptor(
+            name = "browser_page_action",
+            description = "Controla o navegador embutido do app: action=open (com url http/https pública), back, forward, reload, get_text (texto visível), get_state (título, URL e estado), stop, close. Não preenche formulários nem clica em elementos.",
+            riskLevel = RiskLevel.LOCAL_MUTATION,
+            params = listOf(
+                ToolParamSpec("action", "open | back | forward | reload | get_text | get_state | stop | close", required = true),
+                ToolParamSpec("url", "URL http ou https; obrigatória apenas para action=open")
+            ),
+            runtimeTier = RuntimeSupportTier.NATIVE_LOCAL_VERIFIED,
+            expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
+            requiredPermissionNote = "Nenhuma permissão Android; WebView sem acesso a arquivos",
+            postConditionNote = "Resultado confirmado pelo WebView (carregamento, parada ou texto lido); URLs locais, privadas e esquemas não http(s) são recusados"
+        ),
+        ToolDescriptor(
             name = "diagnostics_snapshot",
             description = "Gera relatório local sanitizado (/diagnostico) sem segredos nem conversa.",
             riskLevel = RiskLevel.READ_ONLY,

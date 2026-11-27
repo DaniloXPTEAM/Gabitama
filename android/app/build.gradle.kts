@@ -140,3 +140,8 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
+// Room: exporta o schema de cada versão para validar migrações em teste (27/11).
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}

@@ -23,7 +23,8 @@ enum class BrowserAction(val wireName: String, val changesPage: Boolean) {
     SCREENSHOT("screenshot", changesPage = false),
     GET_TEXT("get_text", changesPage = false),
     GET_PAGE_INFO("get_page_info", changesPage = false),
-    LIST_TABS("list_tabs", changesPage = false);
+    LIST_TABS("list_tabs", changesPage = false),
+    STOP("stop", changesPage = true);
 
     companion object {
         private val byWireName: Map<String, BrowserAction> = entries.associateBy { it.wireName }

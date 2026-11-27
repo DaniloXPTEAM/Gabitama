@@ -24,6 +24,7 @@ class BrowserUseManager @Inject constructor(
         BrowserAction.GET_TEXT,
         BrowserAction.GET_PAGE_INFO,
         BrowserAction.CLOSE_TAB,
+        BrowserAction.STOP,
     )
 
     /** Abre [rawUrl] e espera o WebView confirmar o carregamento. */
@@ -49,6 +50,7 @@ class BrowserUseManager @Inject constructor(
             BrowserAction.RELOAD -> navigate(BrowserCommand.NavigationKind.RELOAD, "Recarreguei a página", actionTimeoutMs)
             BrowserAction.GET_TEXT -> readText(actionTimeoutMs)
             BrowserAction.GET_PAGE_INFO -> pageInfo()
+            BrowserAction.STOP -> stop(actionTimeoutMs)
             BrowserAction.CLOSE_TAB -> {
                 val url = controller.session.value?.url
                 controller.close()
@@ -56,6 +58,26 @@ class BrowserUseManager @Inject constructor(
             }
             else -> BrowserActionResult.error("UNSUPPORTED_ACTION", "Ação indisponível: ${action.wireName}.")
         }
+    }
+
+    /**
+     * Para o carregamento em curso. Sucesso só quando o WebView confirma stopLoading();
+     * sem carregamento em andamento, informa isso sem fingir uma parada.
+     */
+    suspend fun stop(timeoutMs: Long = ACTION_TIMEOUT_MS): BrowserActionResult {
+        val done = CompletableDeferred<Boolean>()
+        if (!controller.requestStop(done)) {
+            return if (controller.isOpen()) {
+                BrowserActionResult.ok("Não havia carregamento em andamento para parar.", controller.session.value?.url)
+            } else {
+                BrowserActionResult.error("NO_SESSION", "Nenhuma página está aberta no navegador do app.")
+            }
+        }
+        val stopped = withTimeoutOrNull(timeoutMs) { done.await() }
+            ?: return BrowserActionResult.error("ACTION_TIMEOUT", "O navegador não confirmou a parada em ${timeoutMs / 1000}s.", controller.session.value?.url)
+        val url = controller.session.value?.url
+        return if (stopped) BrowserActionResult.ok("Carregamento interrompido.", url)
+        else BrowserActionResult.error("STOP_FAILED", "Não foi possível interromper o carregamento.", url)
     }
 
     private suspend fun navigate(

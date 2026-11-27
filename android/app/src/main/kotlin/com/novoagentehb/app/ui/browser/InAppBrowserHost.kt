@@ -98,7 +98,16 @@ fun InAppBrowserHost(
                             }
                         }
                     }
-                    BrowserCommand.Stop -> webView?.stopLoading()
+                    is BrowserCommand.Stop -> {
+                        val view = webView
+                        if (view == null) {
+                            command.done.complete(false)
+                        } else {
+                            view.stopLoading()
+                            controller.onLoadCancelled()
+                            command.done.complete(true)
+                        }
+                    }
                 }
             }
         }
@@ -127,7 +136,7 @@ fun InAppBrowserHost(
                             modifier = Modifier.weight(1f),
                         )
                         if (load is BrowserLoadState.Loading) {
-                            TextButton(onClick = { controller.requestStop() }) { Text("Parar") }
+                            TextButton(onClick = { controller.requestStop(CompletableDeferred()) }) { Text("Parar") }
                         } else {
                             TextButton(onClick = { controller.close() }) { Text("Fechar") }
                         }

@@ -1,5 +1,8 @@
 package com.novoagentehb.app.agent.executor
 
+import com.novoagentehb.app.agent.browser.BrowserAction
+import com.novoagentehb.app.agent.browser.BrowserActionResult
+import com.novoagentehb.app.agent.browser.BrowserUseManager
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
 import com.novoagentehb.app.agent.media.GeminiImageGeneration
 import com.novoagentehb.app.agent.skills.LocalSkillExecutor
@@ -49,7 +52,8 @@ class ToolExecutorAndVerifier @Inject constructor(
     private val diagnosticsEngine: DiagnosticsEngine,
     private val okHttpClient: OkHttpClient,
     private val skillRegistry: SkillAndMcpRegistry,
-    private val localSkillExecutor: LocalSkillExecutor
+    private val localSkillExecutor: LocalSkillExecutor,
+    private val browserUseManager: BrowserUseManager,
 ) {
     var lastFailureSnapshot: ProviderFailure? = null
 
@@ -327,6 +331,7 @@ class ToolExecutorAndVerifier @Inject constructor(
                     LocalSkillExecutor.toToolResult(localSkillExecutor.execute(skill, args["input"].orEmpty()))
                 }
             }
+            "browser_page_action" -> browserPageAction(args)
             "diagnostics_snapshot" -> {
                 val report = diagnosticsEngine.buildReport(
                     DiagnosticsInput(
@@ -342,5 +347,42 @@ class ToolExecutorAndVerifier @Inject constructor(
             }
             else -> ToolExecutionResult(false, false, "Capacidade desconhecida: ${request.capabilityName}", errorCode = "UNKNOWN_CAPABILITY", semantics = ToolExecutionSemantics.NOT_IMPLEMENTED)
         }
+    }
+
+    /**
+     * Ponte do agente para o navegador embutido. O resultado vem do WebView (carregamento,
+     * texto lido, parada confirmada), não de presunção. Ações não listadas são recusadas.
+     */
+    private suspend fun browserPageAction(args: Map<String, String>): ToolExecutionResult {
+        val action = args["action"].orEmpty().trim().lowercase()
+        val result: BrowserActionResult = when (action) {
+            "open" -> browserUseManager.open(args["url"].orEmpty())
+            "back" -> browserUseManager.perform(BrowserAction.BACK)
+            "forward" -> browserUseManager.perform(BrowserAction.FORWARD)
+            "reload" -> browserUseManager.perform(BrowserAction.RELOAD)
+            "get_text" -> browserUseManager.perform(BrowserAction.GET_TEXT)
+            "get_state" -> browserUseManager.perform(BrowserAction.GET_PAGE_INFO)
+            "stop" -> browserUseManager.perform(BrowserAction.STOP)
+            "close" -> browserUseManager.perform(BrowserAction.CLOSE_TAB)
+            else -> return ToolExecutionResult(
+                false, false,
+                "Ação de navegador desconhecida. Use: open, back, forward, reload, get_text, get_state, stop ou close.",
+                errorCode = "BROWSER_ACTION_UNKNOWN",
+                semantics = ToolExecutionSemantics.NOT_IMPLEMENTED
+            )
+        }
+        val semantics = if (action == "get_text" || action == "get_state") {
+            ToolExecutionSemantics.READ_VERIFIED
+        } else {
+            ToolExecutionSemantics.EXECUTED_AND_VERIFIED
+        }
+        return ToolExecutionResult(
+            success = result.success,
+            verified = result.success,
+            summary = result.text,
+            payload = result.pageUrl.orEmpty(),
+            errorCode = result.errorCode,
+            semantics = semantics
+        )
     }
 }
