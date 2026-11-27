@@ -109,9 +109,15 @@ class NvidiaFluxSchnellProvider(
                     onSuccess = { continuation.resume(it) },
                     onFailure = { e ->
                         continuation.resumeWithException(
-                            if (e is ImageGenerationException) e
-                            else ImageGenerationException(ImageErrorCategory.INVALID_RESPONSE,
-                                "Resposta da NVIDIA não pôde ser lida.")
+                            when {
+                                e is ImageGenerationException -> e
+                                // Timeout pode ocorrer durante a leitura do corpo, após os cabeçalhos.
+                                e is SocketTimeoutException || e is InterruptedIOException ->
+                                    ImageGenerationException(ImageErrorCategory.TIMEOUT,
+                                        "Tempo esgotado aguardando a NVIDIA; tente novamente mais tarde.")
+                                else -> ImageGenerationException(ImageErrorCategory.INVALID_RESPONSE,
+                                    "Resposta da NVIDIA não pôde ser lida.")
+                            }
                         )
                     }
                 )
