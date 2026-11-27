@@ -59,6 +59,7 @@ class SecureKeyVault @Inject constructor(
         const val KEY_DEEPSEEK = "deepseek_api_key"
         const val KEY_ANTHROPIC = "anthropic_api_key"
         const val KEY_ELEVENLABS = "elevenlabs_api_key"
+        const val KEY_NVIDIA_API_KEY = "nvidia_api_key"
         const val KEY_SPOTIFY_CLIENT_ID = "spotify_client_id"
         const val KEY_SPOTIFY_CLIENT_SECRET = "spotify_client_secret"
 
@@ -67,6 +68,7 @@ class SecureKeyVault @Inject constructor(
             Regex("""AQ\.[0-9A-Za-z\-_]{10,}"""),
             Regex("""sk-[0-9A-Za-z\-_]{16,}"""),
             Regex("""gsk_[0-9A-Za-z]{16,}"""),
+            Regex("""nvapi-[0-9A-Za-z\-_]{16,}"""),
             Regex("""Bearer\s+[0-9A-Za-z\-_.]{12,}""", RegexOption.IGNORE_CASE)
         )
 

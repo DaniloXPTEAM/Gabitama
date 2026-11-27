@@ -86,6 +86,7 @@ fun SettingsScreen(
     var deepSeekKeyInput by remember { mutableStateOf("") }
     var anthropicKeyInput by remember { mutableStateOf("") }
     var elevenLabsKeyInput by remember { mutableStateOf("") }
+    var nvidiaKeyInput by remember { mutableStateOf("") }
     var spotifyIdInput by remember { mutableStateOf("") }
     var spotifySecretInput by remember { mutableStateOf("") }
 
@@ -267,6 +268,10 @@ fun SettingsScreen(
                                 ApiKeyRow("ElevenLabs (${if (viewModel.hasKey(SecureKeyVault.KEY_ELEVENLABS)) "configurada" else "ausente"})", elevenLabsKeyInput, { elevenLabsKeyInput = it }) {
                                     viewModel.saveApiKey(SecureKeyVault.KEY_ELEVENLABS, elevenLabsKeyInput)
                                     elevenLabsKeyInput = ""
+                                }
+                                ApiKeyRow("NVIDIA NIM (imagens FLUX.1-schnell, ${if (viewModel.hasKey(SecureKeyVault.KEY_NVIDIA_API_KEY)) "configurada" else "ausente"})", nvidiaKeyInput, { nvidiaKeyInput = it }) {
+                                    viewModel.saveApiKey(SecureKeyVault.KEY_NVIDIA_API_KEY, nvidiaKeyInput)
+                                    nvidiaKeyInput = ""
                                 }
                                 ApiKeyRow("Spotify Client ID (${if (viewModel.hasKey(SecureKeyVault.KEY_SPOTIFY_CLIENT_ID)) "configurada" else "ausente"})", spotifyIdInput, { spotifyIdInput = it }) {
                                     viewModel.saveApiKey(SecureKeyVault.KEY_SPOTIFY_CLIENT_ID, spotifyIdInput)

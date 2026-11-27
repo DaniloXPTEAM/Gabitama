@@ -636,17 +636,7 @@ class TaskOrchestrator @Inject constructor(
         providerUsed: String? = null,
         liveCallId: String? = null
     ): ExecutionReceipt {
-        val configuredImageModel = if (rawRequest.capabilityName == "generate_image") prefs.geminiImageModel.first() else ""
-        if (rawRequest.capabilityName == "generate_image" && (configuredImageModel.isBlank() ||
-                (rawRequest.userConfirmed && rawRequest.args["model"] != configuredImageModel))) {
-            val receipt = ExecutionReceipt(rawRequest.taskId, rawRequest.idempotencyKey, rawRequest.capabilityName,
-                RiskLevel.PAID_API_CALL, TaskStatus.FAILED,
-                "Rota de imagem não configurada ou alterada. Configure ou reautorize o modelo em Ajustes; nenhuma imagem foi solicitada.",
-                false, errorCode = "IMAGE_ROUTE_UNAVAILABLE")
-            persistReceipt(receipt, rawRequest.goalId)
-            return receipt
-        }
-        val request = if (rawRequest.capabilityName == "generate_image") rawRequest.copy(args = rawRequest.args + ("model" to configuredImageModel)) else rawRequest
+        val request = rawRequest
         val descriptor = registry.find(request.capabilityName)
             ?: return ExecutionReceipt(
                 taskId = request.taskId,

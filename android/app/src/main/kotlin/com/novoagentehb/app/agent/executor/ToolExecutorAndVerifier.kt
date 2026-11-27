@@ -4,7 +4,8 @@ import com.novoagentehb.app.agent.browser.BrowserAction
 import com.novoagentehb.app.agent.browser.BrowserActionResult
 import com.novoagentehb.app.agent.browser.BrowserUseManager
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
-import com.novoagentehb.app.agent.media.GeminiImageGeneration
+import com.novoagentehb.app.agent.media.image.ImageConsent
+import com.novoagentehb.app.agent.media.image.ImageGenerationException
 import com.novoagentehb.app.agent.skills.LocalSkillExecutor
 import com.novoagentehb.app.agent.skills.SkillAndMcpRegistry
 import okhttp3.OkHttpClient
@@ -55,6 +56,7 @@ class ToolExecutorAndVerifier @Inject constructor(
     private val localSkillExecutor: LocalSkillExecutor,
     private val browserUseManager: BrowserUseManager,
     private val mcpChatToolRunner: com.novoagentehb.app.agent.skills.McpChatToolRunner,
+    private val imageGenerationExecutor: com.novoagentehb.app.agent.media.image.ImageGenerationExecutor,
 ) {
     var lastFailureSnapshot: ProviderFailure? = null
 
@@ -62,18 +64,20 @@ class ToolExecutorAndVerifier @Inject constructor(
         val args = request.args
         return when (request.capabilityName) {
             "generate_image" -> {
-                if (args.keys.any { it != "model" && it != "prompt" }) {
+                if (args.keys.any { it != "prompt" }) {
                     ToolExecutionResult(false, false, "Referência, edição e parâmetros adicionais ainda não são suportados; nenhuma imagem foi solicitada.", errorCode = "IMAGE_ARGUMENT_UNSUPPORTED")
                 } else try {
-                    val artifact = GeminiImageGeneration.generate(okHttpClient, modelRouter.resolveApiKey(ProviderId.GEMINI),
-                        args["model"].orEmpty(), args["prompt"].orEmpty(), request.userConfirmed && request.paidConsentGranted, safLibraryManager)
-                    ToolExecutionResult(true, true, "Imagem criada e salva em ${artifact.path}; SHA-256 ${artifact.sha256}. Abra na Biblioteca.", payload = artifact.path)
+                    val artifact = imageGenerationExecutor.generate(
+                        args["prompt"].orEmpty(),
+                        ImageConsent(userConfirmed = request.userConfirmed, paidConsentGranted = request.paidConsentGranted)
+                    )
+                    ToolExecutionResult(true, true,
+                        "Imagem criada e salva em ${artifact.relativePath}; SHA-256 ${artifact.sha256}. Abra na Biblioteca.",
+                        payload = artifact.relativePath)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
-                } catch (e: GeminiImageGeneration.ImageFailure) {
-                    ToolExecutionResult(false, false, e.message ?: "Erro de geração de imagem.", errorCode = "IMAGE_PROVIDER_FAILED")
-                } catch (e: IllegalArgumentException) {
-                    ToolExecutionResult(false, false, e.message ?: "Solicitação de imagem inválida.", errorCode = "IMAGE_REQUEST_INVALID")
+                } catch (e: ImageGenerationException) {
+                    ToolExecutionResult(false, false, e.message ?: "Erro de geração de imagem.", errorCode = "IMAGE_${e.category.name}")
                 } catch (_: Exception) {
                     ToolExecutionResult(false, false, "Imagem não pôde ser validada ou salva.", errorCode = "IMAGE_SAVE_FAILED")
                 }

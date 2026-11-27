@@ -292,14 +292,14 @@ class CapabilityRegistry @Inject constructor() {
         ),
         ToolDescriptor(
             name = "generate_image",
-            description = "Gera uma imagem por texto com a rota Gemini de imagem configurada pela pessoa, após confirmação de custo. Não suporta referência nem edição.",
+            description = "Gera uma imagem por texto com FLUX.1-schnell (NVIDIA NIM), salva no armazenamento privado e mostra no chat. Requer confirmação por pedido. Não suporta referência nem edição.",
             riskLevel = RiskLevel.PAID_API_CALL,
             params = listOf(
                 ToolParamSpec("prompt", "Descrição da imagem", required = true)
             ),
             runtimeTier = RuntimeSupportTier.HTTP_BYOK_OR_PUBLIC,
             expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
-            requiredPermissionNote = "INTERNET, chave Gemini e autorização por geração",
+            requiredPermissionNote = "INTERNET, chave NVIDIA no cofre e confirmação por geração",
             postConditionNote = "Imagem válida salva e relida no workspace; visualização na Biblioteca"
         ),
         ToolDescriptor(
