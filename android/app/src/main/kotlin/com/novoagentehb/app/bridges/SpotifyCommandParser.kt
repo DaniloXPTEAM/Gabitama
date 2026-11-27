@@ -76,7 +76,7 @@ object SpotifyOutcomeRules {
                 success = true,
                 verified = false,
                 errorCode = null,
-                message = "Abri $what no Spotify. Não confirmei o resultado nem iniciei nenhuma reprodução.",
+                message = "Abri $what no Spotify. Não confirmei o resultado. Nada foi reproduzido pela Gabi.",
             )
         } else {
             SpotifyResult(false, false, "SPOTIFY_FAILED", failureMessage ?: "Não consegui abrir o Spotify.")

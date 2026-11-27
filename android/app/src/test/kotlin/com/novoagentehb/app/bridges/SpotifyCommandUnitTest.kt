@@ -16,7 +16,7 @@ class SpotifyCommandUnitTest {
         val r = SpotifyOutcomeRules.forOpen(opened = true, query = null, failureMessage = null)
         assertTrue(r.success)
         assertFalse("abrir o app não é verificação", r.verified)
-        assertTrue(r.message.contains("Nada") || r.message.contains("não iniciei"))
+        assertTrue(r.message.contains("Nada foi reproduzido"))
     }
 
     @Test
