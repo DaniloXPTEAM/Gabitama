@@ -158,7 +158,7 @@ class AgentCoreUnitTest {
 
     @Test
     fun capabilitySemanticsSeparateHandoffNotificationPreviewAndUnimplemented() {
-        assertEquals(31, registry.capabilities.size) // + run_local_skill (27/11) + browser_page_action (27/11)
+        assertEquals(32, registry.capabilities.size) // + run_local_skill (27/11) + browser_page_action (27/11) + mcp_call_tool (27/11)
         val counts = registry.countByTier()
         assertTrue((counts[RuntimeSupportTier.NATIVE_LOCAL_VERIFIED] ?: 0) >= 6)
         assertTrue((counts[RuntimeSupportTier.ANDROID_BRIDGE_INTENT] ?: 0) >= 10)

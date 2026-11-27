@@ -23,6 +23,7 @@ enum class ToolExecutionSemantics(val label: String) {
     HANDOFF_TO_USER("App/Intent aberto — usuário conclui no app"),
     ACCESSIBILITY_AUTOMATED("Automação via Acessibilidade (exige confirmação)"),
     ARTIFACT_CREATED_ONLY("Apenas manifesto/artefato criado (não executa instruções)"),
+    REMOTE_RESPONSE_ONLY("Resposta de servidor externo recebida; efeito externo não verificado pelo app"),
     NOT_IMPLEMENTED("Não implementado")
 }
 

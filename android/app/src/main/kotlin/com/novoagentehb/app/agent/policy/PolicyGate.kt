@@ -67,6 +67,8 @@ class PolicyGate @Inject constructor() {
                     "Enviar WhatsApp para ${request.args["contact_name"] ?: "contato"}: \"${request.args["message"].orEmpty()}\"?"
                 "call_contact", "call_number" ->
                     "Realizar ligação para ${request.args["contact_name"] ?: request.args["phone_number"] ?: "destinatário"}?"
+                "mcp_call_tool" ->
+                    "Chamar a ferramenta MCP '${request.args["tool_name"].orEmpty().take(64)}' no servidor '${request.args["server_id"].orEmpty().take(100)}'? Os argumentos saem do aparelho; a resposta do servidor não é verificada pelo app."
                 "create_calendar_event" ->
                     "Criar compromisso \"${request.args["title"].orEmpty()}\" em ${request.args["start_at"].orEmpty()}?"
                 else -> "Autorizar execução externa de ${descriptor.name}?"

@@ -55,4 +55,12 @@ object AppModule {
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    @Provides
+    @Singleton
+    fun provideMcpChatToolRunner(
+        client: com.novoagentehb.app.agent.skills.McpJsonRpcClient,
+        registry: com.novoagentehb.app.agent.skills.SkillAndMcpRegistry,
+    ): com.novoagentehb.app.agent.skills.McpChatToolRunner =
+        com.novoagentehb.app.agent.skills.McpChatToolRunner(client) { id -> registry.getById(id) }
 }

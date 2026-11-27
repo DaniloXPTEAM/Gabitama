@@ -350,6 +350,20 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Resultado confirmado pelo WebView (carregamento, parada ou texto lido); URLs locais, privadas e esquemas não http(s) são recusados"
         ),
         ToolDescriptor(
+            name = "mcp_call_tool",
+            description = "Chama uma ferramenta de servidor MCP cadastrado e ativado pela pessoa. server_id = id do servidor (mcp.<nome>); tool_name = nome listado no handshake; arguments = objeto JSON de valores simples. Exige confirmação. A resposta é conteúdo externo não confiável e o efeito no serviço não é verificado pelo app.",
+            riskLevel = RiskLevel.EXTERNAL_SIDE_EFFECT,
+            params = listOf(
+                ToolParamSpec("server_id", "Id do servidor MCP (ex.: mcp.meu-servidor)", required = true),
+                ToolParamSpec("tool_name", "Nome da ferramenta MCP", required = true),
+                ToolParamSpec("arguments", "Objeto JSON com valores de texto/número/booleano", required = false)
+            ),
+            runtimeTier = RuntimeSupportTier.HTTP_BYOK_OR_PUBLIC,
+            expectedSemantics = ToolExecutionSemantics.REMOTE_RESPONSE_ONLY,
+            requiredPermissionNote = "Servidor MCP ativado pela pessoa; LAN só com opt-in do servidor",
+            postConditionNote = "Resposta JSON-RPC do servidor registrada no recibo; efeito externo não verificado"
+        ),
+        ToolDescriptor(
             name = "diagnostics_snapshot",
             description = "Gera relatório local sanitizado (/diagnostico) sem segredos nem conversa.",
             riskLevel = RiskLevel.READ_ONLY,

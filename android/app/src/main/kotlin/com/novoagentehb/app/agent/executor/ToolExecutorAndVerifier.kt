@@ -54,6 +54,7 @@ class ToolExecutorAndVerifier @Inject constructor(
     private val skillRegistry: SkillAndMcpRegistry,
     private val localSkillExecutor: LocalSkillExecutor,
     private val browserUseManager: BrowserUseManager,
+    private val mcpChatToolRunner: com.novoagentehb.app.agent.skills.McpChatToolRunner,
 ) {
     var lastFailureSnapshot: ProviderFailure? = null
 
@@ -332,6 +333,7 @@ class ToolExecutorAndVerifier @Inject constructor(
                 }
             }
             "browser_page_action" -> browserPageAction(args)
+            "mcp_call_tool" -> mcpChatToolRunner.run(args, request.userConfirmed)
             "diagnostics_snapshot" -> {
                 val report = diagnosticsEngine.buildReport(
                     DiagnosticsInput(
