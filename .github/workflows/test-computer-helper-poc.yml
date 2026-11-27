@@ -1,25 +1,8 @@
 name: Verificar prova de conceito do computador auxiliar
 on:
   workflow_dispatch:
-  push:
-    branches: [arena/1dba9faf-gabitama]
-    paths:
-      - android/computer-helper/**
-      - android/computer-contract/**
-      - android/app/src/main/kotlin/com/novoagentehb/app/computer/helper/**
-      - android/app/src/androidTest/java/com/novoagentehb/app/computer/helper/**
-      - android/app/src/debug/**
-      - android/app/build.gradle.kts
-      - android/settings.gradle.kts
-      - scripts/android/computer-helper-poc/**
-      - scripts/android/proot-original/**
-      - third_party/tama-runtime/android/deps/**
-      - android/rootfs-extractor/**
-      - android/app/src/main/kotlin/com/openminis/app/sandbox/RootfsManager.kt
-      - android/app/src/main/kotlin/com/openminis/app/sandbox/PRootKernel.kt
-      - android/sandbox-proot-core/**
-      - scripts/android/alpine-provenance/**
-      - .github/workflows/test-computer-helper-poc.yml
+  # push removido em 27/11: prova de conceito do computador só roda manualmente nesta fase.
+
 permissions:
   contents: read
 jobs:
