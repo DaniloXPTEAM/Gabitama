@@ -17,6 +17,7 @@ import com.novoagentehb.app.app.navigation.Screen
 import com.novoagentehb.app.design.LocalHBStage
 import com.novoagentehb.app.design.NovoAgenteTheme
 import com.novoagentehb.app.gabi.HBCharacterController
+import com.novoagentehb.app.gabi.VoiceEngineCoordinator
 import com.novoagentehb.app.ui.browser.InAppBrowserHost
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var browserHistoryStore: BrowserHistoryStore
+
+    @Inject
+    lateinit var voiceCoordinator: VoiceEngineCoordinator
 
     private val autoStartListening = mutableStateOf(false)
     private val pendingRoute = mutableStateOf<String?>(null)
@@ -56,6 +60,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Sair do app (ex.: abrir o Spotify) pausa a voz e não grava em segundo plano.
+        // Rotação também passa por onStop: nesse caso a voz continua.
+        if (!isChangingConfigurations) voiceCoordinator.onAppBackgrounded()
     }
 
     override fun onNewIntent(intent: Intent) {

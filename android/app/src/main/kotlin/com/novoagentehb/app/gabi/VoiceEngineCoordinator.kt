@@ -5,6 +5,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.audiofx.AcousticEchoCanceler
 import android.os.Bundle
@@ -468,6 +471,8 @@ class VoiceEngineCoordinator @Inject constructor(
     private data class PcmChunk(val generation: Long, val bytes: ByteArray)
     private val pcmEngine = PcmPlaybackEngine(GeminiLiveVoiceClient.OUTPUT_SAMPLE_RATE) { pcmAudioFactory }
     private val pcmOutChannel = Channel<PcmChunk>(capacity = Channel.UNLIMITED)
+    private val audioManager: AudioManager? by lazy { context.getSystemService(AudioManager::class.java) }
+    private var playbackFocus: AudioFocusRequest? = null
 
     private var liveReducerState = LiveReducerInput()
     private var activeLiveModel: String = AppPreferences.DEFAULT_GEMINI_LIVE_MODEL
@@ -818,6 +823,7 @@ class VoiceEngineCoordinator @Inject constructor(
 
     private fun releasePcmTrack() {
         pcmEngine.release()
+        abandonPlaybackFocus()
     }
 
     fun startListening() {
@@ -944,6 +950,7 @@ class VoiceEngineCoordinator @Inject constructor(
 
     fun playPcm24kAudio(pcmBytes: ByteArray) {
         if (pcmBytes.isEmpty()) return
+        requestPlaybackFocus()
         ensurePcmPlayerConsumer()
         pcmOutChannel.trySend(PcmChunk(pcmEngine.generation, pcmBytes))
     }
@@ -960,7 +967,55 @@ class VoiceEngineCoordinator @Inject constructor(
         mediaPlayer = null
         drainPcmOutQueueAndFlushTrack()
         runCatching { systemTts?.stop() }
+        abandonPlaybackFocus()
         updateStatus { it.copy(isSpeaking = false) }
+    }
+
+    /**
+     * Foco de áudio para a fala. Perder o foco (outro app tocando, chamada) para a fala;
+     * não há retomada automática: a pessoa decide quando voltar a ouvir a Gabi.
+     */
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            mainHandler.post { stopSpeaking() }
+        }
+    }
+
+    private fun requestPlaybackFocus() {
+        if (playbackFocus != null) return
+        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener(focusListener, mainHandler)
+            .build()
+        // Se o foco não for concedido, a fala continua: a pessoa já pediu a resposta.
+        runCatching { audioManager?.requestAudioFocus(req) }
+        playbackFocus = req
+    }
+
+    private fun abandonPlaybackFocus() {
+        val req = playbackFocus ?: return
+        playbackFocus = null
+        runCatching { audioManager?.abandonAudioFocusRequest(req) }
+    }
+
+    /**
+     * Chamado quando o app sai do primeiro plano (ex.: o usuário abriu outro app).
+     * Para escuta, fala e Gemini Live e lembra a pausa. Não apaga conversa nem preferências.
+     */
+    fun onAppBackgrounded() {
+        val liveOn = liveReducerState.keepAlive
+        val busy = _status.value.isListening || _status.value.isSpeaking
+        if (!liveOn && !busy) return
+        VoicePauseMemory.markPaused()
+        stopListening()
+        stopSpeaking()
+        if (liveOn) stopGeminiLiveSession()
+        abandonPlaybackFocus()
     }
 
     fun stopAllVoice() {
@@ -990,8 +1045,10 @@ class VoiceEngineCoordinator @Inject constructor(
             })
             cont.invokeOnCancellation { runCatching { systemTts?.stop() } }
             val params = Bundle()
+            requestPlaybackFocus()
             systemTts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         }
+        abandonPlaybackFocus()
         updateStatus { it.copy(isSpeaking = false) }
     }
 

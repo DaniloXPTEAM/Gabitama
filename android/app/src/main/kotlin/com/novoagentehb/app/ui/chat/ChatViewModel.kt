@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.novoagentehb.app.bridges.SpotifyHandoffMemory
+import com.novoagentehb.app.gabi.VoicePauseMemory
 import javax.inject.Inject
 
 @HiltViewModel
@@ -59,9 +60,15 @@ class ChatViewModel @Inject constructor(
      * explícito do que foi e do que NÃO foi confirmado. Consome o handoff uma única vez.
      */
     fun onAppResumed() {
-        val pending = SpotifyHandoffMemory.takeForResume(System.currentTimeMillis()) ?: return
+        val pending = SpotifyHandoffMemory.takeForResume(System.currentTimeMillis())
+        val voicePaused = VoicePauseMemory.consumePaused()
+        val notices = listOfNotNull(
+            pending?.let { SpotifyHandoffMemory.resumeText(it) },
+            if (voicePaused) VoicePauseMemory.resumeNotice() else null
+        )
+        if (notices.isEmpty()) return
         viewModelScope.launch {
-            orchestrator.recordResumeNotice(SpotifyHandoffMemory.resumeText(pending))
+            notices.forEach { orchestrator.recordResumeNotice(it) }
         }
     }
 
