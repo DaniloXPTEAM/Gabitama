@@ -44,6 +44,29 @@ jobs:
           set -o pipefail
           ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
 
+      - name: Diagnóstico da falha do Gradle (anotações, sem artefato)
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os, re
+          log = os.path.join(os.environ['RUNNER_TEMP'], 'gradle.log')
+          try:
+              lines = open(log, encoding='utf-8', errors='replace').read().splitlines()
+          except FileNotFoundError:
+              lines = ['gradle.log ausente']
+          keys = re.compile(r'FAILED|What went wrong|Caused by|^e: |error:|Could not|OutOfMemory|Timeout|timed out|Exception|BUILD FAILED|exit code|Daemon', re.I)
+          picked = [l for l in lines if keys.search(l)][:60]
+          if not picked:
+              picked = lines[-40:]
+          def esc(t):
+              return t.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          text = ' | '.join(x.strip() for x in picked)
+          chunks = [text[i:i+3000] for i in range(0, len(text), 3000)][:8]
+          print(f"::error title=Gradle diagnóstico::linhas={len(lines)} trechos={len(chunks)}")
+          for n, c in enumerate(chunks, 1):
+              print(f"::warning title=Gradle diagnóstico {n}/{len(chunks)}::{esc(c)}")
+          PY
+
       - name: Resumo dos testes JVM (contagem, sem logs de conteúdo)
         if: always()
         working-directory: android
@@ -95,13 +118,15 @@ jobs:
           ls app/schemas/*/ 2>/dev/null
 
       - name: Publicar schema Room v2 (repositório) como texto base64 (anotações, sem artefato)
-        if: success()
+        if: always()
         run: |
           python3 - <<'PY'
           import base64, glob, hashlib, os
           # Um step por arquivo: o GitHub limita anotações por step (~10).
           paths = sorted(glob.glob('android/app/schemas/**/2.json', recursive=True))
-          assert paths, 'schema v2 ausente'
+          if not paths:
+              print("::warning title=SCHEMA v2::arquivo ausente (build não gerou schema)")
+              raise SystemExit(0)
           path = paths[0]
           raw = open(path, 'rb').read()
           enc = base64.b64encode(raw).decode()
