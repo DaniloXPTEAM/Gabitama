@@ -22,10 +22,12 @@ object SpotifyHandoffMemory {
     }
 
     /** Retorna o handoff pendente uma única vez e apenas se ainda estiver dentro do prazo. */
-    fun takeForResume(nowMillis: Long): Pending? = synchronized(lock) {
-        val current = pending ?: return null
-        pending = null
-        if (nowMillis - current.createdAtMillis > MAX_AGE_MILLIS || nowMillis < current.createdAtMillis) null else current
+    fun takeForResume(nowMillis: Long): Pending? {
+        synchronized(lock) {
+            val current = pending ?: return null
+            pending = null
+            return if (nowMillis - current.createdAtMillis > MAX_AGE_MILLIS || nowMillis < current.createdAtMillis) null else current
+        }
     }
 
     fun clear() = synchronized(lock) { pending = null }
