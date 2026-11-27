@@ -47,18 +47,21 @@ interface BrowserHistoryDao {
  * Migração aditiva da versão 1 para 2: cria apenas a tabela `browser_history`.
  * Não altera nem remove tabelas existentes (chat, memória, metas, lembretes, etc.).
  */
+/** SQL da migração 1→2; o teste de schema compara estas constantes com o schema Room v2 exportado. */
+internal const val BROWSER_HISTORY_CREATE_SQL =
+    "CREATE TABLE IF NOT EXISTS `browser_history` (" +
+        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+        "`url` TEXT NOT NULL, " +
+        "`title` TEXT NOT NULL, " +
+        "`visitedAt` INTEGER NOT NULL)"
+
+internal const val BROWSER_HISTORY_INDEX_SQL =
+    "CREATE INDEX IF NOT EXISTS `index_browser_history_visitedAt` " +
+        "ON `browser_history` (`visitedAt`)"
+
 val MIGRATION_1_2: Migration = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "CREATE TABLE IF NOT EXISTS `browser_history` (" +
-                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                "`url` TEXT NOT NULL, " +
-                "`title` TEXT NOT NULL, " +
-                "`visitedAt` INTEGER NOT NULL)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_browser_history_visitedAt` " +
-                "ON `browser_history` (`visitedAt`)"
-        )
+        db.execSQL(BROWSER_HISTORY_CREATE_SQL)
+        db.execSQL(BROWSER_HISTORY_INDEX_SQL)
     }
 }
