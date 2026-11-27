@@ -188,7 +188,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           emulator-boot-timeout: 600
           disable-animations: true
-          script: cd android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.novoagentehb.app.data.local.RoomMigration1To2AndroidTest --no-daemon --stacktrace
+          script: cd android && chmod +x gradlew && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.novoagentehb.app.data.local.RoomMigration1To2AndroidTest --no-daemon --stacktrace
 
       - name: Resumo do teste instrumentado (contagem, sem logs de conteúdo, sem artefato)
         if: always()
