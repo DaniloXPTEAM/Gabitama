@@ -69,12 +69,48 @@ jobs:
           echo "::notice title=APK debug compilado no runner (não exportado)::$(stat -c%s app/build/outputs/apk/debug/app-debug.apk) bytes"
           rm -f app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Exibir schemas Room exportados (texto no log, sem artefato)
+      - name: Gerar schema Room da versão 1 em cópia temporária (sem alterar o repositório)
         if: success()
-        working-directory: android/app
         run: |
-          for f in $(find schemas -name '*.json' 2>/dev/null | sort); do
-            echo "::group::schema $f"
-            cat "$f"
-            echo "::endgroup::"
-          done
+          rm -rf "$RUNNER_TEMP/v1" && mkdir -p "$RUNNER_TEMP/v1"
+          cp -r android "$RUNNER_TEMP/v1/android"
+          cd "$RUNNER_TEMP/v1/android/app/src/main/kotlin/com/novoagentehb/app"
+          python3 - <<'PY'
+          import re
+          p='data/local/AppDatabase.kt'
+          s=open(p,encoding='utf-8').read()
+          s=s.replace('        SkillRecordEntity::class,\n        BrowserHistoryEntity::class\n','        SkillRecordEntity::class\n')
+          s=s.replace('version = 2,','version = 1,')
+          s=s.replace('    abstract fun browserHistoryDao(): BrowserHistoryDao\n','')
+          open(p,'w',encoding='utf-8').write(s)
+          p='app/di/AppModule.kt'
+          s=open(p,encoding='utf-8').read()
+          s=re.sub(r'.*provideBrowserHistoryDao.*\n','',s)
+          s=s.replace('            .addMigrations(MIGRATION_1_2)\n','')
+          open(p,'w',encoding='utf-8').write(s)
+          PY
+          cd "$RUNNER_TEMP/v1/android"
+          chmod +x gradlew
+          ./gradlew :app:kspDebugKotlin --no-daemon -q 2>&1 | tail -20
+          ls app/schemas/*/ 2>/dev/null
+
+      - name: Publicar schemas Room como texto base64 (anotações, sem artefato)
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import base64, glob, os, re
+          files = []
+          for path in sorted(glob.glob(os.environ['RUNNER_TEMP'] + '/v1/android/app/schemas/**/*.json', recursive=True)):
+              files.append(('v1', path))
+          for path in sorted(glob.glob('android/app/schemas/**/*.json', recursive=True)):
+              files.append(('v2', path))
+          for tag, path in files:
+              raw = open(path, 'rb').read()
+              enc = base64.b64encode(raw).decode()
+              chunks = [enc[i:i+3000] for i in range(0, len(enc), 3000)]
+              name = os.path.basename(path)
+              print(f"::notice title=SCHEMA {tag} {name} HEAD::parts={len(chunks)} sha256={__import__('hashlib').sha256(raw).hexdigest()} bytes={len(raw)}")
+              for n, c in enumerate(chunks, 1):
+                  print(f"::notice title=SCHEMA {tag} {name} {n}/{len(chunks)}::{c}")
+          print(f"::notice title=SCHEMAS FILES::{len(files)}")
+          PY
