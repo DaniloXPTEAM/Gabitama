@@ -2,6 +2,7 @@ package com.novoagentehb.app.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.novoagentehb.app.data.local.DatabaseVersionGuard
 import com.novoagentehb.app.data.local.MIGRATION_1_2
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -29,11 +30,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
+        // Sem fallbackToDestructiveMigration: versão sem migração gera erro controlado e preserva os dados.
+        DatabaseVersionGuard.checkOrThrow(context.getDatabasePath(AppDatabase.DATABASE_NAME), context.noBackupFilesDir)
+        return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
             .addMigrations(MIGRATION_1_2)
-            .fallbackToDestructiveMigration()
             .build()
+    }
 
     @Provides fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
     @Provides fun provideMemoryDao(db: AppDatabase): MemoryDao = db.memoryDao()
