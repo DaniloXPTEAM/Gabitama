@@ -81,6 +81,15 @@ fun ChatScreen(
     val context = LocalContext.current
     val hbState by viewModel.hbState.collectAsState()
     val messages by viewModel.messages.collectAsState()
+    // Retomada: ao voltar ao GabiTama (ex.: depois do Spotify), registra o aviso do handoff pendente.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.onAppResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val turnState by viewModel.turnState.collectAsState()
     val voiceState by viewModel.voiceState.collectAsState()
     val voiceError by viewModel.voiceError.collectAsState()

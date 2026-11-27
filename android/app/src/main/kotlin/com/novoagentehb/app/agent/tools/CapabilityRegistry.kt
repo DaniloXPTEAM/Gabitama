@@ -86,7 +86,7 @@ class CapabilityRegistry @Inject constructor() {
         ),
         ToolDescriptor(
             name = "search_spotify",
-            description = "Abre busca ou URI de faixa no Spotify (handoff; não confirma reprodução).",
+            description = "Abre a busca no Spotify (handoff; não confirma resultados). Não reproduz música: pedidos de tocar são recusados sem integração autorizada.",
             riskLevel = RiskLevel.DEVICE_BRIDGE,
             params = listOf(ToolParamSpec("query", "Música, artista ou playlist", required = true)),
             idempotent = true,

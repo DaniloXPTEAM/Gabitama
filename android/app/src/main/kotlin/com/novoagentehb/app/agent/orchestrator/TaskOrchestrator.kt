@@ -776,6 +776,9 @@ class TaskOrchestrator @Inject constructor(
         return if (skillsFrag.isBlank()) base else "$base\n\n$skillsFrag"
     }
 
+    /** Registra o aviso de retomada (ex.: voltou do Spotify) na mesma sessão do chat. */
+    suspend fun recordResumeNotice(text: String) = saveAssistantMessage(text)
+
     private suspend fun saveAssistantMessage(
         content: String,
         taskId: String? = null,

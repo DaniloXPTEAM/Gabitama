@@ -5,6 +5,8 @@ import com.novoagentehb.app.agent.browser.BrowserActionResult
 import com.novoagentehb.app.agent.browser.BrowserInteractionKind
 import com.novoagentehb.app.agent.browser.BrowserInteractionRequest
 import com.novoagentehb.app.agent.browser.BrowserUseManager
+import com.novoagentehb.app.bridges.SpotifyHandoffMemory
+import com.novoagentehb.app.bridges.SpotifyOutcomeRules
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
 import com.novoagentehb.app.agent.media.image.ImageConsent
 import com.novoagentehb.app.agent.media.image.ImageGenerationException
@@ -104,8 +106,16 @@ class ToolExecutorAndVerifier @Inject constructor(
                 }
             }
             "open_app" -> {
-                val res = deviceBridge.openApp(args["app_name"].orEmpty())
-                ToolExecutionResult(res.success, res.verified, res.message, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
+                val appName = args["app_name"].orEmpty()
+                val res = deviceBridge.openApp(appName)
+                if (appName.trim().lowercase().contains("spotify")) {
+                    // Abrir o Spotify é handoff: registra para retomada e não declara reprodução.
+                    if (res.success) SpotifyHandoffMemory.remember(SpotifyHandoffMemory.Kind.OPEN, null, System.currentTimeMillis())
+                    val r = SpotifyOutcomeRules.forOpen(opened = res.success, query = null, failureMessage = res.message)
+                    ToolExecutionResult(r.success, false, r.message, errorCode = r.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
+                } else {
+                    ToolExecutionResult(res.success, res.verified, res.message, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
+                }
             }
             "call_contact" -> {
                 val res = deviceBridge.callContact(args["contact_name"].orEmpty())
@@ -132,13 +142,25 @@ class ToolExecutorAndVerifier @Inject constructor(
                 ToolExecutionResult(res.success, res.verified, res.message, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
             }
             "search_spotify" -> {
-                val res = deviceBridge.searchSpotify(args["query"].orEmpty())
-                val msg = if (res.success) {
-                    "${res.message} (HANDOFF_TO_USER: tela aberta no Spotify — reprodução efetiva não garantida automaticamente)."
+                val query = args["query"].orEmpty().trim()
+                if (args["mode"] == "play") {
+                    // Pedido de reprodução: sem integração autorizada, nada é aberto nem marcado como tocando.
+                    val r = SpotifyOutcomeRules.forPlayRequest(query)
+                    ToolExecutionResult(false, false, r.message, errorCode = r.errorCode, semantics = ToolExecutionSemantics.NOT_IMPLEMENTED)
+                } else if (query.isEmpty()) {
+                    val r = SpotifyOutcomeRules.forBlankQuery()
+                    ToolExecutionResult(false, false, r.message, errorCode = r.errorCode, semantics = ToolExecutionSemantics.NOT_IMPLEMENTED)
                 } else {
-                    res.message
+                    val res = deviceBridge.searchSpotify(query)
+                    if (res.success) SpotifyHandoffMemory.remember(SpotifyHandoffMemory.Kind.SEARCH, query, System.currentTimeMillis())
+                    val msg = if (res.success) {
+                        "${res.message} (HANDOFF_TO_USER: a busca foi aberta; o resultado e a reprodução não foram verificados.)"
+                    } else {
+                        res.message
+                    }
+                    // Abrir a busca nunca é verificação de resultado: verified permanece falso.
+                    ToolExecutionResult(res.success, false, msg, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
                 }
-                ToolExecutionResult(res.success, res.verified, msg, errorCode = res.errorCode, semantics = ToolExecutionSemantics.HANDOFF_TO_USER)
             }
             "pause_music" -> {
                 val res = deviceBridge.pauseMedia()

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.novoagentehb.app.bridges.SpotifyHandoffMemory
 import javax.inject.Inject
 
 @HiltViewModel
@@ -50,6 +51,17 @@ class ChatViewModel @Inject constructor(
                     else -> Unit
                 }
             }
+        }
+    }
+
+    /**
+     * Chamado quando o chat volta ao primeiro plano. Se houve handoff (ex.: Spotify), grava um aviso
+     * explícito do que foi e do que NÃO foi confirmado. Consome o handoff uma única vez.
+     */
+    fun onAppResumed() {
+        val pending = SpotifyHandoffMemory.takeForResume(System.currentTimeMillis()) ?: return
+        viewModelScope.launch {
+            orchestrator.recordResumeNotice(SpotifyHandoffMemory.resumeText(pending))
         }
     }
 

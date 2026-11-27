@@ -158,22 +158,25 @@ class AndroidDeviceBridge @Inject constructor(
         }
     }
 
+    /**
+     * Abre a BUSCA no Spotify. Não resolve nem abre a primeira faixa: isso reproduziria música
+     * sem pedido de reprodução. Sucesso aqui é handoff; verified=false porque o app não vê a tela.
+     */
     suspend fun searchSpotify(query: String): BridgeOutcome {
-        val trackUri = spotifyBridge.resolveTrackUri(query)
-        val uriToOpen = trackUri ?: "https://open.spotify.com/search/${URLEncoder.encode(query.trim(), "UTF-8")}"
+        val cleanQuery = query.trim()
+        if (cleanQuery.isEmpty()) return BridgeOutcome(false, false, SpotifyOutcomeRules.forBlankQuery().message, "SPOTIFY_QUERY_EMPTY")
+        val uriToOpen = "https://open.spotify.com/search/${URLEncoder.encode(cleanQuery, "UTF-8")}"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriToOpen)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (isInstalled("com.spotify.music")) setPackage("com.spotify.music")
         }
         return runCatching {
             context.startActivity(intent)
-            if (trackUri != null) {
-                BridgeOutcome(true, true, "Abrindo faixa correspondente no Spotify ($trackUri).")
-            } else {
-                BridgeOutcome(true, true, "Busca no Spotify aberta para \"$query\".")
-            }
+            val r = SpotifyOutcomeRules.forOpen(opened = true, query = cleanQuery, failureMessage = null)
+            BridgeOutcome(r.success, r.verified, r.message)
         }.getOrElse { err ->
-            BridgeOutcome(false, false, "Não consegui abrir o Spotify: ${err.message}", "SPOTIFY_FAILED")
+            val r = SpotifyOutcomeRules.forOpen(opened = false, query = cleanQuery, failureMessage = "Não consegui abrir o Spotify: ${err.message}")
+            BridgeOutcome(false, false, r.message, r.errorCode)
         }
     }
 
@@ -478,6 +481,13 @@ class AndroidDeviceBridge @Inject constructor(
             return null
         }
 
+        private fun spotifyIntent(cmd: SpotifyCommandParser.Command): Pair<String, Map<String, String>>? = when (cmd) {
+            is SpotifyCommandParser.Command.Open -> "open_app" to mapOf("app_name" to cmd.appName)
+            is SpotifyCommandParser.Command.Search -> "search_spotify" to mapOf("query" to cmd.query)
+            is SpotifyCommandParser.Command.PlayRequest -> "search_spotify" to mapOf("query" to cmd.target, "mode" to "play")
+            SpotifyCommandParser.Command.NotSpotify -> null
+        }
+
         /**
          * Parser offline de contingência em pt-BR quando não há modelo LLM configurado.
          * Preserva os comandos offline clássicos da Gabi (`voz-latencia`).
@@ -488,6 +498,9 @@ class AndroidDeviceBridge @Inject constructor(
                 // Comando especifico antes de abertura generica de apps.
                 norm.contains("camera") || norm.contains("tirar foto") ->
                     "take_photo" to emptyMap()
+                // Spotify antes das regras genéricas (abrir, pesquisar, tocar): "abre o Spotify" não vira busca.
+                SpotifyCommandParser.parse(input) !is SpotifyCommandParser.Command.NotSpotify ->
+                    spotifyIntent(SpotifyCommandParser.parse(input))
                 norm.startsWith("abrir ") || norm.startsWith("abre ") -> {
                     val app = input.trim().substringAfter(" ").trim()
                     "open_app" to mapOf("app_name" to app)
@@ -523,10 +536,6 @@ class AndroidDeviceBridge @Inject constructor(
                     "read_gmail" to emptyMap()
                 norm.contains("pausar musica") || norm.contains("para a musica") || norm.contains("pausa a musica") ->
                     "pause_music" to emptyMap()
-                norm.startsWith("tocar ") || norm.contains("spotify") -> {
-                    val q = input.replace(Regex("(?i)(tocar|no spotify|spotify)"), "").trim()
-                    "search_spotify" to mapOf("query" to q.ifBlank { "Brasil" })
-                }
                 norm.startsWith("youtube ") || norm.contains("no youtube") -> {
                     val q = input.replace(Regex("(?i)(buscar|pesquisar|no youtube|youtube)"), "").trim()
                     "search_youtube" to mapOf("query" to q)
