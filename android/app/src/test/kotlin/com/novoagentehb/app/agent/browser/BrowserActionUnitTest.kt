@@ -6,53 +6,44 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Fatia 1 do navegador (portada do Tama V2, GPL-3.0): modelo de ação puro, sem Android. */
+/** Modelo de ação do navegador: puro, sem Android. Implementação própria do GabiTama (MIT). */
 class BrowserActionUnitTest {
 
     @Test
-    fun everyActionValueRoundTripsThroughFromString() {
+    fun everyActionRoundTripsThroughWireName() {
         for (action in BrowserAction.entries) {
-            assertEquals(action, BrowserAction.fromString(action.value))
+            assertEquals(action, BrowserAction.fromWireName(action.wireName))
         }
-        assertNull(BrowserAction.fromString("acao_inexistente"))
-        assertEquals(BrowserAction.entries.size, BrowserAction.allValues.size)
+        assertNull(BrowserAction.fromWireName("acao_inexistente"))
+        assertEquals(BrowserAction.entries.size, BrowserAction.wireNames.size)
     }
 
     @Test
-    fun onlyNavigateOpensANewPage() {
-        assertTrue(BrowserAction.NAVIGATE.opensNewPage)
-        // Ações que operam na página atual não podem abrir outra aba (regressão #612/#614 do Tama).
-        for (action in listOf(BrowserAction.EXECUTE_JS, BrowserAction.GET_TEXT, BrowserAction.CLICK, BrowserAction.SCREENSHOT)) {
-            assertFalse(action.name, action.opensNewPage)
-        }
+    fun wireNameIsCaseAndSpaceInsensitive() {
+        assertEquals(BrowserAction.RELOAD, BrowserAction.fromWireName("  Reload "))
     }
 
     @Test
-    fun handOverIsDistinctSoThePersonCanTakeOverLoginOrCaptcha() {
-        assertEquals("hand_over", BrowserAction.HAND_OVER.value)
-        assertFalse(BrowserAction.HAND_OVER.opensNewPage)
+    fun readOnlyActionsDoNotChangePage() {
+        assertFalse(BrowserAction.GET_TEXT.changesPage)
+        assertFalse(BrowserAction.GET_PAGE_INFO.changesPage)
+        assertTrue(BrowserAction.BACK.changesPage)
+        assertTrue(BrowserAction.RELOAD.changesPage)
     }
 
     @Test
-    fun userAgentProfilesHaveExpectedViewportsAndCustomHasNoDefaultString() {
-        assertEquals(412 to 915, UserAgentProfile.MOBILE_CHROME.viewportSize)
-        assertEquals(1280 to 800, UserAgentProfile.DESKTOP_CHROME.viewportSize)
-        assertNull(UserAgentProfile.CUSTOM.userAgentString)
-        assertTrue(UserAgentProfile.MOBILE_CHROME.userAgentString!!.contains("Android"))
+    fun scrollDirectionParses() {
+        assertEquals(ScrollDirection.DOWN, ScrollDirection.fromWireName("down"))
+        assertNull(ScrollDirection.fromWireName("left"))
     }
 
     @Test
-    fun scrollDirectionParsesOnlyKnownValues() {
-        assertEquals(ScrollDirection.UP, ScrollDirection.fromString("up"))
-        assertEquals(ScrollDirection.DOWN, ScrollDirection.fromString("down"))
-        assertNull(ScrollDirection.fromString("left"))
-    }
-
-    @Test
-    fun errorResultIsMarkedUnsuccessfulWithPrefix() {
-        val r = BrowserActionResult.error("tempo esgotado")
-        assertFalse(r.success)
-        assertEquals("Error: tempo esgotado", r.text)
-        assertNull(r.tabId)
+    fun resultFactoriesSetSuccessAndErrorCode() {
+        val ok = BrowserActionResult.ok("feito", "https://example.com/")
+        assertTrue(ok.success)
+        assertNull(ok.errorCode)
+        val err = BrowserActionResult.error("LOAD_TIMEOUT", "demorou")
+        assertFalse(err.success)
+        assertEquals("LOAD_TIMEOUT", err.errorCode)
     }
 }

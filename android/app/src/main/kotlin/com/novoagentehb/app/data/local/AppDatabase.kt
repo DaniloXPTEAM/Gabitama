@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
         ReminderItemEntity::class,
         FeedEventEntity::class,
         TaskReceiptEntity::class,
-        SkillRecordEntity::class
+        SkillRecordEntity::class,
+        BrowserHistoryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun feedEventDao(): FeedEventDao
     abstract fun taskReceiptDao(): TaskReceiptDao
     abstract fun skillRecordDao(): SkillRecordDao
+    abstract fun browserHistoryDao(): BrowserHistoryDao
 
     companion object {
         const val DATABASE_NAME = "novo_agente_hb.db"

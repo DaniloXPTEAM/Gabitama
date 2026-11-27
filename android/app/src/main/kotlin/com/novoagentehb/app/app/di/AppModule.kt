@@ -2,9 +2,11 @@ package com.novoagentehb.app.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.novoagentehb.app.data.local.MIGRATION_1_2
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.novoagentehb.app.data.local.AppDatabase
+import com.novoagentehb.app.data.local.BrowserHistoryDao
 import com.novoagentehb.app.data.local.ChatMessageDao
 import com.novoagentehb.app.data.local.FeedEventDao
 import com.novoagentehb.app.data.local.GoalDao
@@ -29,6 +31,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+            .addMigrations(MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -39,6 +42,7 @@ object AppModule {
     @Provides fun provideFeedEventDao(db: AppDatabase): FeedEventDao = db.feedEventDao()
     @Provides fun provideTaskReceiptDao(db: AppDatabase): TaskReceiptDao = db.taskReceiptDao()
     @Provides fun provideSkillRecordDao(db: AppDatabase): SkillRecordDao = db.skillRecordDao()
+    @Provides fun provideBrowserHistoryDao(db: AppDatabase): BrowserHistoryDao = db.browserHistoryDao()
 
     @Provides
     @Singleton

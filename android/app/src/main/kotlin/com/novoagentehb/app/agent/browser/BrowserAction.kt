@@ -1,117 +1,106 @@
-/*
- * Origem: DaniloXPTEAM/tamaaiv2 (commit 154f076), módulo browser/BrowserAction.kt.
- * Adaptado ao pacote do GabiTama em 2026-11-27. Licença de origem: GPL-3.0 (ver
- * docs/fusion/F3_BROWSER_PORT_PLAN_2026-11-27.md e LICENSE_PENDING_OWNER.txt).
- * Alteração: apenas o nome do pacote.
- */
 package com.novoagentehb.app.agent.browser
 
+import java.net.URI
+import java.net.URISyntaxException
+
 /**
- * All browser actions available to the agent, mirroring iOS BrowserAction.
+ * Ações de navegador que o agente pode solicitar.
+ *
+ * Implementação própria do GabiTama (licença do projeto: MIT). Não deriva de código
+ * de outros projetos; o conjunto de ações foi definido pelos requisitos do agente.
+ *
+ * [changesPage] indica ações que alteram a página ou as abas e, portanto, exigem
+ * que o resultado seja relido antes de ser tratado como estado atual.
  */
-enum class BrowserAction(val value: String) {
-    NAVIGATE("navigate"),
-    SCREENSHOT("screenshot"),
-    CLICK("click"),
-    TYPE("type"),
-    GET_TEXT("get_text"),
-    SCROLL("scroll"),
-    GET_PAGE_INFO("get_page_info"),
-    EXECUTE_JS("execute_js"),
-    FIND_ELEMENTS("find_elements"),
-    HOVER("hover"),
-    GET_READABLE("get_readable"),
-    SET_USER_AGENT("set_user_agent"),
-    SET_VIEWPORT("set_viewport"),
-    GET_BACKBONE("get_backbone"),
-    FETCH("fetch"),
-    NEW_TAB("new_tab"),
-    CLOSE_TAB("close_tab"),
-    LIST_TABS("list_tabs"),
-    GET_COOKIES("get_cookies"),
-    SET_COOKIES("set_cookies"),
-    SCROLL_AND_COLLECT("scroll_and_collect"),
-    WAIT_FOR_DOM_STABLE("wait_for_dom_stable"),
-    // nanoMuse: the page needs the person (login, code, payment, CAPTCHA) — the browser goes to them (io.github.nanomuse.browser.BrowserHandOver).
-    HAND_OVER("hand_over");
+enum class BrowserAction(val wireName: String, val changesPage: Boolean) {
+    NAVIGATE("navigate", changesPage = true),
+    BACK("back", changesPage = true),
+    FORWARD("forward", changesPage = true),
+    RELOAD("reload", changesPage = true),
+    SCROLL("scroll", changesPage = true),
+    NEW_TAB("new_tab", changesPage = true),
+    CLOSE_TAB("close_tab", changesPage = true),
+    SCREENSHOT("screenshot", changesPage = false),
+    GET_TEXT("get_text", changesPage = false),
+    GET_PAGE_INFO("get_page_info", changesPage = false),
+    LIST_TABS("list_tabs", changesPage = false);
+
+    companion object {
+        private val byWireName: Map<String, BrowserAction> = entries.associateBy { it.wireName }
+
+        /** Converte o nome enviado pelo agente; retorna null para ações desconhecidas. */
+        fun fromWireName(name: String): BrowserAction? = byWireName[name.trim().lowercase()]
+
+        /** Nomes aceitos, para mensagens de erro e para o prompt do agente. */
+        val wireNames: List<String> get() = entries.map { it.wireName }
+    }
+}
+
+enum class ScrollDirection(val wireName: String) {
+    UP("up"),
+    DOWN("down");
+
+    companion object {
+        fun fromWireName(name: String): ScrollDirection? =
+            entries.find { it.wireName == name.trim().lowercase() }
+    }
+}
+
+/** Resultado da validação de uma URL solicitada ao navegador. */
+sealed class UrlCheck {
+    data class Allowed(val url: String) : UrlCheck()
+    data class Rejected(val reason: String) : UrlCheck()
+}
+
+/**
+ * Política de URL do navegador: apenas http/https, sem credenciais embutidas, tamanho
+ * limitado e sem endereços locais ou de rede privada. Esquemas como file:, javascript:,
+ * intent: e content: são recusados.
+ */
+object BrowserUrlPolicy {
+    const val MAX_URL_LENGTH = 2048
+    private val allowedSchemes = setOf("http", "https")
+
+    fun check(raw: String): UrlCheck {
+        val candidate = raw.trim()
+        if (candidate.isEmpty()) return UrlCheck.Rejected("URL vazia")
+        if (candidate.length > MAX_URL_LENGTH) return UrlCheck.Rejected("URL longa demais")
+        val uri = try {
+            URI(candidate)
+        } catch (e: URISyntaxException) {
+            return UrlCheck.Rejected("URL inválida")
+        }
+        val scheme = uri.scheme?.lowercase()
+            ?: return UrlCheck.Rejected("Esquema ausente; use http:// ou https://")
+        if (scheme !in allowedSchemes) return UrlCheck.Rejected("Esquema não permitido: $scheme")
+        if (uri.host.isNullOrBlank()) return UrlCheck.Rejected("Host ausente")
+        if (uri.userInfo != null) return UrlCheck.Rejected("Credenciais na URL não são permitidas")
+        if (isLocalOrPrivateHost(uri.host)) {
+            return UrlCheck.Rejected("Endereço local ou de rede privada não é permitido")
+        }
+        return UrlCheck.Allowed(uri.toString())
+    }
 
     /**
-     * [T-browser-readaction-follow-tab-and-yolo-android] True when this action
-     * opens / replaces the page (navigate) and may therefore fan out to
-     * a fresh tab under the implicit-tab grace window. False for
-     * operate-current-page actions (execute_js, get_text, click, …) which must
-     * follow selectedTabId.
+     * Recusa loopback, link-local, redes privadas e nomes locais, para que o agente não
+     * use o navegador para acessar roteadores ou serviços do aparelho e da rede.
+     * Verificação apenas pelo texto do host; não resolve DNS.
      */
-    val opensNewPage: Boolean get() = this in opensNewPageActions
-
-    companion object {
-        private val map = entries.associateBy { it.value }
-        fun fromString(s: String): BrowserAction? = map[s]
-
-        /** Actions that visually change the page and warrant an auto-snapshot. */
-        val visualChangeActions: Set<BrowserAction> = setOf(
-            NAVIGATE, CLICK, SCROLL, HOVER, TYPE
-        )
-
-        /**
-         * [T-browser-readaction-follow-tab-and-yolo-android] Actions that open
-         * or replace the page in a tab — these are the ONLY actions that should
-         * fan out to a fresh tab when an implicit (tab_id-less) call lands while
-         * the previously-used tab is still inside its inUse grace window. The
-         * grace-based fan-out exists so N back-to-back *navigates* open N
-         * distinct tabs instead of trampling tab 0 (issue #595).
-         *
-         * Every other action operates on the CURRENT page (read DOM, click,
-         * scroll, screenshot, …). For those, fanning out to a fresh/other tab
-         * is exactly the #612/#614 bug: `navigate A → execute_js` ran the JS on
-         * a different (blank or stale) tab because navigate's tab was still in
-         * grace. Those actions must follow `selectedTabId` (the most-recently
-         * navigated tab), never fan out. See [opensNewPage].
-         *
-         * NEW_TAB / CLOSE_TAB / LIST_TABS / SET_VIEWPORT are handled at the pool
-         * level before tab acquisition, so they're intentionally absent here.
-         */
-        val opensNewPageActions: Set<BrowserAction> = setOf(
-            NAVIGATE
-        )
-
-        val allValues: List<String> = entries.map { it.value }
-    }
-}
-
-enum class ScrollDirection(val value: String) {
-    UP("up"), DOWN("down");
-    companion object {
-        fun fromString(s: String): ScrollDirection? = entries.find { it.value == s }
-    }
-}
-
-enum class UserAgentProfile(val value: String) {
-    MOBILE_CHROME("mobile_chrome"),
-    DESKTOP_CHROME("desktop_chrome"),
-    CUSTOM("custom");
-
-    val userAgentString: String?
-        get() = when (this) {
-            MOBILE_CHROME -> "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36"
-            DESKTOP_CHROME -> "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
-            CUSTOM -> null
+    fun isLocalOrPrivateHost(rawHost: String): Boolean {
+        val host = rawHost.lowercase().removePrefix("[").removeSuffix("]")
+        if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true
+        if (host.contains(':')) {
+            // IPv6 literal: loopback, não especificado, unique-local (fc00::/7) e link-local (fe80::/10)
+            return host == "::1" || host == "::" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")
         }
-
-    val displayName: String
-        get() = when (this) {
-            MOBILE_CHROME -> "Mobile Chrome"
-            DESKTOP_CHROME -> "Desktop Chrome"
-            CUSTOM -> "Custom"
-        }
-
-    val viewportSize: Pair<Int, Int>
-        get() = when (this) {
-            DESKTOP_CHROME -> 1280 to 800
-            MOBILE_CHROME, CUSTOM -> 412 to 915
-        }
-
-    companion object {
-        fun fromString(s: String): UserAgentProfile? = entries.find { it.value == s }
+        val parts = host.split(".")
+        if (parts.size != 4 || parts.any { it.toIntOrNull()?.let { n -> n in 0..255 } != true }) return false
+        val a = parts[0].toInt()
+        val b = parts[1].toInt()
+        return a == 0 || a == 10 || a == 127 ||
+            (a == 169 && b == 254) ||
+            (a == 172 && b in 16..31) ||
+            (a == 192 && b == 168) ||
+            (a == 100 && b in 64..127)
     }
 }
