@@ -153,3 +153,56 @@ jobs:
           for n, c in enumerate(chunks, 1):
               print(f"::notice title=SCHEMA v1 {name} {n}/{len(chunks)}::{c}")
           PY
+
+  room-migration-instrumented:
+    name: Migração Room 1→2 (teste instrumentado, emulador API 34, sem artefatos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout (somente leitura, sem credenciais persistidas)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          sudo chmod a+rw /dev/kvm
+
+      - name: Executar teste instrumentado de migração (somente esta classe)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 600
+          disable-animations: true
+          script: cd android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.novoagentehb.app.data.local.RoomMigration1To2AndroidTest --no-daemon --stacktrace
+
+      - name: Resumo do teste instrumentado (contagem, sem logs de conteúdo, sem artefato)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as E
+          files = glob.glob("android/app/build/outputs/androidTest-results/connected/**/*.xml", recursive=True)
+          if not files:
+              print("::error title=Room migração::nenhum relatório instrumentado encontrado")
+              raise SystemExit(1)
+          roots = [E.parse(f).getroot() for f in files]
+          suites = [r for r in roots if r.tag == "testsuite"] or [x for r in roots for x in r.iter("testsuite")]
+          tot = {k: sum(int(s.get(k, 0)) for s in suites) for k in ("tests", "failures", "errors", "skipped")}
+          print("::notice title=Room migração 1→2::tests=%(tests)d failures=%(failures)d errors=%(errors)d skipped=%(skipped)d" % tot)
+          if tot["tests"] == 0 or tot["failures"] or tot["errors"]:
+              raise SystemExit(1)
+          PY
