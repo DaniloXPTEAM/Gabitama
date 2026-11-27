@@ -36,6 +36,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.novoagentehb.app.agent.browser.BrowserCommand
+import com.novoagentehb.app.agent.browser.BrowserInteractionScripts
 import com.novoagentehb.app.agent.browser.BrowserHistoryStore
 import com.novoagentehb.app.agent.browser.BrowserLoadState
 import com.novoagentehb.app.agent.browser.BrowserSessionController
@@ -95,6 +96,15 @@ fun InAppBrowserHost(
                         } else {
                             view.evaluateJavascript(BrowserTextCodec.READ_TEXT_SCRIPT) { raw ->
                                 command.result.complete(BrowserTextCodec.decode(raw))
+                            }
+                        }
+                    }
+                    is BrowserCommand.Interact -> {
+                        if (view == null) {
+                            command.result.complete("no_response")
+                        } else {
+                            view.evaluateJavascript(BrowserInteractionScripts.build(command.request)) { raw ->
+                                command.result.complete(raw ?: "null")
                             }
                         }
                     }

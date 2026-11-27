@@ -60,6 +60,12 @@ sealed class BrowserCommand {
 
     /** [done] vira true somente após o WebView executar stopLoading(). */
     data class Stop(val done: CompletableDeferred<Boolean>) : BrowserCommand()
+
+    /** Clique ou preenchimento; o código do script volta por [result]. Só após confirmação da pessoa. */
+    data class Interact(
+        val request: BrowserInteractionRequest,
+        val result: CompletableDeferred<String>,
+    ) : BrowserCommand()
 }
 
 /**
@@ -104,6 +110,12 @@ class BrowserSessionController @Inject constructor() {
     fun requestReadText(result: CompletableDeferred<String>): Boolean {
         if (mutableSession.value == null) return false
         return commandChannel.trySend(BrowserCommand.ReadText(result)).isSuccess
+    }
+
+    /** Pede clique ou preenchimento na página atual. Retorna false se não há sessão aberta. */
+    fun requestInteract(request: BrowserInteractionRequest, result: CompletableDeferred<String>): Boolean {
+        if (mutableSession.value == null) return false
+        return commandChannel.trySend(BrowserCommand.Interact(request, result)).isSuccess
     }
 
     /**

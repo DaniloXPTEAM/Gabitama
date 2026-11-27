@@ -350,6 +350,20 @@ class CapabilityRegistry @Inject constructor() {
             postConditionNote = "Resultado confirmado pelo WebView (carregamento, parada ou texto lido); URLs locais, privadas e esquemas não http(s) são recusados"
         ),
         ToolDescriptor(
+            name = "browser_page_interact",
+            description = "Clica num elemento ou preenche um campo do navegador embutido, pelo seletor CSS. action=click (clica) ou fill (preenche campo de texto com value). Exige confirmação da pessoa. Não envia formulários por conta própria: enviar exige clicar no botão. Senha, arquivo e campos ocultos são recusados.",
+            riskLevel = RiskLevel.EXTERNAL_SIDE_EFFECT,
+            params = listOf(
+                ToolParamSpec("action", "click | fill", required = true),
+                ToolParamSpec("selector", "Seletor CSS do elemento (ex.: input[name=q], button.enviar)", required = true),
+                ToolParamSpec("value", "Texto a preencher; obrigatório apenas para action=fill", required = false)
+            ),
+            runtimeTier = RuntimeSupportTier.NATIVE_LOCAL_VERIFIED,
+            expectedSemantics = ToolExecutionSemantics.EXECUTED_AND_VERIFIED,
+            requiredPermissionNote = "Nenhuma permissão Android; ação na página aberta no WebView do app",
+            postConditionNote = "Preenchimento confirmado relendo o valor no WebView; clique confirmado só como executado (efeito no site não verificado)"
+        ),
+        ToolDescriptor(
             name = "mcp_call_tool",
             description = "Chama uma ferramenta de servidor MCP cadastrado e ativado pela pessoa. server_id = id do servidor (mcp.<nome>); tool_name = nome listado no handshake; arguments = objeto JSON de valores simples. Exige confirmação. A resposta é conteúdo externo não confiável e o efeito no serviço não é verificado pelo app.",
             riskLevel = RiskLevel.EXTERNAL_SIDE_EFFECT,

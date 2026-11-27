@@ -80,6 +80,23 @@ class BrowserUseManager @Inject constructor(
         else BrowserActionResult.error("STOP_FAILED", "Não foi possível interromper o carregamento.", url)
     }
 
+    /**
+     * Clica ou preenche um campo da página aberta. Só chamar após confirmação explícita da pessoa
+     * (PolicyGate). O resultado vem do WebView: preenchimento só é 'ok' se o valor foi relido.
+     */
+    suspend fun interact(request: BrowserInteractionRequest, timeoutMs: Long = ACTION_TIMEOUT_MS): BrowserActionResult {
+        if (!controller.isOpen()) {
+            return BrowserActionResult.error("NO_SESSION", "Nenhuma página está aberta no navegador do app.")
+        }
+        val code = CompletableDeferred<String>()
+        if (!controller.requestInteract(request, code)) {
+            return BrowserActionResult.error("NO_SESSION", "Nenhuma página está aberta no navegador do app.")
+        }
+        val raw = withTimeoutOrNull(timeoutMs) { code.await() }
+            ?: return BrowserActionResult.error("ACTION_TIMEOUT", "O navegador não respondeu à interação em ${timeoutMs / 1000}s.", controller.session.value?.url)
+        return BrowserInteractionCodec.toResult(request.kind, BrowserInteractionCodec.parseCode(raw), controller.session.value?.url)
+    }
+
     private suspend fun navigate(
         kind: BrowserCommand.NavigationKind,
         successText: String,

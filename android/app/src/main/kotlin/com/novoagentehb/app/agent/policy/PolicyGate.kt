@@ -67,6 +67,14 @@ class PolicyGate @Inject constructor() {
                     "Enviar WhatsApp para ${request.args["contact_name"] ?: "contato"}: \"${request.args["message"].orEmpty()}\"?"
                 "call_contact", "call_number" ->
                     "Realizar ligação para ${request.args["contact_name"] ?: request.args["phone_number"] ?: "destinatário"}?"
+                "browser_page_interact" -> {
+                    val alvo = request.args["selector"].orEmpty().take(200)
+                    if (request.args["action"].equals("fill", ignoreCase = true)) {
+                        "Preencher o campo “$alvo” na página do navegador com o texto “${request.args["value"].orEmpty().take(200)}”? O texto pode ser enviado ao site se o formulário for enviado depois."
+                    } else {
+                        "Clicar no elemento “$alvo” na página do navegador? Isso pode enviar formulário, abrir link ou executar ação no site."
+                    }
+                }
                 "mcp_call_tool" ->
                     "Chamar a ferramenta MCP '${request.args["tool_name"].orEmpty().take(64)}' no servidor '${request.args["server_id"].orEmpty().take(100)}'? Os argumentos saem do aparelho; a resposta do servidor não é verificada pelo app."
                 "create_calendar_event" ->

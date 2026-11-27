@@ -2,6 +2,8 @@ package com.novoagentehb.app.agent.executor
 
 import com.novoagentehb.app.agent.browser.BrowserAction
 import com.novoagentehb.app.agent.browser.BrowserActionResult
+import com.novoagentehb.app.agent.browser.BrowserInteractionKind
+import com.novoagentehb.app.agent.browser.BrowserInteractionRequest
 import com.novoagentehb.app.agent.browser.BrowserUseManager
 import com.novoagentehb.app.agent.computer.WorkspaceProgram
 import com.novoagentehb.app.agent.media.image.ImageConsent
@@ -337,6 +339,7 @@ class ToolExecutorAndVerifier @Inject constructor(
                 }
             }
             "browser_page_action" -> browserPageAction(args)
+            "browser_page_interact" -> browserPageInteract(args)
             "mcp_call_tool" -> mcpChatToolRunner.run(args, request.userConfirmed)
             "diagnostics_snapshot" -> {
                 val report = diagnosticsEngine.buildReport(
@@ -359,6 +362,40 @@ class ToolExecutorAndVerifier @Inject constructor(
      * Ponte do agente para o navegador embutido. O resultado vem do WebView (carregamento,
      * texto lido, parada confirmada), não de presunção. Ações não listadas são recusadas.
      */
+    private suspend fun browserPageInteract(args: Map<String, String>): ToolExecutionResult {
+        val kind = BrowserInteractionKind.fromWireName(args["action"].orEmpty())
+            ?: return ToolExecutionResult(
+                false, false,
+                "Ação de página desconhecida. Use: click ou fill.",
+                errorCode = "BROWSER_INTERACTION_UNKNOWN",
+                semantics = ToolExecutionSemantics.NOT_IMPLEMENTED
+            )
+        val request = BrowserInteractionRequest.validate(kind, args["selector"].orEmpty(), args["value"])
+            .getOrElse { error ->
+                return ToolExecutionResult(
+                    false, false,
+                    error.message ?: "Parâmetros inválidos para interagir com a página.",
+                    errorCode = "BROWSER_INTERACTION_INVALID",
+                    semantics = ToolExecutionSemantics.NOT_IMPLEMENTED
+                )
+            }
+        val result = browserUseManager.interact(request)
+        // Clique não tem efeito verificável pelo app: relatado como efeito externo não verificado.
+        val semantics = if (kind == BrowserInteractionKind.FILL) {
+            ToolExecutionSemantics.EXECUTED_AND_VERIFIED
+        } else {
+            ToolExecutionSemantics.REMOTE_RESPONSE_ONLY
+        }
+        return ToolExecutionResult(
+            success = result.success,
+            verified = result.success && kind == BrowserInteractionKind.FILL,
+            summary = result.text,
+            payload = result.pageUrl.orEmpty(),
+            errorCode = result.errorCode,
+            semantics = semantics
+        )
+    }
+
     private suspend fun browserPageAction(args: Map<String, String>): ToolExecutionResult {
         val action = args["action"].orEmpty().trim().lowercase()
         val result: BrowserActionResult = when (action) {
