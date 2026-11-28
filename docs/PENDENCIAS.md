@@ -4,6 +4,7 @@
 
 1. **Compilação do APK Debug (`assembleDebug`) e testes JVM (`testDebugUnitTest`):** Atualização (28/11): a CI do branch `arena/1dba9faf-gabitama` compila e executa os testes JVM (run `46152871964` em `4790e8b`: 307 testes, 0 falhas) e a migração Room instrumentada. O sandbox continua sem JDK 17 e Android SDK 34; para build local, seguir `docs/BUILD_LOCAL.md`.
 2. **Testes em Emulador/Aparelho Físico e Rede Externa:** A sessão Gemini Live real (`AudioRecord`/`AudioTrack`/WebSocket), descoberta de modelos via `GET /v1beta/models`, leitura de notificações Spotify e renderização Compose dependem de compilação em estação local com Android SDK e chave `GEMINI_API_KEY`.
+4. **Gate de distribuição de licença:** `scripts/license-audit/check-distribution-license.sh` existe e bloqueia a distribuição enquanto não houver `LICENSE` (MIT) e enquanto `LICENSE_PENDING_OWNER.txt` existir. Não é chamado pela CI; ligá-lo a um workflow exige decisão do proprietário sobre os componentes GPL/LGPL herdados.
 3. **Auditoria de Dependências Transitivas:** `evidence/SBOM.json` cobre 100% das dependências diretas de `libs.versions.toml` e o Gradle Wrapper 8.9; a árvore transitiva completa exige `./gradlew app:dependencies --configuration releaseRuntimeClasspath` em máquina com acesso Maven.
 
 ## 2. Ativos Visuais Opcionais Pendentes (`ASSET_PENDING`)

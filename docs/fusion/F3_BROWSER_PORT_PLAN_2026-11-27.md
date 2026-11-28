@@ -6,7 +6,7 @@ Atualizado em 2026-11-27 (revisão após a fatia 5 e a fatia de interação). Su
 - GabiTama permanece **MIT**. Nenhum arquivo do navegador tem cabeçalho GPL. A implementação é reescrita a partir dos requisitos do agente; não copia código de outro projeto.
 - A referência ao projeto Tama V2 (GPL-3.0) serviu apenas para o levantamento de requisitos e não é base de código.
 - Componentes de terceiros herdados (não são do navegador): `pty_bridge.c`/`PtyBridge.kt`, `deps/proot` (GPL-2.0), `deps/talloc` (LGPL-3.0+), pacote `com.openminis`, textos em `assets/licenses/tama-runtime/`. Avisos preservados; não são removidos nem reclassificados aqui. A regularização desses componentes segue a decisão do proprietário registrada em `LICENSE_PENDING_OWNER.txt`.
-- Gate de licença: o script `check-distribution-license.sh` citado no workflow não existe no branch. Pendência real; não há gate automático de distribuição até ele ser criado ou substituído.
+- Gate de licença: `scripts/license-audit/check-distribution-license.sh` criado (fail-closed). Verificado: bloqueia por ausência de `LICENSE` e por `LICENSE_PENDING_OWNER.txt`. Não é chamado pelo CI de validação técnica; os workflows de distribuição seguem desativados.
 
 ## Estado por fatia
 1. **Modelo de ação** (`BrowserAction`, `BrowserActionResult`, `BrowserUrlPolicy`): entregue. Política de URL: só http/https, sem credenciais, sem endereços locais ou privados.

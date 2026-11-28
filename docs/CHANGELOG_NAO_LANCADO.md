@@ -34,6 +34,7 @@ Base: `0ecdbe5` (main). Último commit verificado pela CI: `4790e8b`.
 - F4: geração de imagem NVIDIA FLUX.1-schnell, exige consentimento por pedido (`93971e1`, `b4a96de`). Sem credencial; geração real não validada.
 
 ## Validação
+- Gate de distribuição de licença: `scripts/license-audit/check-distribution-license.sh` (fail-closed, não ligado ao CI). Hoje bloqueia (sem `LICENSE`; `LICENSE_PENDING_OWNER.txt` presente).
 - CI (GitHub Actions, sem artefatos exportados): JVM 307 testes, 0 falhas; migração Room instrumentada 4 testes, 0 falhas (run `46152871964`, commit `4790e8b`).
 - Não validado no aparelho: Spotify, pausa de voz, audio focus, animações, navegador em sites reais, Gemini Live, geração de imagem.
 
