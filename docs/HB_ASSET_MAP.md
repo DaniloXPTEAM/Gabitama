@@ -21,6 +21,10 @@ Verificado no sandbox via leitura binária de cabeçalho + inspeção visual das
 | `assets/gabi-listening.png` / `gabi-talking.png` | PNG `768x1024`, 8-bit **RGBA** (`color_type=6`) | Poses com mão na orelha / mão na cintura, fundo transparente |
 | `assets/anim/home_idle/f001..f086.png` | PNG `320x569`, 8-bit **RGBA** (`color_type=6`) | Sequência animada em vestido vermelho com canal alfa |
 | `assets/anim/scene_computador/f001..f092.png` | PNG `320x569`, 8-bit **RGBA** (`color_type=6`) | Sequência animada estudando/trabalhando com suéter mostarda e canal alfa |
+| `assets/anim/scene_comer/f001..f048.webp` | WebP `360x480` com alfa, loop de 48 quadros | Respiração sobre `gabi-comer.png` (movimento procedural, ver `scripts/hb/gen_quarto_breathing_webp.py`) |
+| `assets/anim/scene_comendo_reacao/f001..f024.webp` | WebP `360x480` com alfa, loop de 24 quadros | Pulso sobre `gabi-comer.png` (reação ao alimentar) |
+| `assets/anim/scene_ler/f001..f060.webp` | WebP `360x480` com alfa, loop de 60 quadros | Respiração sobre `gabi-ler.png` |
+| `assets/anim/scene_dormir/f001..f072.webp` | WebP `360x480` com alfa, loop de 72 quadros | Respiração mais lenta sobre `gabi-dormir.png` |
 | `assets/avatar/{idle,listening,talking,thinking}/f*.webp` | WebP `VP8X` com chunk **`ALPH`** | Animações circulares/busto do avatar com transparência preservada |
 | `assets/avatar/room.webp` / `assets/room-bg.png` | WebP / PNG `1024x1536` | Cenários de fundo independentes (camada 0 do Quarto da Gabi) |
 | `res/raw/room_bg_loop.mp4` / `assets/avatar/room_intro.mp4` | MP4 H.264 mudo | Vídeo ambiente de fundo (camada 0 opcional) e vídeo de abertura pulável 1x |
