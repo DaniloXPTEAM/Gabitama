@@ -352,7 +352,6 @@ object HBAnimationCatalog {
             returnsToPrevious = false,
             availability = HBMediaAvailability.STATIC_BREATH_FALLBACK,
             provenanceAndLicense = PROVENANCE_VOZ_LATENCIA,
-            pendingAssetNote = "ASSET_PENDING: anim/scene_comer/ (pose transparente gabi-comer.png ativa com respiração)"
         ),
         HBAnimationEntry(
             id = HBCatalogStateId.EATING_REACTION,
@@ -375,7 +374,6 @@ object HBAnimationCatalog {
             returnsToPrevious = true,
             availability = HBMediaAvailability.STATIC_BREATH_FALLBACK,
             provenanceAndLicense = PROVENANCE_VOZ_LATENCIA,
-            pendingAssetNote = "ASSET_PENDING: anim/scene_comendo_reacao/ (pose gabi-comer.png com pulso temporário)"
         ),
         HBAnimationEntry(
             id = HBCatalogStateId.READING,
@@ -398,7 +396,6 @@ object HBAnimationCatalog {
             returnsToPrevious = false,
             availability = HBMediaAvailability.STATIC_BREATH_FALLBACK,
             provenanceAndLicense = PROVENANCE_VOZ_LATENCIA,
-            pendingAssetNote = "ASSET_PENDING: anim/scene_ler/ (pose transparente gabi-ler.png ativa com respiração)"
         ),
         HBAnimationEntry(
             id = HBCatalogStateId.SLEEPING,
@@ -421,7 +418,6 @@ object HBAnimationCatalog {
             returnsToPrevious = false,
             availability = HBMediaAvailability.STATIC_BREATH_FALLBACK,
             provenanceAndLicense = PROVENANCE_VOZ_LATENCIA,
-            pendingAssetNote = "ASSET_PENDING: anim/scene_dormir/ (pose transparente gabi-dormir.png ativa com respiração)"
         ),
         HBAnimationEntry(
             id = HBCatalogStateId.MUSIC_REACTION,
